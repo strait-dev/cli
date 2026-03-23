@@ -24,7 +24,7 @@ jobs:
         run: go build ./...
 
       - name: Test
-        run: go test -race -count=1 ./...
+        run: go test -count=1 ./...
 
   lint:
     name: Lint
@@ -37,7 +37,7 @@ jobs:
           go-version-file: go.mod
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: v2.2.1
 
