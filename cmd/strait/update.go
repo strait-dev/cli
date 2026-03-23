@@ -13,10 +13,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	updateCheckCacheDuration = 24 * time.Hour
-	githubReleasesURL        = "https://api.github.com/repos/leonardomso/strait/releases/latest"
-)
+const updateCheckCacheDuration = 24 * time.Hour
+
+// githubReleasesURL is a var (not const) so tests can override it.
+var githubReleasesURL = "https://api.github.com/repos/strait-dev/cli/releases/latest"
 
 type updateCheckCache struct {
 	LatestVersion string    `json:"latest_version"`
@@ -124,7 +124,7 @@ func newUpgradeCommand() *cobra.Command {
 
 			fmt.Printf("Current: v%s\nLatest:  v%s\n", current, latest)
 			fmt.Println("\nTo upgrade, re-install via your package manager or download from:")
-			fmt.Printf("  https://github.com/leonardomso/strait/releases/tag/v%s\n", latest)
+			fmt.Printf("  https://github.com/strait-dev/cli/releases/tag/v%s\n", latest)
 			return nil
 		},
 	}
