@@ -20,15 +20,30 @@ func newWorkflowsCommand(state *appState) *cobra.Command {
 		Short: "Manage workflows",
 	}
 
+	getCmd := newWorkflowsGetCommand(state)
+	getCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	describeCmd := newWorkflowsDescribeCommand(state)
+	describeCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	updateCmd := newWorkflowsUpdateCommand(state)
+	updateCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	deleteCmd := newWorkflowsDeleteCommand(state)
+	deleteCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	runsCmd := newWorkflowsRunsCommand(state)
+	runsCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	triggerCmd := newWorkflowsTriggerCommand(state)
+	triggerCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	visualizeCmd := newWorkflowsVisualizeCommand(state)
+	visualizeCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+
 	cmd.AddCommand(newWorkflowsListCommand(state))
-	cmd.AddCommand(newWorkflowsGetCommand(state))
-	cmd.AddCommand(newWorkflowsDescribeCommand(state))
+	cmd.AddCommand(getCmd)
+	cmd.AddCommand(describeCmd)
 	cmd.AddCommand(newWorkflowsCreateCommand(state))
-	cmd.AddCommand(newWorkflowsUpdateCommand(state))
-	cmd.AddCommand(newWorkflowsDeleteCommand(state))
-	cmd.AddCommand(newWorkflowsRunsCommand(state))
-	cmd.AddCommand(newWorkflowsTriggerCommand(state))
-	cmd.AddCommand(newWorkflowsVisualizeCommand(state))
+	cmd.AddCommand(updateCmd)
+	cmd.AddCommand(deleteCmd)
+	cmd.AddCommand(runsCmd)
+	cmd.AddCommand(triggerCmd)
+	cmd.AddCommand(visualizeCmd)
 
 	return cmd
 }

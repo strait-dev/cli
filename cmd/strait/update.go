@@ -1,12 +1,15 @@
 package main
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -105,9 +108,15 @@ func updateCachePath() string {
 }
 
 func newUpgradeCommand() *cobra.Command {
+	var apply bool
+
 	cmd := &cobra.Command{
 		Use:   "upgrade",
-		Short: "Check for CLI updates",
+		Short: "Check for CLI updates and optionally self-update",
+		Long: `Checks GitHub releases for a newer version of the Strait CLI.
+With --apply, downloads and replaces the current binary in place.`,
+		Example: `  strait upgrade
+  strait upgrade --apply`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			latest := checkForUpdate()
 			if latest == "" {
@@ -123,11 +132,123 @@ func newUpgradeCommand() *cobra.Command {
 			}
 
 			fmt.Printf("Current: v%s\nLatest:  v%s\n", current, latest)
-			fmt.Println("\nTo upgrade, re-install via your package manager or download from:")
-			fmt.Printf("  https://github.com/strait-dev/cli/releases/tag/v%s\n", latest)
-			return nil
+
+			if !apply {
+				fmt.Println("\nTo upgrade, run: strait upgrade --apply")
+				fmt.Printf("Or download from: https://github.com/strait-dev/cli/releases/tag/v%s\n", latest)
+				return nil
+			}
+
+			return selfUpdate(latest)
 		},
 	}
 
+	cmd.Flags().BoolVar(&apply, "apply", false, "download and replace the current binary")
+
 	return cmd
+}
+
+// selfUpdate downloads the latest release and replaces the current binary.
+func selfUpdate(version string) error {
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("detect binary path: %w", err)
+	}
+	execPath, err = filepath.EvalSymlinks(execPath)
+	if err != nil {
+		return fmt.Errorf("resolve binary path: %w", err)
+	}
+
+	goos := runtime.GOOS
+	goarch := runtime.GOARCH
+	archiveName := fmt.Sprintf("strait_%s_%s_%s.tar.gz", version, goos, goarch)
+	if goos == "windows" {
+		archiveName = fmt.Sprintf("strait_%s_%s_%s.zip", version, goos, goarch)
+	}
+
+	downloadURL := fmt.Sprintf("https://github.com/strait-dev/cli/releases/download/v%s/%s", version, archiveName)
+	fmt.Printf("Downloading %s...\n", downloadURL)
+
+	client := &http.Client{Timeout: 120 * time.Second}
+	resp, err := client.Get(downloadURL) //nolint:noctx // short-lived CLI command
+	if err != nil {
+		return fmt.Errorf("download release: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
+	}
+
+	// Read the archive into a temp file in the same directory as the binary
+	// so os.Rename works (same filesystem).
+	dir := filepath.Dir(execPath)
+	tmpFile, err := os.CreateTemp(dir, "strait-upgrade-*")
+	if err != nil {
+		return fmt.Errorf("create temp file: %w (try running with elevated permissions)", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	// Extract the "strait" binary from the tar.gz archive.
+	binary, err := extractBinaryFromTarGz(resp.Body, "strait")
+	if err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("extract binary: %w", err)
+	}
+
+	if _, err := tmpFile.Write(binary); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("write binary: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("close temp file: %w", err)
+	}
+
+	// Make executable.
+	if err := os.Chmod(tmpPath, 0o755); err != nil { //nolint:gosec // binary must be executable
+		return fmt.Errorf("chmod: %w", err)
+	}
+
+	// Atomic rename to replace the current binary.
+	if err := os.Rename(tmpPath, execPath); err != nil {
+		return fmt.Errorf("replace binary: %w (try running with elevated permissions)", err)
+	}
+
+	fmt.Printf("Upgraded to v%s\n", version)
+	return nil
+}
+
+// extractBinaryFromTarGz reads a tar.gz archive and returns the contents of
+// the file matching binaryName.
+func extractBinaryFromTarGz(r io.Reader, binaryName string) ([]byte, error) {
+	gz, err := gzip.NewReader(r)
+	if err != nil {
+		return nil, fmt.Errorf("open gzip: %w", err)
+	}
+	defer gz.Close()
+
+	tr := tar.NewReader(gz)
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("read tar entry: %w", err)
+		}
+
+		name := filepath.Base(hdr.Name)
+		if name == binaryName && hdr.Typeflag == tar.TypeReg {
+			// Limit read to 200MB to prevent resource exhaustion.
+			const maxBinarySize = 200 * 1024 * 1024
+			data, err := io.ReadAll(io.LimitReader(tr, maxBinarySize))
+			if err != nil {
+				return nil, fmt.Errorf("read binary: %w", err)
+			}
+			return data, nil
+		}
+	}
+
+	return nil, fmt.Errorf("binary %q not found in archive", binaryName)
 }

@@ -23,15 +23,30 @@ func newJobsCommand(state *appState) *cobra.Command {
 		Short: "Manage jobs",
 	}
 
+	getCmd := newJobsGetCommand(state)
+	getCmd.ValidArgsFunction = completeJobSlugs(state)
+	deleteCmd := newJobsDeleteCommand(state)
+	deleteCmd.ValidArgsFunction = completeJobSlugs(state)
+	triggerCmd := newJobsTriggerCommand(state)
+	triggerCmd.ValidArgsFunction = completeJobSlugs(state)
+	versionsCmd := newJobsVersionsCommand(state)
+	versionsCmd.ValidArgsFunction = completeJobSlugs(state)
+	describeCmd := newJobsDescribeCommand(state)
+	describeCmd.ValidArgsFunction = completeJobSlugs(state)
+	editCmd := newJobsEditCommand(state)
+	editCmd.ValidArgsFunction = completeJobSlugs(state)
+	bulkTriggerCmd := newJobsTriggerBulkCommand(state)
+	bulkTriggerCmd.ValidArgsFunction = completeJobSlugs(state)
+
 	cmd.AddCommand(newJobsListCommand(state))
-	cmd.AddCommand(newJobsGetCommand(state))
+	cmd.AddCommand(getCmd)
 	cmd.AddCommand(newJobsCreateCommand(state))
-	cmd.AddCommand(newJobsTriggerCommand(state))
-	cmd.AddCommand(newJobsTriggerBulkCommand(state))
-	cmd.AddCommand(newJobsDeleteCommand(state))
-	cmd.AddCommand(newJobsVersionsCommand(state))
-	cmd.AddCommand(newJobsDescribeCommand(state))
-	cmd.AddCommand(newJobsEditCommand(state))
+	cmd.AddCommand(triggerCmd)
+	cmd.AddCommand(bulkTriggerCmd)
+	cmd.AddCommand(deleteCmd)
+	cmd.AddCommand(versionsCmd)
+	cmd.AddCommand(describeCmd)
+	cmd.AddCommand(editCmd)
 
 	return cmd
 }
