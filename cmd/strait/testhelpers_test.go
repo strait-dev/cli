@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -160,4 +161,12 @@ func newRouterServer(t *testing.T, routes map[string]http.HandlerFunc) *httptest
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte(`{"error":"not found"}`))
 	}))
+}
+
+// testContextWithTimeout creates a context with a timeout and registers cleanup.
+func testContextWithTimeout(t *testing.T, d time.Duration) (context.Context, context.CancelFunc) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), d)
+	t.Cleanup(cancel)
+	return ctx, cancel
 }
