@@ -262,3 +262,96 @@ func TestRuntimes(t *testing.T) {
 		}
 	}
 }
+
+func TestGenerateSlug(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"My Job Name", "my-job-name"},
+		{"  spaces  ", "spaces"},
+		{"UPPER-CASE", "upper-case"},
+		{"special!@#chars", "specialchars"},
+		{"multiple---hyphens", "multiple-hyphens"},
+		{"trailing-", "trailing"},
+		{"-leading", "leading"},
+		{"123-numbers", "123-numbers"},
+		{"", ""},
+		{"already-slug", "already-slug"},
+		{"underscores_here", "underscores-here"},
+		{"MixedCase_And-Hyphens", "mixedcase-and-hyphens"},
+	}
+
+	for _, tc := range tests {
+		t.Run("input="+tc.input, func(t *testing.T) {
+			t.Parallel()
+			got := GenerateSlug(tc.input)
+			if got != tc.want {
+				t.Fatalf("GenerateSlug(%q) = %q, want %q", tc.input, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestValidateTimeout_Boundaries(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input   int
+		wantErr bool
+	}{
+		{0, true},
+		{1, false},
+		{86400, false},
+		{86401, true},
+		{-1, true},
+	}
+
+	for _, tc := range tests {
+		err := ValidateTimeout(tc.input)
+		if tc.wantErr && err == nil {
+			t.Errorf("ValidateTimeout(%d) expected error", tc.input)
+		}
+		if !tc.wantErr && err != nil {
+			t.Errorf("ValidateTimeout(%d) unexpected error: %v", tc.input, err)
+		}
+	}
+}
+
+func TestValidateMaxAttempts_Boundaries(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input   int
+		wantErr bool
+	}{
+		{0, true},
+		{1, false},
+		{100, false},
+		{101, true},
+		{-1, true},
+	}
+
+	for _, tc := range tests {
+		err := ValidateMaxAttempts(tc.input)
+		if tc.wantErr && err == nil {
+			t.Errorf("ValidateMaxAttempts(%d) expected error", tc.input)
+		}
+		if !tc.wantErr && err != nil {
+			t.Errorf("ValidateMaxAttempts(%d) unexpected error: %v", tc.input, err)
+		}
+	}
+}
+
+func TestValidateCron_Aliases(t *testing.T) {
+	t.Parallel()
+
+	aliases := []string{"@yearly", "@annually", "@monthly", "@weekly", "@daily", "@midnight", "@hourly"}
+	for _, alias := range aliases {
+		if err := ValidateCron(alias); err != nil {
+			t.Errorf("ValidateCron(%q) unexpected error: %v", alias, err)
+		}
+	}
+}
