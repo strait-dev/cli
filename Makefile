@@ -1,4 +1,4 @@
-.PHONY: build test lint vet fmt clean install
+.PHONY: build test lint vet fmt clean install hooks
 
 BINARY := strait
 VERSION ?= dev
@@ -35,3 +35,6 @@ tidy:
 	go mod tidy
 
 check: vet lint test
+
+hooks:
+	lefthook install

@@ -1,5 +1,6 @@
 bin/
 dist/
+strait
 *.exe
 *.exe~
 *.dll
