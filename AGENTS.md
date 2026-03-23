@@ -14,7 +14,7 @@ If instructions conflict, use this priority order:
 ## 1) What this project is
 
 - **Project**: Strait CLI
-- **Language**: Go 1.24
+- **Language**: Go 1.26
 - **Module**: `github.com/strait-dev/cli`
 - **Purpose**: Standalone command-line interface for the Strait job orchestration platform.
   - 50+ commands covering job management, workflow orchestration, deployment, local development, and real-time monitoring

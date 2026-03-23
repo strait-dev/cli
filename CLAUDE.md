@@ -12,7 +12,7 @@ Read and follow `AGENTS.md` in this repository root — it is the primary operat
 
 ## Project quick reference
 
-- **Language**: Go 1.24, module `github.com/strait-dev/cli`
+- **Language**: Go 1.26, module `github.com/strait-dev/cli`
 - **Build**: `go build ./...` or `make build`
 - **Test**: `go test ./...` or `make test`
 - **Lint**: `golangci-lint run ./...` or `make lint`

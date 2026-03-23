@@ -1,0 +1,9 @@
+pre-commit:
+  parallel: true
+  commands:
+    vet:
+      run: go vet ./...
+    lint:
+      run: golangci-lint run ./...
+    test:
+      run: go test -short -count=1 ./...
