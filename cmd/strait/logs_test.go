@@ -150,10 +150,12 @@ func TestPrintGroupedLogs_GroupsBySlug(t *testing.T) {
 	}
 
 	state := &appState{opts: &rootOptions{outputFormat: "json"}}
-	err := printGroupedLogs(state, rows)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	captureCommandOutput(t, func() {
+		err := printGroupedLogs(state, rows)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 }
 
 func TestPrintGroupedLogs_UnknownSlug(t *testing.T) {
@@ -164,10 +166,12 @@ func TestPrintGroupedLogs_UnknownSlug(t *testing.T) {
 	}
 
 	state := &appState{opts: &rootOptions{outputFormat: "json"}}
-	err := printGroupedLogs(state, rows)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	captureCommandOutput(t, func() {
+		err := printGroupedLogs(state, rows)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 }
 
 func TestPrintGroupedLogs_LevelCounts(t *testing.T) {
@@ -180,10 +184,12 @@ func TestPrintGroupedLogs_LevelCounts(t *testing.T) {
 	}
 
 	state := &appState{opts: &rootOptions{outputFormat: "json"}}
-	err := printGroupedLogs(state, rows)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	captureCommandOutput(t, func() {
+		err := printGroupedLogs(state, rows)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 }
 
 func TestSortLogRows(t *testing.T) {

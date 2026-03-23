@@ -1,6 +1,24 @@
-# Strait CLI
+<p align="center">
+  <img src=".github/header.png" alt="Strait" width="100%" />
+</p>
 
-The standalone command-line interface for the [Strait](https://strait.dev) job orchestration platform. A single Go binary with 50+ commands covering job management, workflow orchestration, deployment, local development, and real-time monitoring.
+<p align="center">
+  <strong>Command-line interface for the Strait platform</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/strait-dev/cli/actions/workflows/ci.yml"><img src="https://github.com/strait-dev/cli/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/strait-dev/cli/releases"><img src="https://img.shields.io/github/v/release/strait-dev/cli" alt="Release" /></a>
+  <a href="https://github.com/strait-dev/cli/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
+  <img src="https://img.shields.io/badge/go-1.25-00ADD8?logo=go" alt="Go" />
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="Platform" />
+</p>
+
+---
+
+The official CLI for [Strait](https://strait.dev) -- an open-source job execution and workflow orchestration platform for humans and AI agents. A single Go binary with 55+ commands covering job management, workflow orchestration, deployment, declarative GitOps, local development, and real-time monitoring.
+
+[Website](https://strait.dev) | [Platform Repo](https://github.com/strait-dev/strait) | [Documentation](https://docs.strait.dev) | [Releases](https://github.com/strait-dev/cli/releases)
 
 ## Installation
 
@@ -219,13 +237,87 @@ strait triggers send my-event-key --payload '{"data": "value"}'
 strait triggers purge --older-than 30 --dry-run
 ```
 
+### Declarative GitOps
+
+Manage infrastructure as code with declarative YAML definitions:
+
+```bash
+# Validate definition files (syntax, required fields, cron expressions, DAG acyclicity)
+strait validate -f jobs.yaml
+strait validate -f ./definitions/
+
+# Deep validation with endpoint reachability checks
+strait check -f jobs.yaml --check-endpoints
+
+# Preview what would change on the server
+strait diff -f jobs.yaml
+
+# Apply definitions to the server
+strait apply -f jobs.yaml
+strait apply -f ./definitions/ --dry-run
+
+# Export current server state as declarative YAML
+strait export all --project proj-1 --output-dir ./definitions/
+strait export jobs --project proj-1 --name-contains "payment"
+strait export workflows --project proj-1
+
+# Compile project config into a deployment manifest
+strait build --config strait.config.json --out-dir .strait
+strait build --config strait.config.json --dry-run --json
+```
+
+### Command Aliases
+
+```bash
+strait alias set trig "trigger"
+strait alias set rl "runs list --status failed"
+strait alias list
+strait alias delete trig
+```
+
+### Audit Log
+
+```bash
+strait audit --project proj-1
+strait audit --project proj-1 --actor-id user_abc --limit 20
+strait audit --project proj-1 --resource-type job --from 2026-03-01T00:00:00Z
+```
+
+### Raw API Access
+
+```bash
+strait api GET /v1/projects/proj-1/jobs
+strait api POST /v1/projects/proj-1/jobs --field 'name=my-job' --field 'endpoint=http://example.com'
+strait api DELETE /v1/projects/proj-1/jobs/my-job --header 'X-Custom:value'
+```
+
+### Account and Config
+
+```bash
+strait whoami                    # Show authenticated user, context, server, project
+strait config path               # Print config file location
+strait config edit               # Open config in $EDITOR
+strait config edit --editor vim  # Open config in specific editor
+strait open                      # Open dashboard in browser
+strait open run_abc123           # Open specific resource in browser
+```
+
 ## Local Development
 
 ```bash
+# Test a job handler locally
 strait dev test process-payment --payload '{"id": "123"}'
 strait dev test --all --config strait.config.json
+
+# Expose local server via Cloudflare tunnel
 strait dev tunnel --port 3000
+
+# Check local dev status
 strait dev status
+
+# Run a command with strait context env vars injected
+strait run -- node worker.js
+strait run --context staging -- python process.py
 ```
 
 ## Interactive Features
@@ -236,11 +328,11 @@ strait dev status
 strait tui --project proj-1
 ```
 
-Live terminal dashboard with queue metrics, run explorer, and event timeline.
+Live terminal dashboard with queue metrics, run explorer, and event timeline. Navigate with keyboard shortcuts to browse jobs, runs, and events in real time.
 
 ### Interactive Wizards
 
-When run without flags in a TTY, `strait init`, `strait create job`, and `strait create workflow` launch interactive wizards.
+When run without flags in a TTY, `strait init`, `strait create job`, and `strait create workflow` launch interactive wizards that walk through required fields with validation.
 
 ## CI/CD Integration
 
@@ -250,15 +342,81 @@ strait ci check          # Validate CI readiness
 strait deploy --ci       # Non-interactive deployment
 ```
 
-## Diagnostics
+## Monitoring and Diagnostics
 
 ```bash
+# Health and status
 strait doctor            # Comprehensive health check
 strait status            # System status overview
 strait health            # Server health
-strait trace run_abc123  # Trace run execution
-strait perf --project p  # Performance analytics
-strait top               # Queue depth monitoring
+
+# Real-time monitoring
+strait listen --project proj-1                    # Watch for new runs as they appear
+strait listen --project proj-1 --status failed    # Filter to failed runs only
+strait top                                        # Live queue depth monitoring
+strait top queue                                  # Queue-specific stats
+strait top jobs                                   # Job-specific stats
+
+# Run analysis
+strait trace run_abc123                           # ASCII timeline for a run
+strait perf --project proj-1                      # Performance analytics
+
+# Waiting and draining
+strait wait run run_abc123 --for "status=completed" --timeout 5m
+strait wait queue --empty --timeout 10m
+strait drain --timeout 5m                         # Wait for all executing runs to finish
+
+# Cleanup
+strait cleanup --project proj-1 --runs-older-than 720h --dry-run
+strait cleanup --project proj-1 --runs-older-than 720h --status failed --yes
+
+# Debugging
+strait debug bundle run_abc123                    # Collect diagnostics into shareable archive
+strait debug bundle run_abc123 --no-events        # Exclude events from bundle
+strait diagnose run_abc123                        # Run troubleshooting diagnostics
+strait profile --type cpu --duration 30s          # Capture pprof profile from server
+strait profile --type heap --output heap.prof
+```
+
+## Extensions
+
+Extend the CLI with custom executables:
+
+```bash
+strait extension list                             # Discover extensions in PATH
+strait extension install github.com/user/strait-myext
+strait extension run myext --flag value
+strait extension create my-extension              # Scaffold a new extension
+strait extension remove myext
+```
+
+Extensions are executables named `strait-<name>` in your PATH, invoked as `strait extension run <name> [args...]`.
+
+## Fixtures
+
+Manage fixture data for demos and testing:
+
+```bash
+strait fixtures create --template full --project proj-1
+strait fixtures create --template minimal
+strait fixtures clean --project proj-1
+```
+
+## Backup and Restore
+
+```bash
+strait backup create --output backup.sql --database-url $DATABASE_URL
+strait backup create --format custom --output backup.dump
+strait backup restore -i backup.sql --database-url $DATABASE_URL --yes
+strait backup restore -i backup.dump --clean --yes
+```
+
+## Self-Update
+
+```bash
+strait upgrade           # Check for new CLI version
+strait upgrade --apply   # Download and install the latest version
+strait version           # Print current version
 ```
 
 ## Output Formats
@@ -267,7 +425,9 @@ strait top               # Queue depth monitoring
 strait jobs list -o json
 strait jobs list -o yaml
 strait jobs list -o csv
+strait jobs list -o wide
 strait jobs list -o go-template --output-template '{{.ID}} {{.Status}}'
+strait jobs list -o jsonpath --output-jsonpath '{.items[*].name}'
 ```
 
 ## Shell Completion
@@ -281,7 +441,7 @@ strait completion fish > ~/.config/fish/completions/strait.fish
 ## Architecture
 
 ```
-cmd/strait/              Command definitions (50+ commands)
+cmd/strait/              Command definitions (55+ commands)
 internal/
   types/                 CLI-own types matching REST API JSON contract
   client/                HTTP API client (50+ methods)
@@ -315,4 +475,4 @@ make check         # vet + lint + test
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+MIT

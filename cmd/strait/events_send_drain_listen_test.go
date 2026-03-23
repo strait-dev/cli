@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -143,10 +145,10 @@ func TestDrain_Timeout(t *testing.T) {
 func TestListen_ReceivesRuns(t *testing.T) {
 	t.Parallel()
 	now := time.Date(2026, 3, 20, 10, 0, 0, 0, time.UTC)
-	callCount := 0
+	var callCount atomic.Int32
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"GET /v1/runs": func(w http.ResponseWriter, _ *http.Request) {
-			callCount++
+			callCount.Add(1)
 			runs := []map[string]any{
 				{"id": "run-1", "status": "completed", "attempt": 1, "triggered_by": "manual",
 					"created_at": now.Format(time.RFC3339)},
@@ -156,19 +158,18 @@ func TestListen_ReceivesRuns(t *testing.T) {
 	})
 	state := newTestState(t, srv)
 
-	// Use context with very short timeout so listen exits quickly.
 	cmd := newListenCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test", "--interval", "50ms"})
+	// Discard output to avoid racing on os.Stdout with other parallel tests.
+	cmd.SetOut(io.Discard)
 
 	// Listen runs forever, so we need a context timeout.
-	ctx, cancel := testContextWithTimeout(t, 150*time.Millisecond)
+	ctx, cancel := testContextWithTimeout(t, 500*time.Millisecond)
 	defer cancel()
 
-	captureCommandOutput(t, func() {
-		_ = cmd.ExecuteContext(ctx)
-	})
+	_ = cmd.ExecuteContext(ctx)
 
-	if callCount == 0 {
+	if callCount.Load() == 0 {
 		t.Fatal("expected at least one poll")
 	}
 }
