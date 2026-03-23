@@ -30,7 +30,7 @@ func newDevCommand(state *appState) *cobra.Command {
 		Short:   "Run local development mode",
 		Long:    "Starts local strait development runtime with optional Docker dependencies and sensible local defaults.",
 		Example: "strait dev\n  strait dev --no-docker --port 9090\n  strait dev --seed",
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if !noDocker {
 				if _, err := exec.LookPath("docker"); err != nil {
 					return fmt.Errorf("docker is required for dev mode; install docker or rerun with --no-docker")
