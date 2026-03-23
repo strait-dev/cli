@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -28,8 +29,8 @@ Optionally pass a run ID or job slug to open a specific page.`,
 
 			target := dashURL
 			if len(args) == 1 {
-				resource := args[0]
-				if strings.HasPrefix(resource, "run_") || strings.HasPrefix(resource, "run-") {
+				resource := url.PathEscape(args[0])
+				if strings.HasPrefix(args[0], "run_") || strings.HasPrefix(args[0], "run-") {
 					target = dashURL + "/runs/" + resource
 				} else {
 					target = dashURL + "/jobs/" + resource

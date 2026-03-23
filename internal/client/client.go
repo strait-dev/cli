@@ -200,7 +200,10 @@ func (c *Client) doJSONWithHeaders(ctx context.Context, method, endpoint string,
 		if out == nil {
 			return nil
 		}
-		return json.NewDecoder(resp.Body).Decode(out)
+		// Cap decoded response to 50 MB to prevent unbounded memory allocation
+		// from a malicious or misconfigured server.
+		const maxResponseBody = 50 * 1024 * 1024
+		return json.NewDecoder(io.LimitReader(resp.Body, maxResponseBody)).Decode(out)
 	}
 
 	return lastErr

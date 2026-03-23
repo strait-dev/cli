@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -154,7 +155,7 @@ func (d *tuiDashboard) run(ctx context.Context, interval time.Duration) error {
 		d.mu.Lock()
 		d.selectedRunID = r.ID
 		d.mu.Unlock()
-		go d.updateRunDetailSafe(ctx, r.ID)
+		go safeGo(func() { d.updateRunDetailSafe(ctx, r.ID) })
 	})
 
 	if err := d.refresh(ctx); err != nil {
@@ -165,7 +166,7 @@ func (d *tuiDashboard) run(ctx context.Context, interval time.Duration) error {
 	var closeOnce sync.Once
 	closeDone := func() { closeOnce.Do(func() { close(done) }) }
 
-	go d.refreshLoop(ctx, interval, done)
+	go safeGo(func() { d.refreshLoop(ctx, interval, done) })
 	d.setupInputCapture(closeDone)
 
 	if err := d.app.SetRoot(d.pages, true).SetFocus(d.runsTable).Run(); err != nil {
@@ -394,14 +395,14 @@ func (d *tuiDashboard) setupInputCapture(closeDone func()) {
 			d.app.Stop()
 			return nil
 		case 'r':
-			go func() { _ = d.refresh(context.Background()) }()
+			go safeGo(func() { _ = d.refresh(context.Background()) })
 			return nil
 		case 't':
 			d.mu.Lock()
 			runID := d.selectedRunID
 			d.mu.Unlock()
 			if runID != "" {
-				go d.triggerSelectedJob(context.Background(), runID)
+				go safeGo(func() { d.triggerSelectedJob(context.Background(), runID) })
 			}
 			return nil
 		case 'c':
@@ -409,7 +410,7 @@ func (d *tuiDashboard) setupInputCapture(closeDone func()) {
 			runID := d.selectedRunID
 			d.mu.Unlock()
 			if runID != "" {
-				go d.cancelSelectedRun(context.Background(), runID)
+				go safeGo(func() { d.cancelSelectedRun(context.Background(), runID) })
 			}
 			return nil
 		case 'j':
@@ -489,6 +490,17 @@ func (d *tuiDashboard) cancelSelectedRun(ctx context.Context, runID string) {
 		d.detailView.SetText(fmt.Sprintf("[yellow]canceled run %s[-]", runID))
 	})
 	_ = d.refresh(ctx)
+}
+
+// safeGo runs fn with panic recovery so background goroutines don't crash
+// the TUI process.
+func safeGo(fn func()) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("recovered panic in background goroutine", "panic", r)
+		}
+	}()
+	fn()
 }
 
 func tviewStatusColor(status types.RunStatus) string {

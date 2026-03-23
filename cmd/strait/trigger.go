@@ -46,7 +46,8 @@ func newTriggerCommand(state *appState) *cobra.Command {
 			} else if strings.TrimSpace(payload) != "" {
 				req.Payload = json.RawMessage(payload)
 			} else if stdinPiped() {
-				raw, err := io.ReadAll(os.Stdin)
+				const maxStdinPayload = 10 * 1024 * 1024 // 10 MB
+				raw, err := io.ReadAll(io.LimitReader(os.Stdin, maxStdinPayload))
 				if err != nil {
 					return fmt.Errorf("read stdin: %w", err)
 				}

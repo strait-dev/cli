@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -327,7 +328,8 @@ func readStdinIfAvailable() ([]byte, error) {
 	if fi.Mode()&os.ModeNamedPipe == 0 {
 		return nil, nil
 	}
-	return os.ReadFile("/dev/stdin")
+	const maxStdinPayload = 10 * 1024 * 1024 // 10 MB
+	return io.ReadAll(io.LimitReader(os.Stdin, maxStdinPayload))
 }
 
 func newDevTunnelCommand(state *appState) *cobra.Command {

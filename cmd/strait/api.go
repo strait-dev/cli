@@ -84,7 +84,9 @@ func newAPICommand(state *appState) *cobra.Command {
 			}
 			defer resp.Body.Close()
 
-			rawResp, err := io.ReadAll(resp.Body)
+			// Cap response to 10 MB to prevent unbounded memory allocation.
+			const maxResponseBytes = 10 * 1024 * 1024
+			rawResp, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 			if err != nil {
 				return err
 			}

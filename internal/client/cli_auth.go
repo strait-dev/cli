@@ -39,7 +39,7 @@ func (c *Client) RequestDeviceCode(ctx context.Context) (*DeviceCodeResponse, er
 	}
 
 	var out DeviceCodeResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 64*1024)).Decode(&out); err != nil {
 		return nil, fmt.Errorf("decode device code response: %w", err)
 	}
 	return &out, nil
@@ -93,7 +93,7 @@ func (c *Client) PollDeviceToken(ctx context.Context, deviceCode string, interva
 
 		if resp.StatusCode == http.StatusOK {
 			var out DeviceTokenResponse
-			if decErr := json.NewDecoder(resp.Body).Decode(&out); decErr != nil {
+			if decErr := json.NewDecoder(io.LimitReader(resp.Body, 64*1024)).Decode(&out); decErr != nil {
 				_ = resp.Body.Close()
 				return nil, fmt.Errorf("decode token response: %w", decErr)
 			}
