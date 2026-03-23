@@ -493,11 +493,11 @@ func (d *tuiDashboard) cancelSelectedRun(ctx context.Context, runID string) {
 }
 
 // safeGo runs fn with panic recovery so background goroutines don't crash
-// the TUI process.
+// the TUI process. Logs the panic value and a stack hint via slog.
 func safeGo(fn func()) {
 	defer func() {
 		if r := recover(); r != nil {
-			slog.Error("recovered panic in background goroutine", "panic", r)
+			slog.Error("recovered panic in background goroutine", "panic", fmt.Sprintf("%v", r))
 		}
 	}()
 	fn()

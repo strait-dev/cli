@@ -59,6 +59,13 @@ func openBrowser(url string) error {
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	go cmd.Wait() //nolint:errcheck // detached browser process
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				_ = r // swallow panic from detached browser process
+			}
+		}()
+		_ = cmd.Wait()
+	}()
 	return nil
 }

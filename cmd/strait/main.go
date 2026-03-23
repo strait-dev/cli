@@ -23,7 +23,14 @@ func main() {
 	os.Exit(code)
 }
 
-func run(ctx context.Context) int {
+func run(ctx context.Context) (exitCode int) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "fatal: %v\n", r)
+			exitCode = 2
+		}
+	}()
+
 	if err := newRootCommand().ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, formatCLIError(err))
 		return 1

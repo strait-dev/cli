@@ -157,6 +157,11 @@ func loginWithDeviceCode(cmd *cobra.Command, state *appState, targetContext, tar
 	// Start a goroutine to print dots as a progress indicator.
 	done := make(chan struct{})
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				_ = r // swallow panic in cosmetic progress goroutine
+			}
+		}()
 		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 		for {
