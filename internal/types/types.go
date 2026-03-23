@@ -380,15 +380,28 @@ type Job struct {
 
 // JobVersion represents a versioned snapshot of a job definition.
 type JobVersion struct {
-	ID          string          `json:"id"`
-	JobID       string          `json:"job_id"`
-	Version     int             `json:"version"`
-	Definition  json.RawMessage `json:"definition"`
-	ChangeNote  string          `json:"change_note,omitempty"`
-	Checksum    string          `json:"checksum,omitempty"`
-	CreatedBy   string          `json:"created_by,omitempty"`
-	PublishedAt *time.Time      `json:"published_at,omitempty"`
-	CreatedAt   time.Time       `json:"created_at"`
+	ID                  string            `json:"id"`
+	JobID               string            `json:"job_id"`
+	Version             int               `json:"version"`
+	VersionID           string            `json:"version_id,omitempty"`
+	BackwardsCompatible bool              `json:"backwards_compatible,omitempty"`
+	Name                string            `json:"name"`
+	Slug                string            `json:"slug"`
+	Description         string            `json:"description,omitempty"`
+	Cron                string            `json:"cron,omitempty"`
+	PayloadSchema       json.RawMessage   `json:"payload_schema,omitempty"`
+	Tags                map[string]string `json:"tags,omitempty"`
+	EndpointURL         string            `json:"endpoint_url"`
+	FallbackEndpointURL string            `json:"fallback_endpoint_url,omitempty"`
+	MaxAttempts         int               `json:"max_attempts"`
+	TimeoutSecs         int               `json:"timeout_secs"`
+	WebhookURL          string            `json:"webhook_url,omitempty"`
+	WebhookSecret       string            `json:"webhook_secret,omitempty"`
+	RunTTLSecs          int               `json:"run_ttl_secs,omitempty"`
+	MachinePreset       string            `json:"machine_preset,omitempty"`
+	ImageURI            string            `json:"image_uri,omitempty"`
+	Region              string            `json:"region,omitempty"`
+	CreatedAt           time.Time         `json:"created_at"`
 }
 
 // JobRun represents a job run as returned by the REST API.
