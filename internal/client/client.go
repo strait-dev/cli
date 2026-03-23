@@ -6,6 +6,8 @@ package client
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -44,11 +46,18 @@ func New(baseURL, apiKey string, timeout time.Duration) (*Client, error) {
 		timeout = 30 * time.Second
 	}
 
+	// The stream client uses no overall timeout (SSE connections are long-lived)
+	// but limits the TLS handshake and response-header phase to prevent hangs
+	// when the server accepts TCP but never responds.
+	streamTransport := http.DefaultTransport.(*http.Transport).Clone()
+	streamTransport.TLSHandshakeTimeout = 10 * time.Second
+	streamTransport.ResponseHeaderTimeout = 30 * time.Second
+
 	return &Client{
 		baseURL:    parsed.String(),
 		apiKey:     strings.TrimSpace(apiKey),
 		http:       &http.Client{Timeout: timeout},
-		streamHTTP: &http.Client{Timeout: 0},
+		streamHTTP: &http.Client{Timeout: 0, Transport: streamTransport},
 	}, nil
 }
 
@@ -165,6 +174,7 @@ func (c *Client) doJSONWithHeaders(ctx context.Context, method, endpoint string,
 			lastErr = fmt.Errorf("request failed with status %d", resp.StatusCode)
 			if attempt < maxRetries-1 {
 				backoff := time.Duration(1<<uint(attempt)) * time.Second
+				backoff += jitter(backoff / 4) // add up to 25% jitter
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
@@ -194,4 +204,15 @@ func (c *Client) doJSONWithHeaders(ctx context.Context, method, endpoint string,
 	}
 
 	return lastErr
+}
+
+// jitter returns a random duration in [0, maxJitter) using crypto/rand.
+func jitter(maxJitter time.Duration) time.Duration {
+	if maxJitter <= 0 {
+		return 0
+	}
+	var buf [8]byte
+	_, _ = rand.Read(buf[:])
+	n := binary.LittleEndian.Uint64(buf[:])
+	return time.Duration(n % uint64(maxJitter)) //nolint:gosec // jitter overflow is harmless — wraps to a valid positive duration
 }

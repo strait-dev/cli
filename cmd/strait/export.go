@@ -270,6 +270,14 @@ func writeYAMLFiles(outputDir string, docs []exportDocument, forceOverwrite bool
 			name = fmt.Sprintf("%s-%d", strings.ToLower(doc.Kind), i+1)
 		}
 		path := filepath.Join(outputDir, fmt.Sprintf("%s.yaml", name))
+
+		// Verify resolved path stays within the output directory.
+		absDir, _ := filepath.Abs(outputDir)
+		absPath, _ := filepath.Abs(path)
+		if !strings.HasPrefix(absPath, absDir+string(filepath.Separator)) {
+			return nil, fmt.Errorf("refusing to write %q: resolves outside output directory", name)
+		}
+
 		if !forceOverwrite {
 			if _, err := os.Stat(path); err == nil {
 				return nil, fmt.Errorf("refusing to overwrite existing file %q without --force-overwrite", path)
