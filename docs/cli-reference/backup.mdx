@@ -1,0 +1,46 @@
+---
+title: "backup"
+description: "Create and restore database backups"
+---
+
+## strait backup create
+
+Create a database backup using `pg_dump`.
+
+```bash
+strait backup create
+strait backup create --output backup.sql
+strait backup create --database-url postgres://user:pass@host:5432/db
+strait backup create --format custom --output backup.dump
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--output` | Output file path | auto-generated with timestamp |
+| `--database-url` | PostgreSQL connection string | `DATABASE_URL` env var |
+| `--format` | Dump format: `plain`, `custom`, `directory`, `tar` | `plain` |
+| `--verbose` | Verbose pg_dump output | `false` |
+
+<Info>
+  Requires `pg_dump` to be installed and available in your PATH.
+</Info>
+
+## strait backup restore
+
+Restore a database backup using `pg_restore` or `psql`.
+
+```bash
+strait backup restore -i backup.sql --database-url $DATABASE_URL --yes
+strait backup restore -i backup.dump --clean --yes
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `-i` | Input file path (required) | |
+| `--database-url` | PostgreSQL connection string | `DATABASE_URL` env var |
+| `--clean` | Drop existing objects before restoring | `false` |
+| `--yes` | Skip confirmation prompt | `false` |
+
+<Warning>
+  The `--clean` flag drops existing database objects before restoring. Use with caution.
+</Warning>

@@ -1,0 +1,118 @@
+---
+title: "Security and Credentials"
+description: "Where your API keys are stored, how they are transmitted, and how to rotate them"
+---
+
+## Credential storage
+
+The CLI stores API keys in your operating system's secure keyring:
+
+| OS | Backend |
+|---|---|
+| macOS | Keychain (`security` framework) |
+| Linux | Secret Service API (GNOME Keyring, KWallet) |
+| Windows | Windows Credential Manager |
+
+Credentials are stored under the service name `strait` with the context name as the account identifier (e.g. `default`, `prod`, `staging`).
+
+### Store a credential
+
+```bash
+strait login                          # Browser flow, stores automatically
+strait login --token strait_abc123    # Direct token, stores automatically
+```
+
+### View stored contexts
+
+```bash
+strait context list
+strait auth status
+```
+
+### Remove a credential
+
+```bash
+strait logout                         # Remove from active context
+strait logout --context staging       # Remove from specific context
+```
+
+## Credential resolution
+
+The CLI resolves credentials in this order:
+
+1. `--api-key` flag
+2. `STRAIT_API_KEY` environment variable
+3. System keyring (for the active context)
+
+## Stdin authentication
+
+For CI/CD and non-interactive environments, pipe the API key via stdin:
+
+```bash
+echo "$STRAIT_API_KEY" | strait login --with-token
+```
+
+The key is read from stdin, validated against the server, then stored in the keyring.
+
+<Warning>
+  Avoid storing API keys in config files. The CLI warns if `.strait.yaml` contains sensitive fields like `api_key`.
+</Warning>
+
+## What goes over the wire
+
+- API keys are sent as `Authorization: Bearer <key>` headers over HTTPS
+- The CLI validates keys by calling `GET /v1/stats` on the configured server
+- Device code flow uses OAuth-style polling against the server's auth endpoints
+- The verification URL is validated against the configured server host before opening
+
+## API key validation
+
+When you run `strait login`, the CLI validates the key before storing it:
+
+```bash
+# Key is validated against /v1/stats
+# 200 = full access
+# 403 = valid key, missing stats:read scope
+# 401 = invalid or revoked key
+```
+
+## Key rotation
+
+```bash
+# Rotate an existing API key (generates new value)
+strait api-keys rotate key_abc123
+
+# Revoke an old key
+strait api-keys revoke key_abc123
+
+# Re-authenticate with the new key
+strait login --token <new-key>
+```
+
+## Scoped keys
+
+Create keys with minimum required permissions:
+
+```bash
+# Read-only key for monitoring
+strait api-keys create --project proj_1 --name "Monitor" --scopes "jobs:read,runs:read,stats:read"
+
+# CI deploy key
+strait api-keys create --project proj_1 --name "CI Deploy" --scopes "jobs:read,jobs:write,workflows:read,workflows:write"
+
+# Trigger-only key
+strait api-keys create --project proj_1 --name "Trigger" --scopes "jobs:trigger"
+```
+
+See [API Scopes Reference](/cli-reference/scopes) for the full list.
+
+## Local secrets
+
+The CLI also stores local development secrets in the keyring under a separate service name (`strait-secrets`):
+
+```bash
+strait secrets local set MY_SECRET     # Prompts for value, stores in keyring
+strait secrets local get MY_SECRET     # Retrieves from keyring
+```
+
+These are separate from server-side secrets and never leave your machine.

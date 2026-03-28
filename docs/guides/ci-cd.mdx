@@ -1,0 +1,88 @@
+---
+title: "CI/CD Integration"
+description: "Add Strait to your CI pipeline — authenticate, validate, and deploy automatically"
+---
+
+## Generate your pipeline config
+
+Let the CLI detect your CI provider and write the workflow file for you:
+
+```bash
+strait ci setup
+strait ci setup --provider github --env production --dry-run
+```
+
+Supported providers: `github`, `gitlab`, `generic`.
+
+## Validate CI readiness
+
+Make sure your environment has everything it needs:
+
+```bash
+strait ci check
+```
+
+## Authenticate in CI
+
+No browser, no problem. Pipe your API key through stdin:
+
+<CodeGroup>
+```yaml GitHub Actions
+- name: Authenticate
+  run: echo ${{ secrets.STRAIT_API_KEY }} | strait login --with-token
+```
+
+```yaml GitLab CI
+script:
+  - echo $STRAIT_API_KEY | strait login --with-token
+```
+</CodeGroup>
+
+## Deploy in CI mode
+
+The `--ci` flag disables color and interactive prompts — safe for headless environments:
+
+```bash
+strait deploy --config strait.config.json --ci
+```
+
+## Required environment variables
+
+| Variable | What it does |
+|---|---|
+| `STRAIT_API_KEY` | Authenticates the CLI |
+| `STRAIT_SERVER` | Points to your API server |
+| `STRAIT_PROJECT` | Sets the default project |
+
+<Tip>
+  Create a dedicated API key with minimal scopes for CI usage — not your personal credentials. See [API Scopes](/cli-reference/scopes) for the right combination.
+</Tip>
+
+<Accordion title="Full GitHub Actions example">
+```yaml
+name: Deploy to Strait
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Strait CLI
+        run: |
+          curl -L https://github.com/strait-dev/cli/releases/latest/download/strait_linux_amd64.tar.gz | tar xz
+          sudo mv strait /usr/local/bin/
+
+      - name: Authenticate
+        run: echo ${{ secrets.STRAIT_API_KEY }} | strait login --with-token
+
+      - name: Validate
+        run: strait validate -f ./definitions/
+
+      - name: Deploy
+        run: strait apply -f ./definitions/ --ci
+```
+</Accordion>

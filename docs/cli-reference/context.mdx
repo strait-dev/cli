@@ -1,0 +1,43 @@
+---
+title: "context"
+description: "Manage CLI contexts for multiple environments"
+---
+
+## strait context create
+
+Create or update a named context.
+
+```bash
+strait context create prod --server https://api.strait.dev --project proj_1
+```
+
+| Flag | Description |
+|---|---|
+| `--server` | Server URL for this context |
+| `--project` | Default project ID |
+| `--format` | Default output format |
+| `--api-key` | API key for this context |
+
+## strait context use
+
+Switch to a named context.
+
+```bash
+strait context use prod
+```
+
+## strait context list
+
+List all configured contexts.
+
+```bash
+strait context list
+```
+
+## strait context current
+
+Show the currently active context.
+
+```bash
+strait context current
+```

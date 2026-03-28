@@ -1,0 +1,149 @@
+---
+title: "Scripting and Automation"
+description: "Exit codes, JSON piping, CI mode, and bash patterns for automating the CLI"
+---
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Success |
+| `1` | Command error (API failure, validation error, terminal run status) |
+| `2` | Fatal/panic |
+
+Use exit codes for conditional logic:
+
+```bash
+if strait runs watch run_abc123; then
+  echo "Run completed successfully"
+else
+  echo "Run failed"
+  exit 1
+fi
+```
+
+## CI mode
+
+Use `--ci` to disable color output and interactive prompts:
+
+```bash
+strait deploy --config strait.config.json --ci
+```
+
+CI mode is also enabled automatically when `CI=true` or `STRAIT_CI=true` is set.
+
+## JSON output for scripting
+
+Use `-o json` to get machine-readable output on stdout:
+
+```bash
+# Get a single field
+strait jobs get my-job -o json | jq -r '.id'
+
+# List and filter
+strait runs list --status failed -o json | jq -r '.[].id'
+
+# Count runs by status
+strait runs list -o json | jq 'group_by(.status) | map({status: .[0].status, count: length})'
+```
+
+<Info>
+  TTY-styled output goes to stderr. JSON goes to stdout. This means `jq` piping works without capturing stderr noise.
+</Info>
+
+## Common patterns
+
+### Trigger and wait
+
+```bash
+# Trigger a job and wait for the run to complete
+RUN_ID=$(strait trigger my-job --payload '{}' -o json | jq -r '.id')
+strait runs watch "$RUN_ID"
+```
+
+### Trigger, wait, and check logs on failure
+
+```bash
+RUN_ID=$(strait trigger my-job --payload '{}' -o json | jq -r '.id')
+if ! strait runs watch "$RUN_ID"; then
+  strait logs --run "$RUN_ID" --level error
+  exit 1
+fi
+```
+
+### Bulk replay failed runs
+
+```bash
+strait runs list --status failed --limit 50 -o json | jq -r '.[].id' | while read id; do
+  echo "Replaying $id..."
+  strait runs replay "$id"
+done
+```
+
+### Wait for queue to drain before deploy
+
+```bash
+strait drain --timeout 10m
+strait deploy --config strait.config.json --ci
+strait verify
+```
+
+### Check if a job exists before creating
+
+```bash
+if ! strait jobs get my-job -o json > /dev/null 2>&1; then
+  strait create job --name "My Job" --slug my-job --endpoint https://example.com/api
+fi
+```
+
+### Export, diff, and apply with confirmation
+
+```bash
+strait diff -f ./definitions/
+echo ""
+read -p "Apply these changes? (y/n) " confirm
+if [ "$confirm" = "y" ]; then
+  strait apply -f ./definitions/
+fi
+```
+
+## Error handling
+
+API errors go to stderr with structured messages:
+
+```bash
+# Capture stderr for error handling
+if ! OUTPUT=$(strait trigger my-job --payload '{}' 2>&1); then
+  echo "Error: $OUTPUT"
+  exit 1
+fi
+```
+
+## Quiet mode
+
+Use `-q` / `--quiet` for minimal output:
+
+```bash
+strait trigger my-job --payload '{}' -q
+```
+
+## Template output
+
+Use `go-template` or `jsonpath` for custom extraction:
+
+```bash
+# Go template
+strait jobs list -o go-template --output-template '{{.Slug}} {{.ID}}'
+
+# JSONPath
+strait jobs list -o jsonpath --output-jsonpath '{.items[*].name}'
+```
+
+## Environment setup for CI
+
+```bash
+export STRAIT_SERVER=https://api.strait.dev
+export STRAIT_PROJECT=proj_abc123
+export STRAIT_CI=true
+echo "$STRAIT_API_KEY" | strait login --with-token
+```

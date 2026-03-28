@@ -1,0 +1,28 @@
+---
+title: "ci"
+description: "CI/CD pipeline tools: setup and validation"
+---
+
+## strait ci setup
+
+Generate CI/CD pipeline configuration.
+
+```bash
+strait ci setup
+strait ci setup --provider github --env production --dry-run
+```
+
+| Flag | Description |
+|---|---|
+| `--provider` | Override auto-detection (`github`, `gitlab`, `generic`) |
+| `--env` | Deployment environment |
+| `--project` | Project ID |
+| `--dry-run` | Print generated config without writing |
+
+## strait ci check
+
+Validate CI readiness.
+
+```bash
+strait ci check
+```

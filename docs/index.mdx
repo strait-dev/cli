@@ -1,0 +1,59 @@
+---
+title: "Strait CLI"
+description: "Manage jobs, runs, workflows, and deployments from your terminal"
+---
+
+Your entire job orchestration platform, one `strait` command away. Trigger jobs, watch runs in real time, deploy with canary rollouts, and manage infrastructure as code — all without leaving the terminal.
+
+<CardGroup cols={2}>
+  <Card title="Install in 30 seconds" icon="download" href="/getting-started/installation">
+    Homebrew, Go, or pre-built binaries for every platform
+  </Card>
+  <Card title="Your first run in 5 minutes" icon="rocket" href="/getting-started/quickstart">
+    Log in, create a job, trigger it, and watch it complete
+  </Card>
+  <Card title="Set up authentication" icon="key" href="/getting-started/authentication">
+    Browser login, API keys, and multi-environment contexts
+  </Card>
+  <Card title="Explore 55+ commands" icon="terminal" href="/cli-reference">
+    Full reference for every command, flag, and output format
+  </Card>
+</CardGroup>
+
+## Everything you need, nothing you don't
+
+<CardGroup cols={3}>
+  <Card title="Jobs" icon="briefcase" href="/cli-reference/jobs">
+    Create, trigger, schedule, and edit jobs with a single command
+  </Card>
+  <Card title="Runs" icon="play" href="/cli-reference/runs">
+    Watch runs live, replay failures, diff two runs side by side
+  </Card>
+  <Card title="Workflows" icon="diagram-project" href="/cli-reference/workflows">
+    Build multi-step DAG pipelines and visualize them in ASCII
+  </Card>
+  <Card title="Deploy" icon="cloud-arrow-up" href="/guides/deployment">
+    Build, push, and ship with canary rollouts — one command
+  </Card>
+  <Card title="GitOps" icon="code-branch" href="/guides/gitops">
+    Define resources in YAML, validate, diff, and apply
+  </Card>
+  <Card title="Live monitoring" icon="chart-line" href="/guides/monitoring">
+    TUI dashboard, streaming logs, and queue depth — in your terminal
+  </Card>
+</CardGroup>
+
+## Plays nice with your tools
+
+Every command outputs table for humans and JSON for machines. Pipe to `jq`, feed into scripts, or use in CI — the CLI handles both:
+
+```bash
+strait jobs list                    # Pretty table in your terminal
+strait jobs list -o json | jq '.'  # Clean JSON for scripts
+```
+
+<Info>
+  Styled output goes to stderr. Data goes to stdout. So you can pipe JSON while still seeing progress messages — no parsing tricks needed.
+</Info>
+
+Six output formats built in: `table`, `json`, `yaml`, `csv`, `go-template`, `jsonpath`.

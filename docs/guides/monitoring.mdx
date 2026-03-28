@@ -1,0 +1,88 @@
+---
+title: "Monitoring and Diagnostics"
+description: "Watch your infrastructure in real time, diagnose issues, and clean up old data"
+---
+
+## Is everything healthy?
+
+Three commands, three levels of depth:
+
+```bash
+strait health            # Is the server up?
+strait status            # What does the queue look like?
+strait doctor            # Full system checkup (config, auth, connectivity)
+```
+
+`doctor` runs checks in parallel and tells you what is wrong and how to fix it:
+
+```bash
+strait doctor --verbose          # Detailed output
+strait doctor --json             # Machine-readable
+strait doctor --fix              # Auto-fix common issues
+```
+
+## Watch runs as they happen
+
+### Stream new runs
+
+```bash
+strait listen --project proj_1
+strait listen --project proj_1 --status failed
+```
+
+### Live queue depth
+
+```bash
+strait top                            # Queue snapshot
+strait top --watch                    # Auto-refresh
+strait top jobs --project proj_1      # Per-job breakdown
+```
+
+### Full dashboard
+
+Open the interactive TUI with queue metrics, a run explorer, and an event timeline:
+
+```bash
+strait tui --project proj_1
+```
+
+## Analyze past runs
+
+```bash
+strait trace run_abc123               # ASCII timeline of a run's lifecycle
+strait perf --project proj_1          # Throughput and slowest jobs
+strait stats                          # Queue depth snapshot
+```
+
+## Wait for things
+
+Block your script until a condition is met:
+
+```bash
+strait wait run run_abc123 --for "status=completed" --timeout 5m
+strait wait queue --empty --timeout 10m
+strait drain --timeout 5m                # Wait for all executing runs to finish
+```
+
+<Info>
+  `drain` is your best friend before maintenance windows. It blocks until the executing count hits zero.
+</Info>
+
+## Clean up old data
+
+```bash
+strait cleanup --project proj_1 --runs-older-than 720h --dry-run    # Preview
+strait cleanup --project proj_1 --runs-older-than 720h --yes         # Execute
+```
+
+<Warning>
+  Cleanup permanently deletes run records. Always `--dry-run` first.
+</Warning>
+
+## Debug a specific run
+
+```bash
+strait diagnose run run_abc123        # Troubleshooting diagnostics
+strait debug bundle run_abc123        # Package everything into a zip
+strait profile --type cpu --duration 30s  # Capture a pprof profile
+```

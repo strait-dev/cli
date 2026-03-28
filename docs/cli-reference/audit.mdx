@@ -1,0 +1,25 @@
+---
+title: "audit"
+description: "View audit log events for a project"
+---
+
+## strait audit
+
+List audit events with optional filters.
+
+```bash
+strait audit --project proj_1
+strait audit --project proj_1 --actor-id user_abc --limit 20
+strait audit --project proj_1 --resource-type job --from 2026-03-01T00:00:00Z
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--project` | Project ID | from config |
+| `--actor-id` | Filter by user who performed the action | |
+| `--resource-type` | Filter by resource type (e.g. `job`, `workflow`) | |
+| `--resource-id` | Filter by specific resource ID | |
+| `--from` | Start time (RFC3339 or duration like `24h`) | |
+| `--to` | End time (RFC3339 or duration) | |
+| `--order` | Sort order (`asc` or `desc`) | `desc` |
+| `--limit` | Max entries to return | `50` |

@@ -1,0 +1,30 @@
+---
+title: "project"
+description: "Export and import project bundles for GitOps workflows"
+---
+
+## strait project export
+
+Export all jobs, workflows, and resources from a project into a single YAML bundle.
+
+```bash
+strait project export --project proj_1
+strait project export --project proj_1 --output bundle.yaml
+```
+
+| Flag | Description |
+|---|---|
+| `--project` | Project ID |
+| `--output` | Output file path |
+
+## strait project import
+
+Import a project bundle YAML file to the server.
+
+```bash
+strait project import --input bundle.yaml
+```
+
+| Flag | Description |
+|---|---|
+| `--input` | Input bundle file path |

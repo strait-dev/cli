@@ -1,0 +1,77 @@
+---
+title: "Logs and Events"
+description: "View run output, stream logs in real time, and search across jobs"
+---
+
+## View logs for a run
+
+```bash
+strait logs --run run_abc123
+```
+
+## Stream in real time
+
+Follow logs as they come in:
+
+```bash
+strait logs --follow --run run_abc123
+```
+
+## Filter what you see
+
+| Flag | What it does |
+|---|---|
+| `--level` | Show only `debug`, `info`, `warn`, or `error` |
+| `--search` | Case-insensitive text search across messages |
+| `--since` | Time window (e.g. `1h`, `30m`) |
+| `--tail` | Show only the last N events |
+
+```bash
+strait logs --run run_abc123 --level error
+strait logs --run run_abc123 --search "timeout"
+strait logs --run run_abc123 --since 1h --tail 20
+```
+
+## Aggregate logs across jobs
+
+See logs from all recent runs in a project, optionally filtered by job slug pattern:
+
+```bash
+strait logs --project proj_1
+strait logs --project proj_1 --job "payment-*"
+strait logs --project proj_1 --job "payment-*" --group
+```
+
+The `--group` flag gives you a summary breakdown by job.
+
+## Pipe to other tools
+
+When piped, output auto-switches to newline-delimited JSON:
+
+```bash
+strait logs --run run_abc123 --output ndjson | jq '.message'
+```
+
+## Alternative: via runs subcommand
+
+Same data, different entry point:
+
+```bash
+strait runs logs run_abc123
+strait runs logs run_abc123 --follow --level error
+```
+
+## Inspect structured events
+
+```bash
+strait events --run run_abc123
+strait events --run run_abc123 --level error --type log
+```
+
+## Send a custom event
+
+Push a raw event to the server:
+
+```bash
+strait send <event-type> --data '{"key": "value"}'
+```

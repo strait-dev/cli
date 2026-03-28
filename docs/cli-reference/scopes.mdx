@@ -1,0 +1,78 @@
+---
+title: "API Scopes"
+description: "What each scope grants and which ones to use for common use cases"
+---
+
+Scopes control what an API key can do. Pass them to `strait api-keys create --scopes`.
+
+## Available scopes
+
+| Scope | Description |
+|---|---|
+| `*` | Full access (all permissions) |
+| `jobs:read` | List and get jobs |
+| `jobs:write` | Create, update, and delete jobs |
+| `jobs:trigger` | Trigger job runs |
+| `runs:read` | List and get runs, events, and logs |
+| `runs:write` | Cancel and manage runs |
+| `workflows:read` | List and get workflows |
+| `workflows:write` | Create, update, and delete workflows |
+| `workflows:trigger` | Trigger workflow runs |
+| `secrets:read` | List secrets (values are never returned) |
+| `secrets:write` | Create and delete secrets |
+| `api-keys:manage` | Create, rotate, and revoke API keys |
+| `rbac:manage` | Manage team members and roles |
+| `stats:read` | Read queue statistics and analytics |
+| `projects:read` | Read project configuration |
+| `projects:write` | Update project settings |
+| `projects:manage` | Full project management (includes delete) |
+
+## Scope combinations by use case
+
+<Tabs>
+  <Tab title="Read-only monitoring">
+    ```bash
+    strait api-keys create --project proj_1 \
+      --name "Monitor" \
+      --scopes "jobs:read,runs:read,stats:read"
+    ```
+  </Tab>
+
+  <Tab title="CI/CD deploy">
+    ```bash
+    strait api-keys create --project proj_1 \
+      --name "CI Deploy" \
+      --scopes "jobs:read,jobs:write,workflows:read,workflows:write,secrets:read"
+    ```
+  </Tab>
+
+  <Tab title="Trigger only">
+    ```bash
+    strait api-keys create --project proj_1 \
+      --name "Webhook Trigger" \
+      --scopes "jobs:trigger"
+    ```
+  </Tab>
+
+  <Tab title="Full access">
+    ```bash
+    strait api-keys create --project proj_1 \
+      --name "Admin" \
+      --scopes "*"
+    ```
+  </Tab>
+</Tabs>
+
+## Multiple scopes
+
+Pass scopes as a comma-separated string:
+
+```bash
+strait api-keys create --project proj_1 \
+  --name "Custom Key" \
+  --scopes "jobs:read,jobs:write,runs:read,stats:read"
+```
+
+<Tip>
+  Follow the principle of least privilege. Give each key only the scopes it needs.
+</Tip>

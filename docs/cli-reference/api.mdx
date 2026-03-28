@@ -1,0 +1,29 @@
+---
+title: "api"
+description: "Call the Strait REST API directly"
+---
+
+## strait api
+
+Make raw HTTP requests to the Strait API using your current authentication.
+
+```bash
+strait api <METHOD> <PATH>
+```
+
+### Examples
+
+```bash
+strait api GET /v1/projects/proj_1/jobs
+strait api POST /v1/projects/proj_1/jobs --field 'name=my-job' --field 'endpoint=http://example.com'
+strait api DELETE /v1/projects/proj_1/jobs/my-job --header 'X-Custom:value'
+```
+
+| Flag | Description |
+|---|---|
+| `--field` | Request body field in `key=value` form (repeatable) |
+| `--header` | Custom HTTP header (repeatable) |
+
+<Warning>
+  Only API paths are allowed (e.g. `/v1/projects/...`). Absolute URLs are rejected. The CLI automatically prepends your configured server URL.
+</Warning>

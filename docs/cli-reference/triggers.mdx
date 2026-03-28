@@ -1,0 +1,48 @@
+---
+title: "triggers"
+description: "Manage event-based triggers"
+---
+
+## strait triggers list
+
+List event triggers for a project.
+
+```bash
+strait triggers list --project proj_1
+strait triggers list --project proj_1 --status waiting
+```
+
+| Flag | Description |
+|---|---|
+| `--project` | Project ID (required) |
+| `--status` | Filter: `waiting`, `received`, `timed_out`, `canceled` |
+
+## strait triggers get
+
+Get a trigger by event key.
+
+```bash
+strait triggers get <event-key>
+```
+
+## strait triggers send
+
+Send an event to a trigger.
+
+```bash
+strait triggers send <event-key> --payload '{"data": "value"}'
+```
+
+## strait triggers purge
+
+Purge old triggers.
+
+```bash
+strait triggers purge --older-than 30 --dry-run
+strait triggers purge --older-than 30
+```
+
+| Flag | Description |
+|---|---|
+| `--older-than` | Age in days |
+| `--dry-run` | Preview without deleting |

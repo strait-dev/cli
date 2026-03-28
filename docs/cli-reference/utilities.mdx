@@ -1,0 +1,351 @@
+---
+title: "Utilities"
+description: "Health checks, diagnostics, profiling, cleanup, and other utility commands"
+---
+
+## Health and diagnostics
+
+### strait doctor
+
+Run comprehensive parallel health checks across CLI, config, connectivity, and auth.
+
+```bash
+strait doctor
+strait doctor --verbose
+strait doctor --json
+strait doctor --fix
+strait doctor --check-endpoints
+strait doctor --check-manifests ./definitions/
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--verbose` | Detailed output | `false` |
+| `--json` | Machine-readable JSON output | `false` |
+| `--fix` | Auto-fix common issues | `false` |
+| `--check-endpoints` | Test job endpoint reachability | `false` |
+| `--check-manifests` | Validate manifest files in directory | |
+
+### strait diagnose
+
+Run connectivity and configuration checks with fix suggestions.
+
+```bash
+strait diagnose
+strait diagnose --verbose
+strait diagnose --check-readiness
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--verbose` | Detailed output | `false` |
+| `--check-readiness` | Include server readiness check | `false` |
+
+### strait health
+
+Check server health endpoint.
+
+```bash
+strait health
+strait health --ready
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--ready` | Check readiness endpoint instead of health | `false` |
+
+### strait status
+
+Show project status overview (queue stats + recent failures).
+
+```bash
+strait status
+strait status --project proj_1
+```
+
+| Flag | Description |
+|---|---|
+| `--project` | Project ID |
+
+### strait verify
+
+Run post-deploy verification checks (health, readiness, stats, auth).
+
+```bash
+strait verify
+```
+
+## Monitoring
+
+### strait top
+
+Live resource usage stats. Defaults to `top queue` when run without subcommand.
+
+```bash
+strait top
+strait top --watch
+```
+
+### strait top queue
+
+Show queue depth snapshot.
+
+```bash
+strait top queue
+strait top queue --watch --interval 5s
+strait top queue --project proj_1
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--watch` | Refresh continuously | `false` |
+| `--interval` | Refresh interval | `2s` |
+| `--project` | Project ID for project-scoped breakdown | |
+| `--limit` | Max runs sampled for breakdown | `500` |
+
+### strait top jobs
+
+Show job activity leaderboard (active, failed, total runs per job).
+
+```bash
+strait top jobs --project proj_1
+strait top jobs --project proj_1 --watch
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--project` | Project ID (required) | |
+| `--limit` | Max jobs to show | `10` |
+| `--watch` | Refresh continuously | `false` |
+| `--interval` | Refresh interval | `2s` |
+
+### strait trace
+
+Show ASCII timeline visualization of a run's lifecycle events.
+
+```bash
+strait trace <run-id>
+strait trace <run-id> --show-payload --show-result
+strait trace <run-id> --event-limit 100
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--show-payload` | Include run payload in output | `false` |
+| `--show-result` | Include run result in output | `false` |
+| `--event-limit` | Max events to display | `50` |
+
+### strait perf
+
+Show project performance analytics (throughput, health summary, slowest jobs).
+
+```bash
+strait perf --project proj_1
+strait perf --project proj_1 --period 7d
+strait perf --project proj_1 --json
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--project` | Project ID | from config |
+| `--period` | Analysis window (e.g. `24h`, `7d`) | `24h` |
+| `--json` | Machine-readable JSON output | `false` |
+
+### strait stats
+
+Show queue statistics (queued, executing, delayed counts).
+
+```bash
+strait stats
+```
+
+### strait listen
+
+Watch for new runs in real time. Deduplicates by run ID.
+
+```bash
+strait listen --project proj_1
+strait listen --project proj_1 --status failed
+strait listen --interval 3s
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--project` | Project ID | from config |
+| `--status` | Status filter | |
+| `--interval` | Poll interval | `2s` |
+| `--limit` | Max runs per poll | `50` |
+
+## Waiting
+
+### strait wait run
+
+Block until a run reaches a specific condition.
+
+```bash
+strait wait run <run-id> --for "status=completed" --timeout 5m
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--for` | Condition expression (e.g. `status=completed`) | |
+| `--timeout` | Max wait duration | `5m` |
+| `--interval` | Poll interval | `2s` |
+
+### strait wait queue
+
+Block until the queue reaches a condition.
+
+```bash
+strait wait queue --empty --timeout 10m
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--empty` | Wait until queue is empty | `false` |
+| `--timeout` | Max wait duration | `10m` |
+| `--interval` | Poll interval | `2s` |
+
+### strait drain
+
+Wait for all executing runs to finish. Useful before maintenance.
+
+```bash
+strait drain
+strait drain --timeout 5m
+strait drain --interval 3s --timeout 10m
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--timeout` | Max wait duration | `5m` |
+| `--interval` | Poll interval | `2s` |
+
+## Maintenance
+
+### strait cleanup
+
+Remove old runs in terminal states.
+
+```bash
+strait cleanup --project proj_1 --runs-older-than 720h --dry-run
+strait cleanup --project proj_1 --runs-older-than 720h --status failed --yes
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--project` | Project ID | from config |
+| `--runs-older-than` | Age threshold (required, e.g. `720h`) | |
+| `--status` | Target specific status | all terminal |
+| `--dry-run` | Preview without deleting | `false` |
+| `--yes` | Skip confirmation | `false` |
+| `--limit` | Max runs to consider per status | `500` |
+
+## Debugging
+
+### strait debug bundle
+
+Collect run diagnostics into a shareable zip archive.
+
+```bash
+strait debug bundle <run-id>
+strait debug bundle <run-id> --no-events
+strait debug bundle <run-id> --output debug.zip
+```
+
+| Flag | Description |
+|---|---|
+| `--no-events` | Exclude events from bundle |
+| `--output` | Output file path |
+
+### strait profile
+
+Capture pprof profile from the running server.
+
+```bash
+strait profile
+strait profile --type cpu --duration 30s --output cpu.prof
+strait profile --type heap --output heap.prof
+strait profile --type goroutine
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--type` | Profile type: `cpu`, `heap`, `goroutine`, `allocs`, `block`, `mutex`, `threadcreate` | `cpu` |
+| `--duration` | Profile duration (for CPU) | `30s` |
+| `--output` | Output file path | auto-generated |
+
+## Other
+
+### strait version
+
+```bash
+strait version
+strait version --short
+strait version --json
+strait version --check-server
+strait version --check-update
+```
+
+| Flag | Description |
+|---|---|
+| `--short` | Print only the version number |
+| `--json` | JSON output |
+| `--check-server` | Check server health endpoint |
+| `--check-update` | Check for newer CLI version |
+
+### strait upgrade
+
+Upgrade the CLI to the latest version.
+
+```bash
+strait upgrade
+```
+
+### strait init
+
+Initialize a new Strait project in the current directory.
+
+```bash
+strait init
+```
+
+### strait open
+
+Open the Strait dashboard in your browser. Optionally pass a run ID or job slug.
+
+```bash
+strait open
+strait open run_abc123
+strait open my-job
+```
+
+### strait alias
+
+Manage command aliases.
+
+```bash
+strait alias set trig "trigger"
+strait alias set rl "runs list --status failed"
+strait alias list
+strait alias delete trig
+```
+
+### strait completion
+
+Generate shell completion scripts.
+
+```bash
+strait completion bash
+strait completion zsh
+strait completion fish
+strait completion powershell
+```
+
+### strait docs
+
+Open documentation in the browser.
+
+```bash
+strait docs
+```

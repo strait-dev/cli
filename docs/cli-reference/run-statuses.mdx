@@ -1,0 +1,111 @@
+---
+title: "Run Statuses"
+description: "Every status a run can be in, what it means, and how to filter by it"
+---
+
+## Job run statuses
+
+| Status | Terminal | Description |
+|---|---|---|
+| `delayed` | No | Scheduled for future execution |
+| `queued` | No | Waiting in the queue |
+| `dequeued` | No | Picked up by a worker |
+| `executing` | No | Currently running |
+| `waiting` | No | Paused, waiting for an event |
+| `paused` | No | Manually paused |
+| `replay_staged` | No | Queued for replay |
+| `completed` | Yes | Finished successfully |
+| `failed` | Yes | Finished with an error |
+| `timed_out` | Yes | Exceeded the timeout |
+| `crashed` | Yes | Worker crashed during execution |
+| `system_failed` | Yes | Infrastructure-level failure |
+| `canceled` | Yes | Manually canceled |
+| `expired` | Yes | TTL expired before execution |
+| `dead_letter` | No | Moved to dead letter queue after max retries |
+
+### Lifecycle
+
+```
+delayed --> queued --> dequeued --> executing --> completed
+                                           |--> failed
+                                           |--> timed_out
+                                           |--> crashed
+                                           |--> system_failed
+                          |
+                          +--> canceled (at any active stage)
+                          +--> expired (if TTL elapses before execution)
+```
+
+### Using in CLI commands
+
+```bash
+# Filter runs by status
+strait runs list --status failed
+strait runs list --status executing
+
+# Cancel runs by status
+strait runs cancel --all --status executing --project proj_1 --yes
+
+# Listen for specific statuses
+strait listen --project proj_1 --status failed
+
+# Cleanup by status
+strait cleanup --project proj_1 --runs-older-than 720h --status failed
+
+# Wait for a specific status
+strait wait run run_abc123 --for "status=completed"
+```
+
+### Terminal vs active
+
+Terminal statuses mean the run is finished and will not change. Active statuses mean it is still in progress.
+
+- `strait runs watch` exits when the run reaches any terminal status
+- `strait drain` waits until `executing` count reaches 0
+- `strait cleanup` only targets terminal statuses by default
+
+## Workflow run statuses
+
+| Status | Terminal | Description |
+|---|---|---|
+| `pending` | No | Created, not yet started |
+| `running` | No | Steps are executing |
+| `paused` | No | Manually paused |
+| `completed` | Yes | All steps finished successfully |
+| `failed` | Yes | A step failed (depending on failure policy) |
+| `timed_out` | Yes | Workflow exceeded timeout |
+| `canceled` | Yes | Manually canceled |
+
+## Workflow step statuses
+
+| Status | Terminal | Description |
+|---|---|---|
+| `pending` | No | Not yet started |
+| `waiting` | No | Waiting for dependencies |
+| `running` | No | Executing |
+| `completed` | Yes | Finished successfully |
+| `failed` | Yes | Step failed |
+| `skipped` | Yes | Skipped due to dependency failure |
+| `canceled` | Yes | Canceled |
+
+### Step failure policies
+
+| Policy | Behavior |
+|---|---|
+| `fail_workflow` | Fail the entire workflow (default) |
+| `skip_dependents` | Skip downstream steps, continue others |
+| `continue` | Mark step failed but continue all other steps |
+
+## Trigger sources
+
+Each run records how it was triggered:
+
+| Source | Description |
+|---|---|
+| `manual` | Triggered via CLI or API |
+| `cron` | Triggered by cron schedule |
+| `workflow` | Triggered as part of a workflow |
+| `retry` | Automatic retry after failure |
+| `spawn` | Spawned by another run |
+| `debounce` | Debounced trigger |
+| `job_completion` | Triggered by another job's completion |

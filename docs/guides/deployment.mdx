@@ -1,0 +1,81 @@
+---
+title: "Deployment"
+description: "Build Docker images, push to a registry, and deploy — all in one command"
+---
+
+## Deploy a single job
+
+Point at a Dockerfile and go:
+
+```bash
+strait deploy --job my-job --dockerfile ./Dockerfile
+```
+
+The CLI builds the image, pushes it to the registry, and updates the job. One command.
+
+### All the knobs
+
+| Flag | What it does | Default |
+|---|---|---|
+| `--dockerfile` | Path to Dockerfile | `./Dockerfile` |
+| `--tag` | Image tag | git SHA or `latest` |
+| `--registry` | Container registry | `registry.fly.io` |
+| `--image` | Skip the build — use a pre-built image | |
+| `--region` | Region override | |
+| `--preset` | Machine preset override | |
+| `--env` | Target environment | `production` |
+| `--strategy` | `direct` or `canary` | `direct` |
+| `--canary-percent` | Traffic percentage for canary (1-99) | |
+| `--canary-duration` | How long to run canary before full rollout | |
+| `--build-arg` | Docker build args (pass multiple times) | |
+| `--cache` | Use Docker layer caching | `true` |
+| `--push` | Push image after building | `true` |
+| `--dry-run` | Show the plan without executing | `false` |
+
+## Deploy from a manifest
+
+Got a config file with all your jobs defined? Deploy them all at once:
+
+```bash
+strait deploy --config strait.config.json
+```
+
+Preview first with `--dry-run`:
+
+```bash
+strait deploy --config strait.config.json --dry-run
+```
+
+## Ship with canary rollouts
+
+Roll changes out to 10% of traffic, watch for failures, then promote:
+
+```bash
+strait deploy --config strait.config.json \
+  --strategy canary \
+  --canary-percent 10 \
+  --canary-duration 15m
+```
+
+## Stage, promote, and rollback
+
+For more control, create a draft deployment and promote it when you are ready:
+
+```bash
+strait deploy create --config strait.config.json --artifact-uri registry.example.com/app:v1.0
+strait deploy finalize dep_abc123
+strait deploy promote dep_abc123
+```
+
+Something wrong? Roll back:
+
+```bash
+strait deploy rollback --to dep_abc123
+```
+
+## Check your deployments
+
+```bash
+strait deploy list --project proj_1
+strait verify                        # Post-deploy health checks
+```

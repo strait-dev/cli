@@ -1,0 +1,55 @@
+---
+title: "auth"
+description: "Authentication commands: login, logout, whoami, auth status"
+---
+
+## strait login
+
+Authenticate with the Strait API.
+
+```bash
+strait login                          # Browser-based device code flow
+strait login --token <api-key>        # Direct token
+echo $KEY | strait login --with-token # Read from stdin
+strait login --browser                # Open dashboard to create key
+strait login --no-browser             # Skip browser, manual entry
+```
+
+| Flag | Description |
+|---|---|
+| `--token` | API key for direct authentication |
+| `--with-token` | Read API key from stdin |
+| `--api-key` | API key (deprecated, use `--token`) |
+| `--context` | Context to save API key under |
+| `--server` | Server URL to validate against |
+| `--browser` | Open dashboard API key page |
+| `--no-browser` | Do not open browser |
+
+## strait logout
+
+Remove stored API key from the system keyring.
+
+```bash
+strait logout
+strait logout --context staging
+```
+
+| Flag | Description |
+|---|---|
+| `--context` | Context to remove API key from |
+
+## strait whoami
+
+Show the authenticated user, active context, server, and project.
+
+```bash
+strait whoami
+```
+
+## strait auth status
+
+Show current authentication state.
+
+```bash
+strait auth status
+```

@@ -1,0 +1,240 @@
+---
+title: "Examples and Recipes"
+description: "Copy-paste workflows for the things you actually do every day"
+---
+
+## Deploy a new version with canary rollout
+
+<Steps>
+  <Step title="Build and deploy with canary">
+    ```bash
+    strait deploy --config strait.config.json \
+      --strategy canary \
+      --canary-percent 10 \
+      --canary-duration 15m
+    ```
+  </Step>
+
+  <Step title="Monitor the canary">
+    ```bash
+    strait listen --project proj_1 --status failed
+    ```
+  </Step>
+
+  <Step title="Check health">
+    ```bash
+    strait verify
+    ```
+  </Step>
+
+  <Step title="Promote or rollback">
+    ```bash
+    # If healthy:
+    strait deploy promote dep_abc123
+
+    # If issues:
+    strait deploy rollback --to dep_previous
+    ```
+  </Step>
+</Steps>
+
+## Set up a cron job with retries
+
+```bash
+# Create a job that runs every 10 minutes, retries 3 times, 2-minute timeout
+strait create job \
+  --name "Sync Inventory" \
+  --slug sync-inventory \
+  --endpoint https://api.example.com/jobs/sync \
+  --cron "*/10 * * * *" \
+  --timeout 120 \
+  --max-attempts 3 \
+  --project proj_1
+
+# Verify it was created
+strait jobs describe sync-inventory
+
+# Watch the next run
+strait listen --project proj_1
+```
+
+## Debug a failed run
+
+<Steps>
+  <Step title="Find the failed run">
+    ```bash
+    strait runs list --project proj_1 --status failed --limit 5
+    ```
+  </Step>
+
+  <Step title="Inspect the run">
+    ```bash
+    strait runs get run_abc123
+    ```
+  </Step>
+
+  <Step title="View the timeline">
+    ```bash
+    strait trace run_abc123 --show-payload --show-result
+    ```
+  </Step>
+
+  <Step title="Check the logs">
+    ```bash
+    strait logs --run run_abc123 --level error
+    ```
+  </Step>
+
+  <Step title="Collect full diagnostics">
+    ```bash
+    strait debug bundle run_abc123
+    ```
+  </Step>
+
+  <Step title="Replay once fixed">
+    ```bash
+    strait runs replay run_abc123 --wait
+    ```
+  </Step>
+</Steps>
+
+## GitOps workflow from scratch
+
+<Steps>
+  <Step title="Export current state">
+    ```bash
+    strait export all --project proj_1 --output-dir ./definitions/
+    ```
+  </Step>
+
+  <Step title="Edit definitions">
+    Modify the YAML files in `./definitions/` as needed.
+  </Step>
+
+  <Step title="Validate">
+    ```bash
+    strait check -f ./definitions/ --check-endpoints
+    ```
+  </Step>
+
+  <Step title="Preview changes">
+    ```bash
+    strait diff -f ./definitions/
+    ```
+  </Step>
+
+  <Step title="Apply">
+    ```bash
+    strait apply -f ./definitions/
+    ```
+  </Step>
+</Steps>
+
+## Migrate between environments
+
+```bash
+# Export from staging
+strait export all --project proj_staging --output-dir ./definitions/ --context staging
+
+# Preview what would change in production
+strait diff -f ./definitions/ --context prod
+
+# Apply to production
+strait apply -f ./definitions/ --context prod
+```
+
+## Bulk trigger with payloads from a file
+
+```bash
+# Create items.json
+cat > items.json << 'EOF'
+[
+  {"payload": {"user_id": "u1", "action": "sync"}},
+  {"payload": {"user_id": "u2", "action": "sync"}},
+  {"payload": {"user_id": "u3", "action": "sync"}}
+]
+EOF
+
+# Trigger all at once
+strait jobs trigger-bulk sync-users --items-file items.json
+
+# Watch for completions
+strait listen --project proj_1
+```
+
+## CI/CD pipeline with validation gate
+
+```bash
+# In your CI pipeline:
+strait login --with-token <<< "$STRAIT_API_KEY"
+strait validate -f ./definitions/
+strait check -f ./definitions/ --check-endpoints
+strait diff -f ./definitions/
+strait apply -f ./definitions/ --ci
+strait verify
+```
+
+## Monitor queue health during maintenance
+
+<Steps>
+  <Step title="Check current queue depth">
+    ```bash
+    strait stats
+    ```
+  </Step>
+
+  <Step title="Drain executing runs">
+    ```bash
+    strait drain --timeout 10m
+    ```
+  </Step>
+
+  <Step title="Perform maintenance">
+    Your maintenance work here.
+  </Step>
+
+  <Step title="Verify recovery">
+    ```bash
+    strait doctor --verbose
+    strait verify
+    ```
+  </Step>
+</Steps>
+
+## Compare two runs to diagnose regressions
+
+```bash
+# Find a good run and a bad run
+strait runs list --project proj_1 --limit 20
+
+# Compare them
+strait runs diff run_good run_bad --show-payload --show-events
+```
+
+## Aggregate logs across jobs
+
+```bash
+# View logs for all payment-related jobs
+strait logs --project proj_1 --job "payment-*" --level error --since 1h
+
+# Group by job for a summary view
+strait logs --project proj_1 --job "payment-*" --group
+
+# Pipe to jq for custom analysis
+strait logs --project proj_1 --output ndjson | jq 'select(.level == "error") | .message'
+```
+
+## Script with JSON output
+
+```bash
+# Get failed run IDs as JSON and process them
+strait runs list --status failed --limit 10 -o json | jq -r '.[].id' | while read id; do
+  echo "Replaying $id..."
+  strait runs replay "$id"
+done
+
+# Check if a job exists before creating
+if ! strait jobs get my-job -o json > /dev/null 2>&1; then
+  strait create job --name "My Job" --slug my-job --endpoint https://example.com/api
+fi
+```

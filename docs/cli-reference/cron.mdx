@@ -1,0 +1,81 @@
+---
+title: "Cron Expressions"
+description: "The cheatsheet you will keep coming back to for --cron schedules"
+---
+
+Cron expressions set recurring schedules. You will use them with `strait create job --cron`, `strait jobs edit --field "cron=..."`, and in YAML manifests.
+
+## Format
+
+```
+* * * * *
+| | | | |
+| | | | +-- Day of week (0-6, Sun=0)
+| | | +---- Month (1-12)
+| | +------ Day of month (1-31)
+| +-------- Hour (0-23)
++---------- Minute (0-59)
+```
+
+## Common schedules
+
+| Expression | Description |
+|---|---|
+| `* * * * *` | Every minute |
+| `*/5 * * * *` | Every 5 minutes |
+| `*/10 * * * *` | Every 10 minutes |
+| `*/15 * * * *` | Every 15 minutes |
+| `*/30 * * * *` | Every 30 minutes |
+| `0 * * * *` | Every hour (on the hour) |
+| `0 */2 * * *` | Every 2 hours |
+| `0 */6 * * *` | Every 6 hours |
+| `0 0 * * *` | Daily at midnight |
+| `0 9 * * *` | Daily at 9:00 AM |
+| `0 9 * * 1-5` | Weekdays at 9:00 AM |
+| `0 0 * * 0` | Weekly on Sunday at midnight |
+| `0 9 * * 1` | Weekly on Monday at 9:00 AM |
+| `0 0 1 * *` | First day of every month at midnight |
+| `0 0 1 1 *` | January 1st at midnight (yearly) |
+
+## Special characters
+
+| Character | Meaning | Example |
+|---|---|---|
+| `*` | Every value | `* * * * *` (every minute) |
+| `,` | List | `0 9,17 * * *` (9 AM and 5 PM) |
+| `-` | Range | `0 9 * * 1-5` (Mon through Fri) |
+| `/` | Step | `*/10 * * * *` (every 10th minute) |
+
+## Examples with the CLI
+
+<CodeGroup>
+```bash Every 10 minutes
+strait create job --name "Health Check" --slug health-check \
+  --endpoint https://api.example.com/health \
+  --cron "*/10 * * * *"
+```
+
+```bash Weekday mornings
+strait jobs edit my-job --field "cron=0 9 * * 1-5"
+```
+
+```bash Twice daily
+strait jobs edit my-job --field "cron=0 9,17 * * *"
+```
+</CodeGroup>
+
+## Validation
+
+The CLI validates cron expressions when creating or editing jobs:
+
+```bash
+# Validates cron syntax in manifest files
+strait validate -f jobs.yaml
+
+# Deep check including cron validation
+strait check -f jobs.yaml
+```
+
+<Tip>
+  All times are in UTC. Account for timezone differences when setting schedules.
+</Tip>

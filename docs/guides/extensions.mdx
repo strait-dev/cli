@@ -1,0 +1,38 @@
+---
+title: "Extensions"
+description: "Add your own commands to the CLI with plugins"
+---
+
+Drop an executable named `strait-<name>` in your `PATH` and the CLI picks it up automatically.
+
+## List
+
+```bash
+strait extension list
+```
+
+## Install
+
+```bash
+strait extension install github.com/user/strait-myext
+```
+
+## Run
+
+```bash
+strait extension run myext --flag value
+```
+
+## Create
+
+Scaffold a new extension project:
+
+```bash
+strait extension create my-extension
+```
+
+## Remove
+
+```bash
+strait extension remove myext
+```

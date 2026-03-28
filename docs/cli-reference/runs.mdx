@@ -1,0 +1,112 @@
+---
+title: "runs"
+description: "List, inspect, watch, cancel, replay, and diff runs"
+---
+
+## strait runs list
+
+List runs for a project.
+
+```bash
+strait runs list --project proj_1 --status failed --limit 10
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--project` | Project ID | from config |
+| `--status` | Status filter | all |
+| `--limit` | Max runs to return | `50` |
+
+## strait runs get
+
+Get a run by ID.
+
+```bash
+strait runs get <run-id>
+```
+
+## strait runs last
+
+Show the most recent run.
+
+```bash
+strait runs last --project proj_1
+strait runs last --open
+```
+
+| Flag | Description |
+|---|---|
+| `--project` | Project ID |
+| `--open` | Open the run in the browser |
+
+## strait runs watch
+
+Watch a run until it reaches a terminal state.
+
+```bash
+strait runs watch <run-id>
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--interval` | Poll interval | `2s` |
+| `--timeout` | Max watch duration (0 disables) | `5m` |
+
+## strait runs cancel
+
+Cancel one or more runs.
+
+```bash
+strait runs cancel <run-id>
+strait runs cancel --all --status executing --project proj_1 --yes
+```
+
+| Flag | Description |
+|---|---|
+| `--all` | Cancel all runs matching filters |
+| `--project` | Project ID (for `--all` mode) |
+| `--status` | Status filter (for `--all` mode) |
+| `--limit` | Max runs to consider (default: 100) |
+| `--yes` | Confirm bulk cancellation |
+
+## strait runs logs
+
+Show run events and logs.
+
+```bash
+strait runs logs <run-id>
+strait runs logs <run-id> --follow
+```
+
+| Flag | Short | Description |
+|---|---|---|
+| `--follow` | `-f` | Stream logs over SSE |
+| `--level` | | Event level filter (`debug`, `info`, `warn`, `error`) |
+| `--type` | | Event type filter (`log`, `state_change`, `error`, `progress`) |
+
+## strait runs replay
+
+Replay a run using its original payload.
+
+```bash
+strait runs replay <run-id>
+strait runs replay <run-id> --wait
+```
+
+| Flag | Description |
+|---|---|
+| `--wait` | Wait for replayed run to reach terminal state |
+
+## strait runs diff
+
+Compare two runs side by side.
+
+```bash
+strait runs diff <run1> <run2>
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--show-payload` | Include payload diff | `false` |
+| `--show-events` | Include events diff | `false` |
+| `--event-limit` | Max events per run to compare | `50` |

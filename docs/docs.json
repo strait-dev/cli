@@ -1,0 +1,106 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "luma",
+  "name": "Strait \u2014 CLI",
+  "colors": {
+    "primary": "#FF4F00",
+    "light": "#FF4F00",
+    "dark": "#FF4F00"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "index",
+              "getting-started/installation",
+              "getting-started/quickstart",
+              "getting-started/authentication"
+            ]
+          },
+          {
+            "group": "Usage Guides",
+            "pages": [
+              "guides/configuration",
+              "guides/deployment",
+              "guides/gitops",
+              "guides/ci-cd",
+              "guides/local-development",
+              "guides/monitoring",
+              "guides/logs-and-events",
+              "guides/interactive",
+              "guides/scripting",
+              "guides/extensions",
+              "guides/security",
+              "guides/examples",
+              "guides/upgrading",
+              "guides/errors",
+              "guides/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "cli-reference/index",
+              "cli-reference/global-flags",
+              "cli-reference/output-formats",
+              "cli-reference/environment-variables",
+              "cli-reference/config-files",
+              "cli-reference/manifest-schema",
+              "cli-reference/run-statuses",
+              "cli-reference/scopes",
+              "cli-reference/cron"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "cli-reference/auth",
+              "cli-reference/jobs",
+              "cli-reference/runs",
+              "cli-reference/workflows",
+              "cli-reference/workflow-runs",
+              "cli-reference/deploy",
+              "cli-reference/secrets",
+              "cli-reference/api-keys",
+              "cli-reference/triggers",
+              "cli-reference/team",
+              "cli-reference/audit",
+              "cli-reference/config",
+              "cli-reference/context",
+              "cli-reference/logs",
+              "cli-reference/dev",
+              "cli-reference/ci",
+              "cli-reference/tui",
+              "cli-reference/api",
+              "cli-reference/project",
+              "cli-reference/backup",
+              "cli-reference/fixtures",
+              "cli-reference/utilities"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "seo": {
+    "indexing": "navigable"
+  },
+  "search": {
+    "prompt": "Search Strait CLI docs..."
+  },
+  "metadata": {
+    "timestamp": true
+  },
+  "appearance": {
+    "default": "dark"
+  }
+}

@@ -1,0 +1,68 @@
+---
+title: "Upgrading"
+description: "Check for updates and upgrade the CLI in one command"
+---
+
+## Check current version
+
+```bash
+strait version
+```
+
+## Check for updates
+
+```bash
+strait version --check-update
+```
+
+This compares your installed version against the latest release.
+
+## Upgrade
+
+<Tabs>
+  <Tab title="Built-in">
+    ```bash
+    strait upgrade
+    ```
+  </Tab>
+
+  <Tab title="Homebrew">
+    ```bash
+    brew upgrade strait-dev/tap/strait
+    ```
+  </Tab>
+
+  <Tab title="Go">
+    ```bash
+    go install github.com/strait-dev/cli/cmd/strait@latest
+    ```
+  </Tab>
+
+  <Tab title="Binary">
+    Download the latest release from [GitHub Releases](https://github.com/strait-dev/cli/releases) and replace the existing binary.
+  </Tab>
+</Tabs>
+
+## Verify after upgrade
+
+```bash
+strait version
+strait doctor
+```
+
+## Version info flags
+
+| Flag | Description |
+|---|---|
+| `--short` | Print only the version number |
+| `--json` | Machine-readable JSON output |
+| `--check-server` | Also check configured server health |
+| `--check-update` | Check if a newer version is available |
+
+```bash
+# Full version info as JSON
+strait version --json
+
+# Quick version check in scripts
+strait version --short
+```
