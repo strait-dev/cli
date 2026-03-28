@@ -1,0 +1,190 @@
+---
+title: "Error Reference"
+description: "Saw an error? Find it here with the cause and the fix"
+---
+
+## API errors
+
+<AccordionGroup>
+  <Accordion title="request failed (409): already exists / conflict">
+    **Cause**: You tried to create a resource with a name or slug that already exists.
+
+    **Fix**:
+    ```bash
+    # Use a different name/slug
+    strait create job --name "new-name" --slug "new-slug" ...
+
+    # Or update the existing resource
+    strait jobs edit existing-slug --field "endpoint_url=https://new-url.com"
+    ```
+  </Accordion>
+
+  <Accordion title="request failed (404): not found">
+    **Cause**: The resource ID or slug does not exist, or you are looking in the wrong project.
+
+    **Fix**:
+    ```bash
+    # Verify the resource exists
+    strait jobs list
+    strait workflows list
+
+    # Check you are in the right project/context
+    strait context current
+    ```
+  </Accordion>
+
+  <Accordion title="request failed (401): invalid or missing">
+    **Cause**: No API key provided, or the key is expired/invalid.
+
+    **Fix**:
+    ```bash
+    # Re-authenticate
+    strait login
+
+    # Or set the key directly
+    export STRAIT_API_KEY=strait_abc123...
+    ```
+  </Accordion>
+
+  <Accordion title="request failed (403): unauthorized / permission">
+    **Cause**: Your API key lacks the required scope for this operation.
+
+    **Fix**:
+    ```bash
+    # Check your key's scopes
+    strait api-keys list --project proj_1
+
+    # Create a new key with the required scopes
+    strait api-keys create --project proj_1 --name "Full Access" --scopes "jobs:read,jobs:write,workflows:read,workflows:write"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Configuration errors
+
+<AccordionGroup>
+  <Accordion title="No project specified">
+    **Cause**: No project ID was found in flags, env vars, or config.
+
+    **Fix**:
+    ```bash
+    # Set via flag
+    strait jobs list --project proj_abc123
+
+    # Set via environment
+    export STRAIT_PROJECT=proj_abc123
+
+    # Set in context
+    strait context create default --project proj_abc123
+    ```
+  </Accordion>
+
+  <Accordion title="server URL is required">
+    **Cause**: No server URL configured.
+
+    **Fix**:
+    ```bash
+    export STRAIT_SERVER=https://api.strait.dev
+    # or
+    strait context create default --server https://api.strait.dev
+    ```
+  </Accordion>
+
+  <Accordion title="invalid timeout">
+    **Cause**: The `--timeout` flag value is not a valid Go duration.
+
+    **Fix**: Use format like `30s`, `5m`, `1h`.
+    ```bash
+    strait jobs list --timeout 60s
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Connection errors
+
+<AccordionGroup>
+  <Accordion title="connection refused / timeout">
+    **Cause**: The server is unreachable.
+
+    **Fix**:
+    ```bash
+    # Check server URL
+    strait version --check-server
+
+    # Run full diagnostics
+    strait doctor --verbose
+    ```
+  </Accordion>
+
+  <Accordion title="non-interactive terminal detected">
+    **Cause**: `strait login` was run without a TTY and no token was provided.
+
+    **Fix**:
+    ```bash
+    # Provide token directly
+    strait login --token strait_abc123...
+
+    # Or pipe from env
+    echo $STRAIT_API_KEY | strait login --with-token
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Validation errors
+
+<AccordionGroup>
+  <Accordion title="kind is required / metadata.name is required / spec is required">
+    **Cause**: Declarative manifest YAML is missing required fields.
+
+    **Fix**: Ensure every manifest has `kind`, `metadata.name`, and `spec`:
+    ```yaml
+    kind: Job
+    metadata:
+      name: my-job
+    spec:
+      project_id: proj_abc123
+      endpoint_url: https://example.com/api
+    ```
+  </Accordion>
+
+  <Accordion title="job spec requires project_id and endpoint_url">
+    **Cause**: Job manifest is missing required spec fields.
+
+    **Fix**: Add both fields to the spec.
+  </Accordion>
+
+  <Accordion title="unsupported kind">
+    **Cause**: The `kind` field is not `Job`, `Workflow`, or `api-key`.
+
+    **Fix**: Use one of the supported kinds.
+  </Accordion>
+
+  <Accordion title="payload must be valid JSON">
+    **Cause**: The `--payload` or `--data` flag contains invalid JSON.
+
+    **Fix**: Validate your JSON:
+    ```bash
+    echo '{"key": "value"}' | jq .   # Check syntax
+    strait trigger my-job --payload '{"key": "value"}'
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Tool dependency errors
+
+<AccordionGroup>
+  <Accordion title="docker is required for dev mode">
+    **Cause**: `strait dev` needs Docker but it is not installed.
+
+    **Fix**: Install Docker, or skip it:
+    ```bash
+    strait dev --no-docker
+    ```
+  </Accordion>
+
+  <Accordion title="pg_dump not found in PATH">
+    **Cause**: `strait backup create` requires PostgreSQL client tools.
+
+    **Fix**: Install the PostgreSQL client package for your OS.
+  </Accordion>
+</AccordionGroup>

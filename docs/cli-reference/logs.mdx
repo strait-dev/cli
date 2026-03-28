@@ -1,0 +1,67 @@
+---
+title: "logs / events / send"
+description: "View logs, inspect events, and send custom event payloads"
+---
+
+## strait logs
+
+View run logs and events. Supports single-run and aggregate project-wide modes.
+
+```bash
+strait logs --run <run-id>
+strait logs --run <run-id> --follow
+strait logs --project proj_1 --job "payment-*"
+```
+
+| Flag | Short | Description | Default |
+|---|---|---|---|
+| `--run` | | Run ID to scope logs | |
+| `--project` | | Project ID for aggregate logs | from config |
+| `--follow` | `-f` | Stream logs over SSE (requires `--run`) | `false` |
+| `--level` | | Event level filter (`debug`, `info`, `warn`, `error`) | |
+| `--type` | | Event type filter (`log`, `state_change`, `error`, `progress`) | |
+| `--job` | | Filter by job slug glob pattern (e.g. `payment-*`) | |
+| `--since` | | Show events after this duration ago (e.g. `5m`, `1h`) | |
+| `--search` | | Case-insensitive message filter | |
+| `--tail` | | Show only last N events | `0` (all) |
+| `--group` | | Group events by job slug with summary | `false` |
+| `--output` | | Output format (`ndjson`) | auto-detected |
+
+<Info>
+  When piped (non-TTY), output automatically switches to `ndjson` for pipeline-friendly usage.
+</Info>
+
+### Pipe to other tools
+
+```bash
+strait logs --run run_abc123 --output ndjson | jq '.message'
+```
+
+## strait events
+
+Inspect structured events for a run.
+
+```bash
+strait events --run <run-id>
+strait events --run <run-id> --level error --type log
+```
+
+| Flag | Description |
+|---|---|
+| `--run` | Run ID (required) |
+| `--level` | Event level filter |
+| `--type` | Event type filter |
+
+## strait send
+
+Send a raw event payload to the server.
+
+```bash
+strait send <event-type>
+strait send <event-type> --data '{"key": "value"}'
+```
+
+| Argument / Flag | Description |
+|---|---|
+| `<event-type>` | Event type (positional, required) |
+| `--data` | JSON data payload |

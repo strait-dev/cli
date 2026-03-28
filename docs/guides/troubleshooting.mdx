@@ -1,0 +1,79 @@
+---
+title: "Troubleshooting"
+description: "Something not working? Start here"
+---
+
+## Quick diagnostics
+
+```bash
+strait doctor
+strait doctor --verbose
+```
+
+## Common issues
+
+<AccordionGroup>
+  <Accordion title="Not authenticated">
+    ```bash
+    strait login
+    # or
+    export STRAIT_API_KEY=strait_abc123...
+    ```
+  </Accordion>
+
+  <Accordion title="No project specified">
+    ```bash
+    strait context create default --project proj_abc123
+    # or
+    export STRAIT_PROJECT=proj_abc123
+    # or pass --project on each command
+    ```
+  </Accordion>
+
+  <Accordion title="Server unreachable">
+    ```bash
+    strait version --check-server
+    strait health
+    ```
+  </Accordion>
+
+  <Accordion title="Permission denied">
+    Check your API key scopes:
+
+    ```bash
+    strait api-keys list --project proj_1
+    ```
+  </Accordion>
+
+  <Accordion title="Resource not found">
+    Verify the resource exists:
+
+    ```bash
+    strait jobs list
+    strait workflows list
+    ```
+  </Accordion>
+
+  <Accordion title="Config file errors">
+    ```bash
+    strait config path    # Find the file
+    strait config edit    # Edit and auto-validate
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Debug a run
+
+```bash
+strait diagnose run <run-id>
+strait debug bundle <run-id>
+strait trace <run-id>
+```
+
+## Get help
+
+```bash
+strait --help
+strait <command> --help
+strait docs
+```

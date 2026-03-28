@@ -1,0 +1,50 @@
+---
+title: "Environment Variables"
+description: "Every env var the CLI reads — one table, easy to scan"
+---
+
+## CLI configuration
+
+| Variable | Description | Used by |
+|---|---|---|
+| `STRAIT_SERVER` | API server URL | All API commands |
+| `STRAIT_API_KEY` | API key for authentication | All API commands |
+| `STRAIT_PROJECT` | Default project ID | Commands requiring `--project` |
+| `STRAIT_FORMAT` | Default output format (`table`, `json`, `yaml`, `csv`) | All commands |
+| `STRAIT_CONTEXT` | Active context name override | All commands |
+| `STRAIT_CI` | Enable CI mode (`true`) — disables color and interactive prompts | All commands |
+| `CI` | Also enables CI mode when set to `true` | All commands |
+| `NO_COLOR` | Disable color output (any value) | All commands |
+
+## Authentication
+
+| Variable | Description | Used by |
+|---|---|---|
+| `STRAIT_API_KEY` | API key — also used as fallback during `strait login` if no key provided | `login`, all API commands |
+
+## Server dependencies
+
+These are read by commands that interact with infrastructure directly (e.g. `dev`, `diagnose`):
+
+| Variable | Description | Used by |
+|---|---|---|
+| `DATABASE_URL` | PostgreSQL connection string | `dev`, `backup`, `diagnose` |
+| `REDIS_URL` | Redis connection string | `dev`, `diagnose` |
+| `INTERNAL_SECRET` | Shared secret for internal API auth (16+ chars) | `dev` |
+| `JWT_SIGNING_KEY` | JWT token signing key (32+ chars) | `dev` |
+
+## Editor
+
+| Variable | Description | Used by |
+|---|---|---|
+| `EDITOR` | Preferred editor (falls back to `vi`) | `config edit`, `jobs edit` |
+
+## Priority order
+
+When the same setting is configured in multiple places:
+
+1. **Command-line flags** (highest)
+2. **Environment variables**
+3. **Local config** (`.strait.yaml`)
+4. **Global config** (`~/.config/strait/config.yaml`)
+5. **Built-in defaults** (lowest)

@@ -1,0 +1,64 @@
+---
+title: "Output Formats"
+description: "Six formats for humans and machines — table, JSON, YAML, CSV, Go templates, JSONPath"
+---
+
+Every list and get command speaks six formats. Pick the one that fits your workflow.
+
+## Available formats
+
+| Format | Description |
+|---|---|
+| `table` | Human-readable table (default in TTY) |
+| `json` | JSON object or array |
+| `yaml` | YAML document |
+| `csv` | Comma-separated values |
+| `wide` | Extended table with additional columns |
+| `go-template` | Custom output using Go templates |
+| `jsonpath` | Extract fields using JSONPath expressions |
+
+## Examples
+
+<CodeGroup>
+```bash Table (default)
+strait jobs list
+```
+
+```bash JSON
+strait jobs list -o json
+```
+
+```bash YAML
+strait jobs list -o yaml
+```
+
+```bash CSV
+strait jobs list -o csv
+```
+
+```bash Go template
+strait jobs list -o go-template --output-template '{{.ID}} {{.Slug}}'
+```
+
+```bash JSONPath
+strait jobs list -o jsonpath --output-jsonpath '{.items[*].name}'
+```
+</CodeGroup>
+
+## TTY vs piped output
+
+The CLI automatically detects whether output is going to a terminal or being piped:
+
+- **TTY (terminal)**: Styled output with colors and formatting goes to **stderr**
+- **Piped/redirected**: Machine-readable data (JSON) goes to **stdout**
+
+This means you can safely pipe output while still seeing status messages:
+
+```bash
+strait runs list -o json | jq '.[] | select(.status == "failed")'
+```
+
+<Info>
+  Use `--no-color` or set `NO_COLOR=1` to disable color output in TTY mode.
+  Use `--ci` to disable both color and interactive prompts.
+</Info>

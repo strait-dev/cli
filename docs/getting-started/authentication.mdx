@@ -1,0 +1,81 @@
+---
+title: "Authentication"
+description: "Log in, manage credentials, and switch between environments"
+---
+
+## Log in
+
+Three ways in, depending on your situation:
+
+<Tabs>
+  <Tab title="Browser (recommended)">
+    ```bash
+    strait login
+    ```
+
+    The CLI opens your browser, you confirm a code, and your API key is saved to the system keyring. Done.
+  </Tab>
+
+  <Tab title="Paste a token">
+    Already have an API key? Skip the browser:
+
+    ```bash
+    strait login --token strait_abc123...
+    ```
+  </Tab>
+
+  <Tab title="Pipe from stdin (CI/CD)">
+    No TTY? No problem:
+
+    ```bash
+    echo $STRAIT_API_KEY | strait login --with-token
+    ```
+  </Tab>
+</Tabs>
+
+## Log out
+
+Removes the stored API key from your system keyring:
+
+```bash
+strait logout
+```
+
+## Check who you are
+
+```bash
+strait whoami        # User, context, server, project
+strait auth status   # Quick authenticated/not check
+```
+
+## Work with multiple environments
+
+Contexts let you switch between production, staging, and dev with a single command — each with its own server, project, and credentials.
+
+<Steps>
+  <Step title="Create your contexts">
+    ```bash
+    strait context create prod --server https://api.strait.dev --project proj_prod
+    strait context create staging --server https://staging.strait.dev --project proj_staging
+    ```
+  </Step>
+
+  <Step title="Switch between them">
+    ```bash
+    strait context use prod
+    ```
+  </Step>
+
+  <Step title="See where you are">
+    ```bash
+    strait context current
+    strait context list
+    ```
+  </Step>
+</Steps>
+
+Need to run one command against a different environment without switching? Use the `--context` flag:
+
+```bash
+strait jobs list --context staging
+```

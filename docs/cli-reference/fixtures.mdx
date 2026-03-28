@@ -1,0 +1,29 @@
+---
+title: "fixtures"
+description: "Manage fixture data for demos and testing"
+---
+
+## strait fixtures create
+
+Create fixture data in a project.
+
+```bash
+strait fixtures create
+strait fixtures create --template full
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--template` | Fixture template: `minimal`, `full` | `minimal` |
+
+## strait fixtures clean
+
+Remove fixture-created resources from a project.
+
+```bash
+strait fixtures clean --project proj_1
+```
+
+| Flag | Description |
+|---|---|
+| `--project` | Project ID |

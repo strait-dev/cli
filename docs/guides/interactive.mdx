@@ -1,0 +1,120 @@
+---
+title: "Interactive Features"
+description: "The TUI dashboard, guided wizards, and in-terminal editors"
+---
+
+## TUI dashboard
+
+A full-screen terminal dashboard — queue metrics, run explorer, and event timeline in one view:
+
+```bash
+strait tui --project proj_1
+```
+
+The dashboard has three panels:
+
+| Panel | Description |
+|---|---|
+| **Queue Stats** | Live queued, executing, and delayed counts |
+| **Runs Table** | Scrollable list of recent runs with status |
+| **Detail View** | Events for the selected run |
+
+### Keyboard shortcuts
+
+| Key | Action |
+|---|---|
+| `Up` / `Down` | Navigate runs |
+| `?` | Toggle help overlay |
+| `q` / `Ctrl+C` | Quit |
+
+### Options
+
+| Flag | Description | Default |
+|---|---|---|
+| `--project` | Project ID | from config |
+| `--interval` | Refresh interval | `2s` |
+| `--run-limit` | Max runs to display | `50` |
+| `--event-limit` | Max events for selected run | `25` |
+
+## Interactive wizards
+
+### Create job wizard
+
+When you run `strait create job` in a TTY without `--name`, an interactive form guides you through:
+
+1. Job name
+2. Job slug (auto-suggested)
+3. Endpoint URL
+4. Cron schedule (optional)
+5. Timeout
+6. Max retry attempts
+
+```bash
+strait create job
+```
+
+### Create workflow wizard
+
+Similarly, `strait create workflow` launches a step builder:
+
+1. Workflow name
+2. Workflow slug (auto-suggested)
+3. Description
+4. Step builder (add steps with job refs and dependencies)
+
+```bash
+strait create workflow
+```
+
+<Tip>
+  Wizards only run in TTY terminals. In non-interactive environments (CI, pipes), provide all fields via flags or use `--json` mode.
+</Tip>
+
+## Interactive job editor
+
+Edit a job definition in your preferred editor:
+
+```bash
+strait jobs edit my-job
+strait jobs edit my-job --editor vim
+```
+
+This opens a YAML representation of the job with editable fields:
+
+```yaml
+name: My Job
+slug: my-job
+description: ""
+cron: "*/10 * * * *"
+endpoint_url: https://api.example.com/jobs/process
+max_attempts: 3
+timeout_secs: 120
+run_ttl_secs: 0
+enabled: true
+```
+
+Save and close the editor to apply changes. If no changes are detected, the update is skipped.
+
+The editor is resolved in this order:
+1. `--editor` flag
+2. `$EDITOR` environment variable
+3. `vi` (default)
+
+## Interactive config editor
+
+```bash
+strait config edit
+strait config edit --editor nano
+```
+
+Opens the CLI config file and validates it after saving.
+
+## Login prompt
+
+When `strait login` is run interactively without `--token`:
+
+1. Opens browser for device code authorization
+2. Displays a one-time code
+3. Polls until you confirm in the browser
+
+If the browser flow fails, falls back to a manual API key prompt where you paste the key (input is hidden).

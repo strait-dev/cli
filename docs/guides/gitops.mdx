@@ -1,0 +1,79 @@
+---
+title: "Declarative GitOps"
+description: "Define your infrastructure in YAML, version it in Git, and apply it from the CLI"
+---
+
+Stop clicking through dashboards. Define your jobs and workflows in YAML, review changes in pull requests, and apply them with a single command.
+
+## The workflow
+
+<Steps>
+  <Step title="Write your definitions">
+    Define jobs and workflows as YAML manifests. See the [manifest schema](/cli-reference/manifest-schema) for the full format.
+  </Step>
+
+  <Step title="Validate">
+    Catch errors before they hit the server:
+
+    ```bash
+    strait validate -f jobs.yaml
+    strait validate -f ./definitions/
+    ```
+  </Step>
+
+  <Step title="Check endpoints (optional)">
+    Verify that job endpoint URLs are actually reachable:
+
+    ```bash
+    strait check -f jobs.yaml --check-endpoints
+    ```
+  </Step>
+
+  <Step title="Preview the diff">
+    See what would change on the server before you commit to it:
+
+    ```bash
+    strait diff -f jobs.yaml
+    ```
+  </Step>
+
+  <Step title="Apply">
+    Push your definitions to the server:
+
+    ```bash
+    strait apply -f jobs.yaml
+    ```
+
+    Not sure yet? Add `--dry-run` to see what would happen without changing anything.
+  </Step>
+</Steps>
+
+## Bootstrap from existing resources
+
+Already have jobs on the server? Export them as YAML to get started:
+
+```bash
+strait export all --project proj_1 --output-dir ./definitions/
+strait export jobs --project proj_1 --name-contains "payment"
+strait export workflows --project proj_1
+```
+
+Supported resource types: `jobs`, `workflows`, `api-keys`, `all`.
+
+## Build compiled manifests
+
+Compile your project config into a deployment manifest with a SHA-256 checksum:
+
+```bash
+strait build --config strait.config.json --out-dir .strait
+strait build --dry-run --json
+```
+
+## Project bundles
+
+Export and import entire projects as portable YAML bundles:
+
+```bash
+strait project export --project proj_1 --output bundle.yaml
+strait project import --input bundle.yaml
+```

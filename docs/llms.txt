@@ -1,0 +1,60 @@
+# Strait CLI
+
+> Command-line interface for the Strait job orchestration platform
+
+Strait CLI is the primary interface for the Strait job orchestration platform. 55+ commands for managing jobs, runs, workflows, deployments, secrets, and infrastructure.
+
+## Docs
+
+- [Installation](getting-started/installation.mdx)
+- [Quickstart](getting-started/quickstart.mdx)
+- [Authentication](getting-started/authentication.mdx)
+- [Configuration](guides/configuration.mdx)
+- [Deployment](guides/deployment.mdx)
+- [Declarative GitOps](guides/gitops.mdx)
+- [CI/CD Integration](guides/ci-cd.mdx)
+- [Local Development](guides/local-development.mdx)
+- [Monitoring and Diagnostics](guides/monitoring.mdx)
+- [Logs and Events](guides/logs-and-events.mdx)
+- [Interactive Features](guides/interactive.mdx): TUI dashboard, wizards, interactive editor
+- [Scripting and Automation](guides/scripting.mdx): exit codes, JSON piping, CI mode, bash patterns
+- [Extensions](guides/extensions.mdx)
+- [Security and Credentials](guides/security.mdx): keyring storage, key rotation, stdin auth
+- [Examples and Recipes](guides/examples.mdx): real-world end-to-end workflows
+- [Upgrading](guides/upgrading.mdx)
+- [Error Reference](guides/errors.mdx): common errors with causes and fixes
+- [Troubleshooting](guides/troubleshooting.mdx)
+
+## CLI Reference
+
+- [Overview](cli-reference/index.mdx)
+- [Global Flags](cli-reference/global-flags.mdx)
+- [Output Formats](cli-reference/output-formats.mdx)
+- [Environment Variables](cli-reference/environment-variables.mdx): every env var the CLI reads
+- [Config File Reference](cli-reference/config-files.mdx): config.yaml, .strait.yaml, strait.config.json schema
+- [Manifest Schema](cli-reference/manifest-schema.mdx): declarative YAML schema for jobs, workflows, api-keys
+- [Run Statuses](cli-reference/run-statuses.mdx): status lifecycle, terminal vs active, filter values
+- [API Scopes](cli-reference/scopes.mdx): all permission scopes for API keys
+- [Cron Expressions](cli-reference/cron.mdx): cheatsheet for --cron schedules
+- [auth](cli-reference/auth.mdx): login, logout, whoami, auth status
+- [jobs](cli-reference/jobs.mdx): list, get, create, trigger, trigger-bulk, edit, describe, versions, delete
+- [runs](cli-reference/runs.mdx): list, get, last, watch, cancel, replay, logs, diff
+- [workflows](cli-reference/workflows.mdx): list, get, create, describe, update, delete, trigger, visualize
+- [workflow-runs](cli-reference/workflow-runs.mdx): list, get, steps, watch, cancel
+- [deploy](cli-reference/deploy.mdx): deploy, create, finalize, promote, rollback, list
+- [secrets](cli-reference/secrets.mdx): list, create, delete, local set, local get
+- [api-keys](cli-reference/api-keys.mdx): list, create, rotate, revoke
+- [triggers](cli-reference/triggers.mdx): list, get, send, purge
+- [team](cli-reference/team.mdx): list, add, remove, roles
+- [audit](cli-reference/audit.mdx): view audit log events
+- [config](cli-reference/config.mdx): edit, path
+- [context](cli-reference/context.mdx): create, use, list, current
+- [logs / events / send](cli-reference/logs.mdx): logs, events, send
+- [dev / run](cli-reference/dev.mdx): dev, dev test, dev tunnel, dev status, run
+- [ci](cli-reference/ci.mdx): setup, check
+- [tui](cli-reference/tui.mdx): interactive terminal dashboard
+- [api](cli-reference/api.mdx): raw REST API calls
+- [project](cli-reference/project.mdx): export, import
+- [backup](cli-reference/backup.mdx): create, restore
+- [fixtures](cli-reference/fixtures.mdx): create, clean
+- [utilities](cli-reference/utilities.mdx): doctor, diagnose, verify, cleanup, top, trace, perf, stats, listen, wait, drain, and more

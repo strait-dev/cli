@@ -1,0 +1,90 @@
+---
+title: "Configuration"
+description: "Customize the CLI with config files, env vars, output formats, and aliases"
+---
+
+## Where config lives
+
+The CLI checks these sources in order — first match wins:
+
+1. **Flags** you pass on the command (always win)
+2. **Environment variables** (`STRAIT_SERVER`, `STRAIT_API_KEY`, etc.)
+3. **Local config** (`.strait.yaml` in the current directory)
+4. **Global config** (`~/.config/strait/config.yaml`)
+
+### Edit your config
+
+```bash
+strait config path               # See where it lives
+strait config edit               # Open in $EDITOR
+strait config edit --editor vim  # Pick your editor
+```
+
+The CLI validates the file after you save, so you will know right away if something is off.
+
+## Environment variables
+
+| Variable | What it does |
+|---|---|
+| `STRAIT_SERVER` | API server URL |
+| `STRAIT_API_KEY` | API key for authentication |
+| `STRAIT_PROJECT` | Default project ID |
+| `STRAIT_FORMAT` | Output format (`table`, `json`, `yaml`, `csv`) |
+| `STRAIT_CONTEXT` | Active context name |
+| `NO_COLOR` | Disable color output |
+| `STRAIT_CI` | CI mode — no color, no interactive prompts |
+
+See the full list in the [Environment Variables reference](/cli-reference/environment-variables).
+
+## Pick your output format
+
+Every command speaks six formats. Use whichever fits:
+
+```bash
+strait jobs list -o json       # Pipe to jq
+strait jobs list -o yaml       # Human-friendly structured data
+strait jobs list -o csv        # Drop into a spreadsheet
+strait jobs list -o wide       # More columns in the table
+strait jobs list -o go-template --output-template '{{.ID}} {{.Status}}'
+strait jobs list -o jsonpath --output-jsonpath '{.items[*].name}'
+```
+
+## Shell completion
+
+Tab completion saves keystrokes. Set it up once:
+
+<Tabs>
+  <Tab title="Bash">
+    ```bash
+    strait completion bash > /etc/bash_completion.d/strait
+    ```
+  </Tab>
+  <Tab title="Zsh">
+    ```bash
+    strait completion zsh > "${fpath[1]}/_strait"
+    ```
+  </Tab>
+  <Tab title="Fish">
+    ```bash
+    strait completion fish > ~/.config/fish/completions/strait.fish
+    ```
+  </Tab>
+  <Tab title="PowerShell">
+    ```powershell
+    strait completion powershell | Out-String | Invoke-Expression
+    ```
+  </Tab>
+</Tabs>
+
+## Create your own shortcuts
+
+Tired of typing `strait runs list --status failed`? Make an alias:
+
+```bash
+strait alias set rl "runs list --status failed"
+strait alias set trig "trigger"
+strait alias list
+strait alias delete rl
+```
+
+Aliases expand before parsing, so you can alias entire command chains — flags and all.

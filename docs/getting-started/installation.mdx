@@ -1,0 +1,92 @@
+---
+title: "Installation"
+description: "Install the Strait CLI on macOS, Linux, or Windows"
+---
+
+Pick your preferred method — you will be up and running in under a minute.
+
+<Tabs>
+  <Tab title="Homebrew">
+    The fastest way on macOS and Linux:
+
+    ```bash
+    brew install strait-dev/tap/strait
+    ```
+  </Tab>
+
+  <Tab title="Go">
+    If you already have Go 1.26+ installed:
+
+    ```bash
+    go install github.com/strait-dev/cli/cmd/strait@latest
+    ```
+  </Tab>
+
+  <Tab title="Pre-built binaries">
+    Grab a binary from [GitHub Releases](https://github.com/strait-dev/cli/releases) — available for Linux, macOS, and Windows on both amd64 and arm64.
+
+    <CodeGroup>
+    ```bash macOS (Apple Silicon)
+    curl -L https://github.com/strait-dev/cli/releases/latest/download/strait_darwin_arm64.tar.gz | tar xz
+    sudo mv strait /usr/local/bin/
+    ```
+
+    ```bash macOS (Intel)
+    curl -L https://github.com/strait-dev/cli/releases/latest/download/strait_darwin_amd64.tar.gz | tar xz
+    sudo mv strait /usr/local/bin/
+    ```
+
+    ```bash Linux (amd64)
+    curl -L https://github.com/strait-dev/cli/releases/latest/download/strait_linux_amd64.tar.gz | tar xz
+    sudo mv strait /usr/local/bin/
+    ```
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+## Verify it works
+
+```bash
+strait version
+```
+
+You should see your version number, commit hash, build date, and Go version.
+
+<Tip>
+  Run `strait version --check-update` at any time to see if a newer release is available.
+</Tip>
+
+## Set up shell completion
+
+Tab completion makes the CLI feel native. Set it up once and forget about it:
+
+<Tabs>
+  <Tab title="Bash">
+    ```bash
+    strait completion bash > /etc/bash_completion.d/strait
+    ```
+  </Tab>
+  <Tab title="Zsh">
+    ```bash
+    strait completion zsh > "${fpath[1]}/_strait"
+    ```
+  </Tab>
+  <Tab title="Fish">
+    ```bash
+    strait completion fish > ~/.config/fish/completions/strait.fish
+    ```
+  </Tab>
+  <Tab title="PowerShell">
+    ```powershell
+    strait completion powershell | Out-String | Invoke-Expression
+    ```
+  </Tab>
+</Tabs>
+
+## Keep it fresh
+
+```bash
+strait upgrade
+```
+
+That is it. Head to the [Quickstart](/getting-started/quickstart) to trigger your first run.

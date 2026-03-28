@@ -1,0 +1,92 @@
+---
+title: "workflows"
+description: "Create, manage, visualize, and trigger workflow DAG pipelines"
+---
+
+## strait workflows list
+
+List workflows for a project.
+
+```bash
+strait workflows list --project proj_1
+```
+
+## strait workflows get
+
+Get a workflow by ID or slug.
+
+```bash
+strait workflows get <workflow-id-or-slug>
+```
+
+## strait workflows describe
+
+Show workflow details and step dependency view.
+
+```bash
+strait workflows describe <workflow-id-or-slug>
+```
+
+## strait create workflow
+
+Create a new workflow via flags, JSON stdin, or interactive wizard.
+
+<CodeGroup>
+```bash Flags
+strait create workflow --name data-pipeline --project proj_1 --steps-json '[{"step_ref":"s1","job_ref":"extract"}]'
+```
+
+```bash Interactive wizard (TTY)
+strait create workflow
+```
+
+```bash JSON from stdin
+echo '{"name":"pipeline","steps":[...]}' | strait create workflow --json
+```
+</CodeGroup>
+
+| Flag | Description | Default |
+|---|---|---|
+| `--project` | Project ID | from config |
+| `--name` | Workflow name | required (or wizard) |
+| `--slug` | Workflow slug | auto-generated from name |
+| `--description` | Workflow description | |
+| `--steps-json` | JSON array of workflow steps | |
+| `--json` | Read workflow definition from stdin as JSON | `false` |
+
+## strait workflows update
+
+Update a workflow.
+
+```bash
+strait workflows update <workflow-id-or-slug> --field "name=New Name"
+```
+
+## strait workflows delete
+
+Delete a workflow.
+
+```bash
+strait workflows delete <workflow-id-or-slug> --yes
+```
+
+## strait workflows trigger
+
+Trigger a workflow run.
+
+```bash
+strait workflows trigger <workflow-id-or-slug> --payload '{"date": "2026-03-21"}'
+```
+
+## strait workflows visualize
+
+Render the workflow DAG as ASCII art.
+
+```bash
+strait workflows visualize <workflow-id-or-slug>
+strait workflows visualize <workflow-id-or-slug> --run wfr_abc123
+```
+
+| Flag | Description |
+|---|---|
+| `--run` | Overlay run status on DAG nodes |

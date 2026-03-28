@@ -1,0 +1,45 @@
+---
+title: "Global Flags"
+description: "Flags that work on every command — authentication, output, and behavior"
+---
+
+These flags work on every command. Set them once via config or pass them per-command.
+
+## Connection
+
+| Flag | Description | Default | Env |
+|---|---|---|---|
+| `--server` | API server URL | from config | `STRAIT_SERVER` |
+| `--api-key` | API key for authentication | from keyring | `STRAIT_API_KEY` |
+| `--project` | Default project ID | from config | `STRAIT_PROJECT` |
+| `--context` | Context name override | from config | `STRAIT_CONTEXT` |
+| `--config` | Config file path | auto-detected | |
+| `--timeout` | API request timeout | `30s` | |
+
+## Output
+
+| Flag | Short | Description | Default | Env |
+|---|---|---|---|---|
+| `--format` | `-o` | Output format | `table` | `STRAIT_FORMAT` |
+| `--no-headers` | | Omit table headers | `false` | |
+| `--output-template` | | Go template string | | |
+| `--output-jsonpath` | | JSONPath expression | | |
+| `--no-color` | | Disable color output | `false` | `NO_COLOR` |
+| `--quiet` | `-q` | Minimal output | `false` | |
+| `--verbose` | `-v` | Verbose output | `false` | |
+
+## Mode
+
+| Flag | Description | Default | Env |
+|---|---|---|---|
+| `--ci` | CI mode (no color, no prompts) | `false` | `CI`, `STRAIT_CI` |
+
+## Priority order
+
+Configuration values are resolved in this order (highest priority first):
+
+1. Command-line flags
+2. Environment variables
+3. Local config (`.strait.yaml`)
+4. Global config (`~/.config/strait/config.yaml`)
+5. Built-in defaults

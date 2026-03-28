@@ -1,0 +1,77 @@
+---
+title: "Quickstart"
+description: "Go from zero to your first running job in 5 minutes"
+---
+
+Six commands. That is all it takes to log in, create a job, trigger it, and watch it run.
+
+<Steps>
+  <Step title="Log in">
+    ```bash
+    strait login
+    ```
+
+    Your browser opens, you confirm a one-time code, and you are in. The API key is stored in your system keyring — you will not need to paste it again.
+  </Step>
+
+  <Step title="Confirm you are authenticated">
+    ```bash
+    strait whoami
+    ```
+
+    You should see your user, context, server, and project.
+  </Step>
+
+  <Step title="Set up your project">
+    ```bash
+    strait init
+    ```
+
+    This scaffolds a `strait.config.yaml` in the current directory with your project structure.
+  </Step>
+
+  <Step title="Create a job">
+    ```bash
+    strait jobs create \
+      --name "My First Job" \
+      --slug my-first-job \
+      --endpoint https://example.com/api/process \
+      --project proj_abc123
+    ```
+
+    Prefer a guided walkthrough? Run `strait create job` and the interactive wizard handles the rest.
+  </Step>
+
+  <Step title="Trigger it">
+    ```bash
+    strait trigger my-first-job --payload '{"hello": "world"}'
+    ```
+
+    The CLI returns a run ID. Hold on to it for the next step.
+  </Step>
+
+  <Step title="Watch it run">
+    ```bash
+    strait runs watch <run-id>
+    ```
+
+    The CLI polls until the run completes (or fails). Want the full log stream instead? Use `strait runs logs <run-id> --follow`.
+  </Step>
+</Steps>
+
+## What to explore next
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="sliders" href="/guides/configuration">
+    Set up contexts, output formats, aliases, and shell completion
+  </Card>
+  <Card title="Deployment" icon="cloud-arrow-up" href="/guides/deployment">
+    Build Docker images and deploy with canary rollouts
+  </Card>
+  <Card title="GitOps" icon="code-branch" href="/guides/gitops">
+    Manage your jobs as code with validate, diff, and apply
+  </Card>
+  <Card title="Examples" icon="book" href="/guides/examples">
+    Real-world recipes for common workflows
+  </Card>
+</CardGroup>

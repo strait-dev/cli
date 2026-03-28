@@ -17,7 +17,7 @@
 
 ---
 
-The official CLI for [Strait](https://strait.dev) -- an open-source job execution and workflow orchestration platform. A single Go binary with 55+ commands covering job management, workflow orchestration, deployment, declarative GitOps, local development, and real-time monitoring.
+The official CLI for [Strait](https://strait.dev) — an open-source job execution and workflow orchestration platform. A single Go binary with 55+ commands covering job management, workflow orchestration, deployment, declarative GitOps, local development, and real-time monitoring.
 
 [Website](https://strait.dev) | [Platform Repo](https://github.com/strait-dev/strait) | [Documentation](https://docs.strait.dev) | [Releases](https://github.com/strait-dev/cli/releases)
 
@@ -48,25 +48,25 @@ strait tui                                         # Open the dashboard
 
 | Category | Commands | Docs |
 |---|---|---|
-| Jobs | `create job`, `trigger`, `jobs list/get/describe/edit/delete` | [docs/jobs.md](docs/jobs.md) |
-| Runs | `runs list/get/watch/cancel/replay/diff`, `wait run` | [docs/runs.md](docs/runs.md) |
-| Workflows | `create workflow`, `workflows list/describe/visualize/trigger` | [docs/workflows.md](docs/workflows.md) |
-| Deployment | `deploy`, `deploy create/finalize/promote/rollback/list`, `verify` | [docs/deployment.md](docs/deployment.md) |
-| Logs | `logs`, `events`, `send` | [docs/logs-and-events.md](docs/logs-and-events.md) |
-| GitOps | `validate`, `check`, `diff`, `apply`, `export`, `build`, `project` | [docs/gitops.md](docs/gitops.md) |
-| Secrets | `secrets list/create/delete`, `api-keys list/create/rotate/revoke` | [docs/secrets-and-api-keys.md](docs/secrets-and-api-keys.md) |
-| Team | `team list/add/remove/roles`, `audit` | [docs/team-and-audit.md](docs/team-and-audit.md) |
-| Triggers | `triggers list/get/send/purge` | [docs/event-triggers.md](docs/event-triggers.md) |
-| Monitoring | `doctor`, `status`, `health`, `listen`, `top`, `trace`, `perf`, `stats` | [docs/monitoring.md](docs/monitoring.md) |
-| Local dev | `dev test`, `dev tunnel`, `dev status`, `run` | [docs/local-development.md](docs/local-development.md) |
-| CI/CD | `ci setup`, `ci check` | [docs/ci-cd.md](docs/ci-cd.md) |
-| Extensions | `extension list/install/run/create/remove` | [docs/extensions.md](docs/extensions.md) |
-| Auth | `login`, `logout`, `whoami`, `context`, `auth` | [docs/authentication.md](docs/authentication.md) |
-| Config | `config`, `alias`, `completion` | [docs/configuration.md](docs/configuration.md) |
-| Backup | `backup create`, `backup restore` | [docs/backup.md](docs/backup.md) |
-| Fixtures | `fixtures create/clean` | [docs/fixtures.md](docs/fixtures.md) |
-| Raw API | `api GET/POST/DELETE ...` | [docs/raw-api.md](docs/raw-api.md) |
-| Other | `open`, `cleanup`, `drain`, `diagnose`, `debug`, `profile`, `upgrade` | [docs/monitoring.md](docs/monitoring.md) |
+| Jobs | `create job`, `trigger`, `jobs list/get/describe/edit/delete` | [jobs](docs/cli-reference/jobs.mdx) |
+| Runs | `runs list/get/watch/cancel/replay/diff`, `wait run` | [runs](docs/cli-reference/runs.mdx) |
+| Workflows | `create workflow`, `workflows list/describe/visualize/trigger` | [workflows](docs/cli-reference/workflows.mdx) |
+| Deployment | `deploy`, `deploy create/finalize/promote/rollback/list`, `verify` | [deployment](docs/guides/deployment.mdx) |
+| Logs | `logs`, `events`, `send` | [logs](docs/cli-reference/logs.mdx) |
+| GitOps | `validate`, `check`, `diff`, `apply`, `export`, `build`, `project` | [gitops](docs/guides/gitops.mdx) |
+| Secrets | `secrets list/create/delete`, `api-keys list/create/rotate/revoke` | [secrets](docs/cli-reference/secrets.mdx) |
+| Team | `team list/add/remove/roles`, `audit` | [team](docs/cli-reference/team.mdx) |
+| Triggers | `triggers list/get/send/purge` | [triggers](docs/cli-reference/triggers.mdx) |
+| Monitoring | `doctor`, `status`, `health`, `listen`, `top`, `trace`, `perf`, `stats` | [monitoring](docs/guides/monitoring.mdx) |
+| Local dev | `dev test`, `dev tunnel`, `dev status`, `run` | [local dev](docs/guides/local-development.mdx) |
+| CI/CD | `ci setup`, `ci check` | [ci-cd](docs/guides/ci-cd.mdx) |
+| Extensions | `extension list/install/run/create/remove` | [extensions](docs/guides/extensions.mdx) |
+| Auth | `login`, `logout`, `whoami`, `context`, `auth` | [authentication](docs/getting-started/authentication.mdx) |
+| Config | `config`, `alias`, `completion` | [configuration](docs/guides/configuration.mdx) |
+| Backup | `backup create`, `backup restore` | [backup](docs/cli-reference/backup.mdx) |
+| Fixtures | `fixtures create/clean` | [fixtures](docs/cli-reference/fixtures.mdx) |
+| Raw API | `api GET/POST/DELETE ...` | [api](docs/cli-reference/api.mdx) |
+| Other | `open`, `cleanup`, `drain`, `diagnose`, `debug`, `profile`, `upgrade` | [utilities](docs/cli-reference/utilities.mdx) |
 
 ## Development
 
@@ -77,8 +77,6 @@ make lint          # Run golangci-lint
 make check         # vet + lint + test
 make hooks         # Install lefthook pre-commit hooks
 ```
-
-See [docs/architecture.md](docs/architecture.md) for project structure and design.
 
 ## License
 

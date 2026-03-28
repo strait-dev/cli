@@ -1,0 +1,24 @@
+---
+title: "tui"
+description: "Launch the interactive terminal dashboard"
+---
+
+## strait tui
+
+Open a live terminal UI with queue metrics, run explorer, and event timeline.
+
+```bash
+strait tui --project proj_1
+strait tui --interval 3s --run-limit 30
+```
+
+| Flag | Description | Default |
+|---|---|---|
+| `--project` | Project ID | from config |
+| `--interval` | Refresh interval | `2s` |
+| `--run-limit` | Max runs to display | `20` |
+| `--event-limit` | Max events to display | `50` |
+
+<Info>
+  The TUI provides a full-screen dashboard with panels for queue depth, active runs, and recent events. Use keyboard navigation to explore and interact with resources.
+</Info>

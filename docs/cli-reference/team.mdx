@@ -1,0 +1,54 @@
+---
+title: "team"
+description: "Manage project team members and roles"
+---
+
+## strait team list
+
+List project members.
+
+```bash
+strait team list --project proj_1
+```
+
+| Flag | Description |
+|---|---|
+| `--project` | Project ID |
+
+## strait team add
+
+Add a member to a project.
+
+```bash
+strait team add --user user_abc --role operator --project proj_1
+```
+
+| Flag | Description |
+|---|---|
+| `--user` | User ID |
+| `--role` | Role ID |
+| `--project` | Project ID |
+
+## strait team remove
+
+Remove a member from a project.
+
+```bash
+strait team remove <user-id> --project proj_1
+```
+
+| Flag | Description |
+|---|---|
+| `--project` | Project ID |
+
+## strait team roles
+
+List available roles for a project.
+
+```bash
+strait team roles --project proj_1
+```
+
+| Flag | Description |
+|---|---|
+| `--project` | Project ID |

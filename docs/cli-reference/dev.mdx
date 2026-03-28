@@ -1,0 +1,54 @@
+---
+title: "dev / run"
+description: "Local development, testing, tunnels, and context-aware command execution"
+---
+
+## strait dev
+
+Start local development mode.
+
+```bash
+strait dev
+strait dev --no-docker --port 9090
+strait dev --seed
+```
+
+| Flag | Description |
+|---|---|
+| `--no-docker` | Skip Docker dependency startup |
+| `--port` | Override the default port |
+| `--seed` | Seed with sample data |
+
+## strait dev test
+
+Test job handlers locally.
+
+```bash
+strait dev test <job-slug> --payload '{"id": "123"}'
+strait dev test --all --config strait.config.json
+```
+
+## strait dev tunnel
+
+Expose a local server via Cloudflare tunnel.
+
+```bash
+strait dev tunnel --port 3000
+```
+
+## strait dev status
+
+Check local development environment status.
+
+```bash
+strait dev status
+```
+
+## strait run
+
+Run a local command with Strait context environment variables injected.
+
+```bash
+strait run -- node worker.js
+strait run --context staging -- python process.py
+```

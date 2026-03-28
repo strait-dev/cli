@@ -1,0 +1,163 @@
+---
+title: "Declarative Manifest Schema"
+description: "The YAML format for defining jobs, workflows, and API keys as code"
+---
+
+These are the YAML files you write for `strait validate`, `strait diff`, and `strait apply`. One file can hold multiple resources separated by `---`.
+
+## Structure
+
+Every manifest has three top-level fields:
+
+```yaml
+apiVersion: v1
+kind: Job          # Job, Workflow, or api-key
+metadata:
+  name: my-resource
+spec:
+  # Resource-specific fields
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `apiVersion` | No | API version (currently `v1`) |
+| `kind` | Yes | Resource type: `Job`, `Workflow`, or `api-key` |
+| `metadata.name` | Yes | Resource name (used as display name and slug fallback) |
+| `spec` | Yes | Resource-specific configuration |
+
+## Job manifest
+
+```yaml
+apiVersion: v1
+kind: Job
+metadata:
+  name: sync-inventory
+spec:
+  project_id: proj_abc123
+  slug: sync-inventory
+  endpoint_url: https://api.example.com/jobs/sync
+  cron: "*/10 * * * *"
+  description: Sync product inventory from warehouse
+  timeout_secs: 120
+  max_attempts: 3
+  run_ttl_secs: 86400
+```
+
+### Job spec fields
+
+| Field | Required | Type | Default | Description |
+|---|---|---|---|---|
+| `project_id` | Yes | string | | Project ID |
+| `endpoint_url` | Yes | string | | HTTP endpoint URL |
+| `slug` | No | string | from name | Unique job slug |
+| `description` | No | string | | Description |
+| `cron` | No | string | | Cron schedule expression |
+| `timeout_secs` | No | int | `60` | Execution timeout in seconds |
+| `max_attempts` | No | int | `3` | Max retry attempts |
+| `run_ttl_secs` | No | int | `0` | Run TTL in seconds (0 = no expiry) |
+
+## Workflow manifest
+
+```yaml
+apiVersion: v1
+kind: Workflow
+metadata:
+  name: data-pipeline
+spec:
+  project_id: proj_abc123
+  slug: data-pipeline
+  description: ETL pipeline
+  steps:
+    - step_ref: extract
+      job_ref: extract-data
+    - step_ref: transform
+      job_ref: transform-data
+      depends_on:
+        - extract
+    - step_ref: load
+      job_ref: load-data
+      depends_on:
+        - transform
+      on_failure: continue
+```
+
+### Workflow spec fields
+
+| Field | Required | Type | Description |
+|---|---|---|---|
+| `project_id` | Yes | string | Project ID |
+| `slug` | No | string | Unique workflow slug |
+| `description` | No | string | Description |
+| `steps[]` | No | array | Workflow steps |
+| `steps[].step_ref` | Yes | string | Step reference name (unique within workflow) |
+| `steps[].job_ref` | Yes | string | Job slug this step runs |
+| `steps[].depends_on` | No | array | Step refs this step waits for |
+| `steps[].on_failure` | No | string | Failure behavior |
+
+## API key manifest
+
+```yaml
+apiVersion: v1
+kind: api-key
+metadata:
+  name: CI Deploy Key
+spec:
+  project_id: proj_abc123
+  scopes:
+    - jobs:read
+    - jobs:write
+```
+
+### API key spec fields
+
+| Field | Required | Type | Description |
+|---|---|---|---|
+| `project_id` | Yes | string | Project ID |
+| `scopes` | No | array | Permission scopes |
+
+## Multi-document files
+
+Combine multiple resources in a single file using `---` separators:
+
+```yaml
+apiVersion: v1
+kind: Job
+metadata:
+  name: extract-data
+spec:
+  project_id: proj_abc123
+  endpoint_url: https://api.example.com/jobs/extract
+---
+apiVersion: v1
+kind: Job
+metadata:
+  name: transform-data
+spec:
+  project_id: proj_abc123
+  endpoint_url: https://api.example.com/jobs/transform
+---
+apiVersion: v1
+kind: Workflow
+metadata:
+  name: etl-pipeline
+spec:
+  project_id: proj_abc123
+  steps:
+    - step_ref: extract
+      job_ref: extract-data
+    - step_ref: transform
+      job_ref: transform-data
+      depends_on: [extract]
+```
+
+## Validation
+
+The CLI validates manifests at multiple levels:
+
+| Check | Command | What it validates |
+|---|---|---|
+| Syntax | `validate` | YAML structure, required fields, valid `kind` |
+| Cron | `validate` | Cron expression syntax (jobs only) |
+| DAG | `validate` | Workflow step dependencies are acyclic |
+| Endpoints | `check --check-endpoints` | Job endpoint URLs are reachable |
+| Server diff | `diff` | What would change vs current server state |

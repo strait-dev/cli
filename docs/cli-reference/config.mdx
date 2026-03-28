@@ -1,0 +1,26 @@
+---
+title: "config"
+description: "Manage CLI configuration files"
+---
+
+## strait config edit
+
+Open the config file in your editor.
+
+```bash
+strait config edit
+strait config edit --editor nano
+EDITOR=code strait config edit
+```
+
+| Flag | Description |
+|---|---|
+| `--editor` | Editor command (falls back to `$EDITOR`, then `vi`) |
+
+## strait config path
+
+Print the config file location.
+
+```bash
+strait config path
+```

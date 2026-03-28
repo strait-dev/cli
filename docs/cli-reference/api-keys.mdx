@@ -1,0 +1,36 @@
+---
+title: "api-keys"
+description: "Manage API keys for programmatic access"
+---
+
+## strait api-keys list
+
+List API keys for a project.
+
+```bash
+strait api-keys list --project proj_1
+```
+
+## strait api-keys create
+
+Create a new API key.
+
+```bash
+strait api-keys create --project proj_1 --name "CI Deploy Key" --scopes "jobs:read,jobs:write"
+```
+
+## strait api-keys rotate
+
+Rotate an API key, generating a new value.
+
+```bash
+strait api-keys rotate <key-id>
+```
+
+## strait api-keys revoke
+
+Revoke an API key.
+
+```bash
+strait api-keys revoke <key-id>
+```
