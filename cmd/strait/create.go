@@ -27,14 +27,15 @@ func newCreateCommand(state *appState) *cobra.Command {
 
 func newCreateJobCommand(state *appState) *cobra.Command {
 	var (
-		projectID   string
-		name        string
-		slug        string
-		endpoint    string
-		cronExpr    string
-		timeout     int
-		maxAttempts int
-		asJSON      bool
+		projectID      string
+		name           string
+		slug           string
+		endpoint       string
+		cronExpr       string
+		timeout        int
+		maxAttempts    int
+		asJSON         bool
+		idempotencyKey string
 	)
 
 	cmd := &cobra.Command{
@@ -65,7 +66,7 @@ When run without --name or --json in a TTY, an interactive wizard guides you thr
 				if err != nil {
 					return err
 				}
-				job, err := cli.CreateJob(cmd.Context(), req)
+				job, err := cli.CreateJob(cmd.Context(), req, idempotencyKey)
 				if err != nil {
 					return err
 				}
@@ -123,7 +124,7 @@ When run without --name or --json in a TTY, an interactive wizard guides you thr
 			if err != nil {
 				return err
 			}
-			job, err := cli.CreateJob(cmd.Context(), req)
+			job, err := cli.CreateJob(cmd.Context(), req, idempotencyKey)
 			if err != nil {
 				return err
 			}
@@ -152,18 +153,20 @@ When run without --name or --json in a TTY, an interactive wizard guides you thr
 	cmd.Flags().IntVar(&timeout, "timeout", 60, "timeout in seconds")
 	cmd.Flags().IntVar(&maxAttempts, "max-attempts", 3, "maximum retry attempts")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "read job definition from stdin as JSON")
+	cmd.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "idempotency key to prevent duplicate creates (passed as X-Idempotency-Key header)")
 
 	return cmd
 }
 
 func newCreateWorkflowCommand(state *appState) *cobra.Command {
 	var (
-		projectID   string
-		name        string
-		slug        string
-		description string
-		stepsJSON   string
-		asJSON      bool
+		projectID      string
+		name           string
+		slug           string
+		description    string
+		stepsJSON      string
+		asJSON         bool
+		idempotencyKey string
 	)
 
 	cmd := &cobra.Command{
@@ -194,7 +197,7 @@ When run without --name or --json in a TTY, an interactive wizard guides you thr
 				if err != nil {
 					return err
 				}
-				wf, err := cli.CreateWorkflow(cmd.Context(), req)
+				wf, err := cli.CreateWorkflow(cmd.Context(), req, idempotencyKey)
 				if err != nil {
 					return err
 				}
@@ -277,7 +280,7 @@ When run without --name or --json in a TTY, an interactive wizard guides you thr
 			if err != nil {
 				return err
 			}
-			wf, err := cli.CreateWorkflow(cmd.Context(), req)
+			wf, err := cli.CreateWorkflow(cmd.Context(), req, idempotencyKey)
 			if err != nil {
 				return err
 			}
@@ -299,6 +302,7 @@ When run without --name or --json in a TTY, an interactive wizard guides you thr
 	cmd.Flags().StringVar(&description, "description", "", "workflow description")
 	cmd.Flags().StringVar(&stepsJSON, "steps-json", "", "JSON array of workflow steps")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "read workflow definition from stdin as JSON")
+	cmd.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "idempotency key to prevent duplicate creates (passed as X-Idempotency-Key header)")
 
 	return cmd
 }

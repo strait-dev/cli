@@ -17,20 +17,22 @@ import (
 )
 
 type rootOptions struct {
-	serverURL    string
-	apiKey       string
-	projectID    string
-	outputFormat string
-	noHeaders    bool
-	outputTpl    string
-	outputPath   string
-	noColor      bool
-	quiet        bool
-	verbose      bool
-	contextName  string
-	configPath   string
-	timeout      time.Duration
-	ciMode       bool
+	serverURL      string
+	apiKey         string
+	projectID      string
+	outputFormat   string
+	noHeaders      bool
+	outputTpl      string
+	outputPath     string
+	noColor        bool
+	quiet          bool
+	verbose        bool
+	contextName    string
+	configPath     string
+	timeout        time.Duration
+	ciMode         bool
+	nonInteractive bool
+	debug          bool
 }
 
 type appState struct {
@@ -43,6 +45,7 @@ type appState struct {
 func newRootCommand() *cobra.Command {
 	opts := &rootOptions{}
 	state := &appState{opts: opts}
+	var llms bool
 
 	cmd := &cobra.Command{
 		Use:           "strait",
@@ -50,6 +53,13 @@ func newRootCommand() *cobra.Command {
 		Long:          "Strait CLI manages jobs, runs, workflows, and other resources via the Strait REST API.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		// RunE handles `strait --llms` (no subcommand).
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if llms {
+				return printLLMSManifest(cmd)
+			}
+			return cmd.Help()
+		},
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			loaded, err := cliconfig.Load(opts.configPath)
 			if err != nil {
@@ -125,6 +135,15 @@ func newRootCommand() *cobra.Command {
 				opts.noColor = true
 			}
 
+			if opts.nonInteractive || os.Getenv("STRAIT_NON_INTERACTIVE") == "1" || os.Getenv("STRAIT_NON_INTERACTIVE") == "true" {
+				opts.nonInteractive = true
+			}
+
+			// CI mode implies non-interactive.
+			if opts.ciMode {
+				opts.nonInteractive = true
+			}
+
 			if opts.noColor {
 				styles.ForceNoColor()
 			}
@@ -147,6 +166,9 @@ func newRootCommand() *cobra.Command {
 	cmd.PersistentFlags().StringVar(&opts.configPath, "config", "", "config file path")
 	cmd.PersistentFlags().DurationVar(&opts.timeout, "timeout", 30*time.Second, "API request timeout")
 	cmd.PersistentFlags().BoolVar(&opts.ciMode, "ci", false, "enable CI mode (no color, no prompts)")
+	cmd.PersistentFlags().BoolVar(&opts.nonInteractive, "non-interactive", false, "disable interactive prompts (also set via STRAIT_NON_INTERACTIVE=1)")
+	cmd.PersistentFlags().BoolVar(&opts.debug, "debug", false, "print HTTP request/response details to stderr")
+	cmd.Flags().BoolVar(&llms, "llms", false, "print full CLI command manifest as JSON for LLM consumption and exit")
 
 	// CLI commands only (no server commands: serve, server, migrate, db)
 	cmd.AddCommand(newDevCommand(state))
@@ -196,6 +218,7 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newBackupCommand(state))
 	cmd.AddCommand(newProfileCommand(state))
 	cmd.AddCommand(newDeployCommand(state))
+	cmd.AddCommand(newCodeDeploymentsCommand(state))
 	cmd.AddCommand(newProjectCommand(state))
 	cmd.AddCommand(newBuildCommand(state))
 	cmd.AddCommand(newDoctorCommand(state))
@@ -209,6 +232,8 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newAuditCommand(state))
 	cmd.AddCommand(newWhoamiCommand(state))
 	cmd.AddCommand(newConfigCommand(state))
+	cmd.AddCommand(newSchemaCommand(state))
+	cmd.AddCommand(newAgentCommand(state))
 
 	rawArgs := os.Args[1:]
 	configPath := extractConfigPath(rawArgs)
@@ -222,7 +247,7 @@ func newRootCommand() *cobra.Command {
 
 func registerRootCompletions(cmd *cobra.Command) {
 	_ = cmd.RegisterFlagCompletionFunc("format", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return []string{"table", "json", "yaml", "csv", "wide", "go-template", "jsonpath"}, cobra.ShellCompDirectiveNoFileComp
+		return []string{"table", "json", "jsonl", "compact", "yaml", "csv", "wide", "go-template", "jsonpath"}, cobra.ShellCompDirectiveNoFileComp
 	})
 
 	_ = cmd.RegisterFlagCompletionFunc("context", func(c *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
@@ -307,6 +332,8 @@ func normalizeLegacyArgs(args []string) []string {
 		"triggers":      {},
 		"whoami":        {},
 		"config":        {},
+		"schema":        {},
+		"agent":         {},
 	}
 
 	first := args[0]
@@ -452,12 +479,13 @@ func newCompletionCommand(root *cobra.Command) *cobra.Command {
 
 func cliEnv() map[string]string {
 	return map[string]string{
-		"STRAIT_SERVER":  strings.TrimSpace(os.Getenv("STRAIT_SERVER")),
-		"STRAIT_API_KEY": strings.TrimSpace(os.Getenv("STRAIT_API_KEY")),
-		"STRAIT_PROJECT": strings.TrimSpace(os.Getenv("STRAIT_PROJECT")),
-		"STRAIT_FORMAT":  strings.TrimSpace(os.Getenv("STRAIT_FORMAT")),
-		"STRAIT_CONTEXT": strings.TrimSpace(os.Getenv("STRAIT_CONTEXT")),
-		"NO_COLOR":       strings.TrimSpace(os.Getenv("NO_COLOR")),
-		"STRAIT_CI":      strings.TrimSpace(os.Getenv("STRAIT_CI")),
+		"STRAIT_SERVER":          strings.TrimSpace(os.Getenv("STRAIT_SERVER")),
+		"STRAIT_API_KEY":         strings.TrimSpace(os.Getenv("STRAIT_API_KEY")),
+		"STRAIT_PROJECT":         strings.TrimSpace(os.Getenv("STRAIT_PROJECT")),
+		"STRAIT_FORMAT":          strings.TrimSpace(os.Getenv("STRAIT_FORMAT")),
+		"STRAIT_CONTEXT":         strings.TrimSpace(os.Getenv("STRAIT_CONTEXT")),
+		"NO_COLOR":               strings.TrimSpace(os.Getenv("NO_COLOR")),
+		"STRAIT_CI":              strings.TrimSpace(os.Getenv("STRAIT_CI")),
+		"STRAIT_NON_INTERACTIVE": strings.TrimSpace(os.Getenv("STRAIT_NON_INTERACTIVE")),
 	}
 }

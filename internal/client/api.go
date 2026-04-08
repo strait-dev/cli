@@ -34,9 +34,13 @@ func (c *Client) GetJob(ctx context.Context, id string) (*types.Job, error) {
 }
 
 // CreateJob creates a new job.
-func (c *Client) CreateJob(ctx context.Context, req CreateJobRequest) (*types.Job, error) {
+func (c *Client) CreateJob(ctx context.Context, req CreateJobRequest, idempotencyKey string) (*types.Job, error) {
 	var out types.Job
-	if err := c.doJSON(ctx, http.MethodPost, "/v1/jobs", nil, req, &out); err != nil {
+	headers := map[string]string{}
+	if strings.TrimSpace(idempotencyKey) != "" {
+		headers["X-Idempotency-Key"] = strings.TrimSpace(idempotencyKey)
+	}
+	if err := c.doJSONWithHeaders(ctx, http.MethodPost, "/v1/jobs", nil, req, headers, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -204,9 +208,13 @@ func (c *Client) GetWorkflow(ctx context.Context, workflowID string) (*WorkflowR
 }
 
 // CreateWorkflow creates a new workflow.
-func (c *Client) CreateWorkflow(ctx context.Context, req CreateWorkflowRequest) (*WorkflowResponse, error) {
+func (c *Client) CreateWorkflow(ctx context.Context, req CreateWorkflowRequest, idempotencyKey string) (*WorkflowResponse, error) {
 	var out WorkflowResponse
-	if err := c.doJSON(ctx, http.MethodPost, "/v1/workflows", nil, req, &out); err != nil {
+	headers := map[string]string{}
+	if strings.TrimSpace(idempotencyKey) != "" {
+		headers["X-Idempotency-Key"] = strings.TrimSpace(idempotencyKey)
+	}
+	if err := c.doJSONWithHeaders(ctx, http.MethodPost, "/v1/workflows", nil, req, headers, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -564,4 +572,93 @@ func (c *Client) ListAuditEvents(ctx context.Context, params ListAuditEventsPara
 		return nil, err
 	}
 	return out, nil
+}
+
+// GetJobBySlug looks up a job by its slug within a project.
+// It passes slug as a query parameter and auto-paginates through all pages
+// so that projects with many jobs never silently miss the target.
+func (c *Client) GetJobBySlug(ctx context.Context, projectID, slug string) (*types.Job, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	query.Set("slug", slug)
+
+	var jobs []types.Job
+	if err := c.doListAllJSON(ctx, "/v1/jobs", query, &jobs); err != nil {
+		return nil, err
+	}
+	for i := range jobs {
+		if jobs[i].Slug == slug {
+			return &jobs[i], nil
+		}
+	}
+	return nil, fmt.Errorf("job with slug %q not found in project", slug)
+}
+
+// CreateCodeDeployment creates a new code-first deployment and returns the
+// deployment record plus a presigned PUT URL for uploading the source tarball.
+func (c *Client) CreateCodeDeployment(ctx context.Context, jobID string, req CreateCodeDeploymentRequest) (*CreateCodeDeploymentResponse, error) {
+	var out CreateCodeDeploymentResponse
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ConfirmCodeDeployment marks the tarball upload complete, triggering the build.
+func (c *Client) ConfirmCodeDeployment(ctx context.Context, jobID, deploymentID string, req ConfirmCodeDeploymentRequest) (*CodeDeployment, error) {
+	var out CodeDeployment
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments", deploymentID, "confirm"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetCodeDeployment fetches a single code deployment by ID.
+func (c *Client) GetCodeDeployment(ctx context.Context, jobID, deploymentID string) (*CodeDeployment, error) {
+	var out CodeDeployment
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/jobs", jobID, "deployments", deploymentID), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListCodeDeployments lists code deployments for a job.
+func (c *Client) ListCodeDeployments(ctx context.Context, jobID string, limit int) ([]CodeDeployment, error) {
+	query := url.Values{}
+	if limit > 0 {
+		query.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	var out []CodeDeployment
+	if err := c.doListJSON(ctx, path.Join("/v1/jobs", jobID, "deployments"), query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RollbackCodeDeployment activates a previously ready deployment as the active
+// deployment for the job, effectively rolling back to that version.
+func (c *Client) RollbackCodeDeployment(ctx context.Context, jobID, deploymentID, projectID string) (*CodeDeployment, error) {
+	body := ConfirmCodeDeploymentRequest{ProjectID: projectID}
+	var out CodeDeployment
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments", deploymentID, "rollback"), nil, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ServerCapabilities represents the capabilities reported by a Strait server instance.
+type ServerCapabilities struct {
+	CodeDeployEnabled bool   `json:"code_deploy_enabled"`
+	BuildKitAddress   string `json:"buildkit_address,omitempty"`
+	RegistryHost      string `json:"registry_host,omitempty"`
+}
+
+// GetServerCapabilities returns the server's feature capabilities.
+// Returns an error when the capabilities endpoint is unavailable (e.g. older servers).
+func (c *Client) GetServerCapabilities(ctx context.Context) (*ServerCapabilities, error) {
+	var out ServerCapabilities
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/system/capabilities", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }

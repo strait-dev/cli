@@ -186,6 +186,7 @@ func newDeployCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newDeployPreviewCommand(state))
 	cmd.AddCommand(newDeployCreateCommand(state))
 	cmd.AddCommand(newDeployFinalizeCommand(state))
+	cmd.AddCommand(newDeploySourceCommand(state))
 
 	return cmd
 }

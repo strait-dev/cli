@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strait-dev/cli/internal/codedeploy"
 	"github.com/strait-dev/cli/internal/styles"
 
 	"github.com/sourcegraph/conc/pool"
@@ -25,7 +25,6 @@ type doctorCheck struct {
 
 func newDoctorCommand(state *appState) *cobra.Command {
 	var verbose bool
-	var asJSON bool
 	var fix bool
 	var checkEndpoints bool
 	var checkManifests string
@@ -37,8 +36,10 @@ func newDoctorCommand(state *appState) *cobra.Command {
 authentication, and environment variables to diagnose common issues.`,
 		Example: `  strait doctor
   strait doctor --verbose
-  strait doctor --json
+  strait doctor --format json
   strait doctor --check-endpoints
+  strait doctor --check-endpoints --project proj-1
+  strait doctor --check-endpoints --check-manifests ./manifests/
   strait doctor --check-manifests ./manifests/`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			var mu sync.Mutex
@@ -312,7 +313,7 @@ authentication, and environment variables to diagnose common issues.`,
 				})
 			}
 
-			// 12. Optional: check endpoints from manifests
+			// 12a. Optional: check endpoints from manifests (when --check-manifests provided)
 			if checkEndpoints && checkManifests != "" {
 				p.Go(func() {
 					manifests, err := loadManifestInputs([]string{checkManifests})
@@ -345,6 +346,115 @@ authentication, and environment variables to diagnose common issues.`,
 				})
 			}
 
+			// 12b. Optional: check endpoints from live server jobs (when --check-endpoints used standalone)
+			if checkEndpoints && checkManifests == "" {
+				p.Go(func() {
+					if sharedCliErr != nil {
+						addCheck(doctorCheck{
+							Check:   "endpoints_live",
+							Status:  "fail",
+							Message: "cannot reach API: " + sharedCliErr.Error(),
+							Fix:     "fix API connectivity before checking endpoints",
+						})
+						return
+					}
+					jobs, listErr := sharedCli.ListJobs(cmd.Context(), state.opts.projectID)
+					if listErr != nil {
+						addCheck(doctorCheck{
+							Check:   "endpoints_live",
+							Status:  "fail",
+							Message: "could not list jobs: " + listErr.Error(),
+							Fix:     "check API key and project ID",
+						})
+						return
+					}
+					if len(jobs) == 0 {
+						addCheck(doctorCheck{
+							Check:   "endpoints_live",
+							Status:  "warn",
+							Message: "no jobs found in project",
+							Fix:     "create jobs with `strait jobs create` or `strait deploy`",
+						})
+						return
+					}
+					for _, job := range jobs {
+						if job.EndpointURL == "" {
+							continue
+						}
+						if reachErr := checkEndpointReachable(job.EndpointURL, 3*time.Second); reachErr != nil {
+							addCheck(doctorCheck{
+								Check:   "endpoint:" + job.Slug,
+								Status:  "fail",
+								Message: reachErr.Error(),
+								Fix:     "verify endpoint URL is correct and reachable",
+							})
+						} else {
+							addCheck(doctorCheck{
+								Check:   "endpoint:" + job.Slug,
+								Status:  "pass",
+								Message: job.EndpointURL,
+							})
+						}
+					}
+				})
+			}
+
+			// 13. Code-deploy server support
+			p.Go(func() {
+				if sharedCliErr != nil {
+					addCheck(doctorCheck{
+						Check:   "code_deploy_supported",
+						Status:  "fail",
+						Message: sharedCliErr.Error(),
+						Fix:     "check API client configuration",
+					})
+					return
+				}
+				caps, capsErr := sharedCli.GetServerCapabilities(cmd.Context())
+				if capsErr != nil {
+					addCheck(doctorCheck{
+						Check:   "code_deploy_supported",
+						Status:  "warn",
+						Message: "capabilities endpoint unavailable (server may be older)",
+						Fix:     "upgrade the Strait server to enable code-first deployments",
+					})
+					return
+				}
+				if !caps.CodeDeployEnabled {
+					addCheck(doctorCheck{
+						Check:   "code_deploy_supported",
+						Status:  "fail",
+						Message: "disabled on server",
+						Fix:     "set BUILDKIT_ADDRESS and REGISTRY_HOST on the server to enable code-first deployments",
+					})
+					return
+				}
+				addCheck(doctorCheck{
+					Check:   "code_deploy_supported",
+					Status:  "pass",
+					Message: "enabled",
+				})
+			})
+
+			// 14. Runtime auto-detect in current directory
+			p.Go(func() {
+				detectedRuntime, ok := codedeploy.DetectRuntime(".")
+				if !ok {
+					addCheck(doctorCheck{
+						Check:   "runtime_detected",
+						Status:  "warn",
+						Message: "no runtime marker found in current directory",
+						Fix:     "add go.mod, package.json, requirements.txt, Cargo.toml, or Gemfile; or pass --runtime to deploy source",
+					})
+					return
+				}
+				addCheck(doctorCheck{
+					Check:   "runtime_detected",
+					Status:  "pass",
+					Message: detectedRuntime,
+				})
+			})
+
 			p.Wait()
 
 			// Auto-fix: only config initialization for now
@@ -357,12 +467,6 @@ authentication, and environment variables to diagnose common issues.`,
 						}
 					}
 				}
-			}
-
-			if asJSON {
-				enc := json.NewEncoder(os.Stdout)
-				enc.SetIndent("", "  ")
-				return enc.Encode(checks)
 			}
 
 			// Summary counts
@@ -416,9 +520,8 @@ authentication, and environment variables to diagnose common issues.`,
 	}
 
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "show detailed check output")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "output results as JSON")
 	cmd.Flags().BoolVar(&fix, "fix", false, "attempt to auto-fix issues where possible")
-	cmd.Flags().BoolVar(&checkEndpoints, "check-endpoints", false, "test endpoint URL reachability from manifests")
+	cmd.Flags().BoolVar(&checkEndpoints, "check-endpoints", false, "test endpoint URL reachability — uses --check-manifests if provided, otherwise fetches live jobs from the server")
 	cmd.Flags().StringVar(&checkManifests, "check-manifests", "", "path to manifest files or directory to validate")
 
 	return cmd

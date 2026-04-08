@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
@@ -27,15 +28,55 @@ func run(ctx context.Context) (exitCode int) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(os.Stderr, "fatal: %v\n", r)
-			exitCode = 2
+			exitCode = ExitPanic
 		}
 	}()
 
 	if err := newRootCommand().ExecuteContext(ctx); err != nil {
-		fmt.Fprintln(os.Stderr, formatCLIError(err))
-		return 1
+		code := exitCodeFromError(err)
+		if isJSONOutputMode() {
+			enc := json.NewEncoder(os.Stdout)
+			out := map[string]any{
+				"error":     err.Error(),
+				"exit_code": code,
+				"code":      exitCodeName(code),
+			}
+			if s := errorSuggestion(code); s != "" {
+				out["suggestion"] = s
+			}
+			if u := errorDocsURL(code); u != "" {
+				out["docs_url"] = u
+			}
+			_ = enc.Encode(out)
+		} else {
+			fmt.Fprintln(os.Stderr, formatCLIError(err))
+		}
+		return code
 	}
-	return 0
+	return ExitOK
+}
+
+// isJSONOutputMode reports whether the current invocation is requesting JSON or
+// JSONL output. It checks the STRAIT_FORMAT env var and scans os.Args for
+// --format / -o flags without depending on cobra flag parsing (which runs after
+// this point when an error occurs).
+func isJSONOutputMode() bool {
+	if f := strings.TrimSpace(os.Getenv("STRAIT_FORMAT")); f == "json" || f == "jsonl" || f == "compact" {
+		return true
+	}
+	args := os.Args[1:]
+	for i, arg := range args {
+		if (arg == "--format" || arg == "-o") && i+1 < len(args) {
+			f := strings.TrimSpace(args[i+1])
+			return f == "json" || f == "jsonl" || f == "compact"
+		}
+		for _, prefix := range []string{"--format=", "-o="} {
+			if f, ok := strings.CutPrefix(arg, prefix); ok {
+				return f == "json" || f == "jsonl" || f == "compact"
+			}
+		}
+	}
+	return false
 }
 
 // formatCLIError turns a raw Go error into a human-friendly styled message.

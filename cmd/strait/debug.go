@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/strait-dev/cli/internal/styles"
@@ -21,6 +22,43 @@ func newDebugCommand(state *appState) *cobra.Command {
 	}
 
 	cmd.AddCommand(newDebugBundleCommand(state))
+	cmd.AddCommand(newDebugRequestCommand(state))
+
+	return cmd
+}
+
+func newDebugRequestCommand(state *appState) *cobra.Command {
+	var body string
+
+	cmd := &cobra.Command{
+		Use:   "request <METHOD> <PATH>",
+		Short: "Send an authenticated HTTP request to the API and print the response",
+		Long: `Send a raw authenticated HTTP request to the Strait API server.
+
+METHOD is the HTTP verb (GET, POST, PATCH, DELETE, etc.).
+PATH is relative to the configured server URL (e.g. /v1/jobs).
+
+The response body is printed as indented JSON when parseable, otherwise as text.
+Use --debug on the root command to also log timing and status code.`,
+		Example: `  strait debug request GET /v1/jobs
+  strait debug request GET /v1/jobs?project_id=proj-1
+  strait debug request POST /v1/jobs --body '{"name":"test","slug":"test","project_id":"p","endpoint_url":"http://x"}'
+  strait debug request DELETE /v1/jobs/job-1`,
+		Args: cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			method := strings.ToUpper(args[0])
+			urlPath := args[1]
+
+			cli, err := newAPIClient(state)
+			if err != nil {
+				return err
+			}
+
+			return cli.RawRequest(cmd.Context(), method, urlPath, body, os.Stdout)
+		},
+	}
+
+	cmd.Flags().StringVar(&body, "body", "", "JSON request body")
 
 	return cmd
 }

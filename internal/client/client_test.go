@@ -159,12 +159,76 @@ func TestCreateJob(t *testing.T) {
 		Name:        "New Job",
 		Slug:        "new-job",
 		EndpointURL: "https://example.com/hook",
-	})
+	}, "")
 	if err != nil {
 		t.Fatalf("CreateJob: %v", err)
 	}
 	if got.ID != "job-new" {
 		t.Fatalf("expected job-new, got %s", got.ID)
+	}
+}
+
+func TestCreateJob_SendsIdempotencyKeyHeader(t *testing.T) {
+	t.Parallel()
+
+	var capturedKey string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedKey = r.Header.Get("X-Idempotency-Key")
+		respondJSON(t, w, http.StatusOK, types.Job{ID: "job-1"})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	_, err := c.CreateJob(context.Background(), CreateJobRequest{
+		ProjectID: "proj-1", Name: "J", Slug: "j", EndpointURL: "http://x",
+	}, "idem-key-1")
+	if err != nil {
+		t.Fatalf("CreateJob: %v", err)
+	}
+	if capturedKey != "idem-key-1" {
+		t.Errorf("X-Idempotency-Key: got %q, want %q", capturedKey, "idem-key-1")
+	}
+}
+
+func TestCreateJob_EmptyIdempotencyKeyOmitsHeader(t *testing.T) {
+	t.Parallel()
+
+	var capturedKey string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedKey = r.Header.Get("X-Idempotency-Key")
+		respondJSON(t, w, http.StatusOK, types.Job{ID: "job-1"})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	_, err := c.CreateJob(context.Background(), CreateJobRequest{
+		ProjectID: "proj-1", Name: "J", Slug: "j", EndpointURL: "http://x",
+	}, "")
+	if err != nil {
+		t.Fatalf("CreateJob: %v", err)
+	}
+	if capturedKey != "" {
+		t.Errorf("expected empty X-Idempotency-Key, got %q", capturedKey)
+	}
+}
+
+func TestCreateWorkflow_SendsIdempotencyKeyHeader(t *testing.T) {
+	t.Parallel()
+
+	var capturedKey string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedKey = r.Header.Get("X-Idempotency-Key")
+		respondJSON(t, w, http.StatusOK, WorkflowResponse{Workflow: types.Workflow{ID: "wf-1"}})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	_, err := c.CreateWorkflow(context.Background(), CreateWorkflowRequest{ProjectID: "p", Name: "W", Slug: "w"}, "wf-idem-key")
+	if err != nil {
+		t.Fatalf("CreateWorkflow: %v", err)
+	}
+	if capturedKey != "wf-idem-key" {
+		t.Errorf("X-Idempotency-Key: got %q, want %q", capturedKey, "wf-idem-key")
 	}
 }
 
@@ -741,7 +805,7 @@ func TestCreateWorkflow(t *testing.T) {
 	defer srv.Close()
 
 	c := mustClient(t, srv.URL)
-	got, err := c.CreateWorkflow(context.Background(), CreateWorkflowRequest{ProjectID: "proj-1", Name: "Flow", Slug: "flow"})
+	got, err := c.CreateWorkflow(context.Background(), CreateWorkflowRequest{ProjectID: "proj-1", Name: "Flow", Slug: "flow"}, "")
 	if err != nil {
 		t.Fatalf("CreateWorkflow: %v", err)
 	}

@@ -263,7 +263,7 @@ func applyCreate(ctx context.Context, cli *client.Client, projectID string, entr
 			MaxAttempts: spec.MaxAttempts,
 			TimeoutSecs: spec.TimeoutSecs,
 			Cron:        spec.Cron,
-		})
+		}, "")
 		return err
 
 	case "workflow":
@@ -278,7 +278,7 @@ func applyCreate(ctx context.Context, cli *client.Client, projectID string, entr
 			Slug:        spec.Slug,
 			Description: spec.Description,
 			Steps:       steps,
-		})
+		}, "")
 		return err
 
 	default:

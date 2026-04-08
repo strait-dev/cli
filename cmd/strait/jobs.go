@@ -37,6 +37,12 @@ func newJobsCommand(state *appState) *cobra.Command {
 	editCmd.ValidArgsFunction = completeJobSlugs(state)
 	bulkTriggerCmd := newJobsTriggerBulkCommand(state)
 	bulkTriggerCmd.ValidArgsFunction = completeJobSlugs(state)
+	pauseCmd := newJobsPauseCommand(state)
+	pauseCmd.ValidArgsFunction = completeJobSlugs(state)
+	resumeCmd := newJobsResumeCommand(state)
+	resumeCmd.ValidArgsFunction = completeJobSlugs(state)
+	updateCmd := newJobsUpdateCommand(state)
+	updateCmd.ValidArgsFunction = completeJobSlugs(state)
 
 	cmd.AddCommand(newJobsListCommand(state))
 	cmd.AddCommand(getCmd)
@@ -47,6 +53,9 @@ func newJobsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(versionsCmd)
 	cmd.AddCommand(describeCmd)
 	cmd.AddCommand(editCmd)
+	cmd.AddCommand(pauseCmd)
+	cmd.AddCommand(resumeCmd)
+	cmd.AddCommand(updateCmd)
 
 	return cmd
 }
@@ -181,7 +190,9 @@ func newJobsDescribeCommand(state *appState) *cobra.Command {
 					styles.DetailLine("Name", job.Name),
 					styles.DetailLine("Slug", job.Slug),
 					styles.DetailLine("Enabled", styles.Enabled(job.Enabled)),
+					styles.DetailLine("Source", jobSourceDisplay(job.SourceType)),
 					styles.DetailLine("Endpoint", job.EndpointURL),
+					styles.DetailLine("Active Deploy", job.ActiveDeploymentID),
 					styles.DetailLine("Cron", job.Cron),
 					styles.DetailLine("Timeout", fmt.Sprintf("%ds", job.TimeoutSecs)),
 					styles.DetailLine("Max Retry", fmt.Sprintf("%d", job.MaxAttempts)),
@@ -402,6 +413,18 @@ func runInteractiveJobEdit(ctx context.Context, cli *client.Client, state *appSt
 	return printData(state, patched)
 }
 
+// jobSourceDisplay returns a short label for a job's source type, e.g. "code" or "endpoint".
+func jobSourceDisplay(sourceType string) string {
+	switch sourceType {
+	case "code":
+		return "code"
+	case "endpoint", "":
+		return "endpoint"
+	default:
+		return sourceType
+	}
+}
+
 func newJobsListCommand(state *appState) *cobra.Command {
 	var projectID string
 
@@ -427,13 +450,18 @@ func newJobsListCommand(state *appState) *cobra.Command {
 
 			rows := make([]map[string]any, 0, len(jobs))
 			for _, job := range jobs {
-				rows = append(rows, map[string]any{
-					"id":      job.ID,
-					"name":    job.Name,
-					"slug":    job.Slug,
-					"cron":    job.Cron,
-					"enabled": styles.Enabled(job.Enabled),
-				})
+				row := map[string]any{
+					"id":          job.ID,
+					"name":        job.Name,
+					"slug":        job.Slug,
+					"cron":        job.Cron,
+					"enabled":     job.Enabled,
+					"source_type": jobSourceDisplay(job.SourceType),
+				}
+				if job.ActiveDeploymentID != "" {
+					row["active_deployment_id"] = job.ActiveDeploymentID
+				}
+				rows = append(rows, row)
 			}
 
 			if isTTYRich(state) {
@@ -443,9 +471,11 @@ func newJobsListCommand(state *appState) *cobra.Command {
 					if cron == "" {
 						cron = "--"
 					}
-					fmt.Fprintf(os.Stderr, "  %s  %-20s  cron=%s  %s\n",
+					src := jobSourceDisplay(job.SourceType)
+					fmt.Fprintf(os.Stderr, "  %s  %-20s  source=%-8s  cron=%s  %s\n",
 						styles.Enabled(job.Enabled),
 						styles.Bold.Render(job.Slug),
+						styles.MutedStyle.Render(src),
 						styles.MutedStyle.Render(cron),
 						styles.MutedStyle.Render(job.ID),
 					)
@@ -486,7 +516,9 @@ func newJobsGetCommand(state *appState) *cobra.Command {
 					styles.DetailLine("Name", job.Name),
 					styles.DetailLine("Slug", job.Slug),
 					styles.DetailLine("Enabled", styles.Enabled(job.Enabled)),
+					styles.DetailLine("Source", jobSourceDisplay(job.SourceType)),
 					styles.DetailLine("Endpoint", job.EndpointURL),
+					styles.DetailLine("Active Deploy", job.ActiveDeploymentID),
 					styles.DetailLine("Cron", job.Cron),
 					styles.DetailLine("Timeout", fmt.Sprintf("%ds", job.TimeoutSecs)),
 					styles.DetailLine("Max Retry", fmt.Sprintf("%d", job.MaxAttempts)),
@@ -504,6 +536,7 @@ func newJobsGetCommand(state *appState) *cobra.Command {
 
 func newJobsCreateCommand(state *appState) *cobra.Command {
 	var req client.CreateJobRequest
+	var idempotencyKey string
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -512,8 +545,8 @@ func newJobsCreateCommand(state *appState) *cobra.Command {
 			if req.ProjectID == "" {
 				req.ProjectID = state.opts.projectID
 			}
-			if req.ProjectID == "" || req.Name == "" || req.Slug == "" || req.EndpointURL == "" {
-				return fmt.Errorf("project, name, slug, and endpoint are required")
+			if req.ProjectID == "" || req.Name == "" || req.Slug == "" {
+				return fmt.Errorf("project, name, and slug are required")
 			}
 
 			cli, err := newAPIClient(state)
@@ -521,7 +554,7 @@ func newJobsCreateCommand(state *appState) *cobra.Command {
 				return err
 			}
 
-			job, err := cli.CreateJob(cmd.Context(), req)
+			job, err := cli.CreateJob(cmd.Context(), req, idempotencyKey)
 			if err != nil {
 				return err
 			}
@@ -544,6 +577,7 @@ func newJobsCreateCommand(state *appState) *cobra.Command {
 	cmd.Flags().IntVar(&req.TimeoutSecs, "timeout-secs", 60, "execution timeout in seconds")
 	cmd.Flags().IntVar(&req.MaxAttempts, "max-attempts", 3, "max attempts")
 	cmd.Flags().IntVar(&req.RunTTLSecs, "run-ttl-secs", 0, "run TTL in seconds")
+	cmd.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "idempotency key to prevent duplicate creates (passed as X-Idempotency-Key header)")
 
 	return cmd
 }
@@ -681,4 +715,209 @@ func newJobsTriggerCommand(state *appState) *cobra.Command {
 	cmd.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "idempotency key")
 
 	return cmd
+}
+
+func newJobsPauseCommand(state *appState) *cobra.Command {
+	var yes bool
+
+	cmd := &cobra.Command{
+		Use:   "pause <job-id-or-slug>",
+		Short: "Pause a job (no new runs will be scheduled)",
+		Args:  cobra.ExactArgs(1),
+		Example: `  strait jobs pause my-job
+  strait jobs pause my-job --yes`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := requireConfirmation(state, "Pause this job?", yes); err != nil {
+				return err
+			}
+
+			cli, err := newAPIClient(state)
+			if err != nil {
+				return err
+			}
+
+			jobID, err := resolveJobIdentifier(cmd.Context(), cli, state, args[0])
+			if err != nil {
+				return err
+			}
+
+			enabled := false
+			job, err := cli.UpdateJob(cmd.Context(), jobID, client.UpdateJobRequest{Enabled: &enabled})
+			if err != nil {
+				return err
+			}
+
+			if isTTYRich(state) {
+				fmt.Fprintln(os.Stderr, styles.Success("Paused job "+styles.Bold.Render(job.ID)))
+				return nil
+			}
+			return printData(state, job)
+		},
+	}
+
+	cmd.Flags().BoolVar(&yes, "yes", false, "skip confirmation prompt")
+	return cmd
+}
+
+func newJobsResumeCommand(state *appState) *cobra.Command {
+	var yes bool
+
+	cmd := &cobra.Command{
+		Use:   "resume <job-id-or-slug>",
+		Short: "Resume a paused job",
+		Args:  cobra.ExactArgs(1),
+		Example: `  strait jobs resume my-job
+  strait jobs resume my-job --yes`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := requireConfirmation(state, "Resume this job?", yes); err != nil {
+				return err
+			}
+
+			cli, err := newAPIClient(state)
+			if err != nil {
+				return err
+			}
+
+			jobID, err := resolveJobIdentifier(cmd.Context(), cli, state, args[0])
+			if err != nil {
+				return err
+			}
+
+			enabled := true
+			job, err := cli.UpdateJob(cmd.Context(), jobID, client.UpdateJobRequest{Enabled: &enabled})
+			if err != nil {
+				return err
+			}
+
+			if isTTYRich(state) {
+				fmt.Fprintln(os.Stderr, styles.Success("Resumed job "+styles.Bold.Render(job.ID)))
+				return nil
+			}
+			return printData(state, job)
+		},
+	}
+
+	cmd.Flags().BoolVar(&yes, "yes", false, "skip confirmation prompt")
+	return cmd
+}
+
+func newJobsUpdateCommand(state *appState) *cobra.Command {
+	var fields []string
+	var fromStdin bool
+
+	cmd := &cobra.Command{
+		Use:   "update <job-id-or-slug>",
+		Short: "Update job fields non-interactively",
+		Long: `Apply field updates to a job without opening an editor.
+Accepts --field key=value flags (repeatable) or --stdin to read a JSON patch from stdin.
+Designed for scripting and CI; never prompts for input.`,
+		Args: cobra.ExactArgs(1),
+		Example: `  strait jobs update my-job --field name=new-name
+  strait jobs update my-job --field cron="0 * * * *" --field timeout_secs=120
+  echo '{"endpoint_url":"http://localhost:3000/jobs/my-job"}' | strait jobs update my-job --stdin`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate flags before making any API calls.
+			upd := client.UpdateJobRequest{}
+			for _, f := range fields {
+				parts := strings.SplitN(f, "=", 2)
+				if len(parts) != 2 {
+					return fmt.Errorf("invalid --field %q: expected key=value", f)
+				}
+				key := strings.TrimSpace(parts[0])
+				val := strings.TrimSpace(parts[1])
+				if err := applyJobField(&upd, key, val); err != nil {
+					return err
+				}
+			}
+
+			cli, err := newAPIClient(state)
+			if err != nil {
+				return err
+			}
+
+			jobID, err := resolveJobIdentifier(cmd.Context(), cli, state, args[0])
+			if err != nil {
+				return err
+			}
+
+			if fromStdin {
+				var patch map[string]any
+				if err := json.NewDecoder(os.Stdin).Decode(&patch); err != nil {
+					return fmt.Errorf("read stdin: %w", err)
+				}
+				if err := applyJobPatch(&upd, patch); err != nil {
+					return err
+				}
+			}
+
+			job, err := cli.UpdateJob(cmd.Context(), jobID, upd)
+			if err != nil {
+				return err
+			}
+
+			if isTTYRich(state) {
+				fmt.Fprintln(os.Stderr, styles.Success("Updated job "+styles.Bold.Render(job.ID)+" (version "+fmt.Sprintf("%d", job.Version)+")"))
+				return nil
+			}
+			return printData(state, job)
+		},
+	}
+
+	cmd.Flags().StringArrayVar(&fields, "field", nil, "field update in key=value form (repeatable)")
+	cmd.Flags().BoolVar(&fromStdin, "stdin", false, "read JSON patch from stdin")
+	return cmd
+}
+
+// applyJobField applies a single key=value string to an UpdateJobRequest.
+func applyJobField(upd *client.UpdateJobRequest, key, val string) error {
+	switch key {
+	case "name":
+		upd.Name = &val
+	case "slug":
+		upd.Slug = &val
+	case "description":
+		upd.Description = &val
+	case "cron":
+		upd.Cron = &val
+	case "endpoint_url", "endpoint":
+		upd.EndpointURL = &val
+	case "enabled":
+		parsed, err := strconv.ParseBool(val)
+		if err != nil {
+			return fmt.Errorf("enabled must be true|false")
+		}
+		upd.Enabled = &parsed
+	case "max_attempts":
+		parsed, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("max_attempts must be an integer")
+		}
+		upd.MaxAttempts = &parsed
+	case "timeout_secs":
+		parsed, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("timeout_secs must be an integer")
+		}
+		upd.TimeoutSecs = &parsed
+	case "run_ttl_secs":
+		parsed, err := strconv.Atoi(val)
+		if err != nil {
+			return fmt.Errorf("run_ttl_secs must be an integer")
+		}
+		upd.RunTTLSecs = &parsed
+	default:
+		return fmt.Errorf("unsupported field %q (supported: name, slug, description, cron, endpoint_url, enabled, max_attempts, timeout_secs, run_ttl_secs)", key)
+	}
+	return nil
+}
+
+// applyJobPatch applies a JSON map of field updates to an UpdateJobRequest.
+func applyJobPatch(upd *client.UpdateJobRequest, patch map[string]any) error {
+	for k, v := range patch {
+		val := fmt.Sprintf("%v", v)
+		if err := applyJobField(upd, k, val); err != nil {
+			return err
+		}
+	}
+	return nil
 }

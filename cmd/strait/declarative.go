@@ -400,7 +400,7 @@ func applyManifest(ctx context.Context, cli *client.Client, m manifest) (map[str
 			return map[string]any{"action": "updated", "kind": "Job", "name": name, "id": job.ID}, nil
 		}
 
-		job, err := cli.CreateJob(ctx, req)
+		job, err := cli.CreateJob(ctx, req, "")
 		if err != nil {
 			return nil, err
 		}
@@ -441,7 +441,7 @@ func applyManifest(ctx context.Context, cli *client.Client, m manifest) (map[str
 			return map[string]any{"action": "updated", "kind": "Workflow", "name": name, "id": wf.ID}, nil
 		}
 
-		wf, err := cli.CreateWorkflow(ctx, req)
+		wf, err := cli.CreateWorkflow(ctx, req, "")
 		if err != nil {
 			return nil, err
 		}

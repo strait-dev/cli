@@ -123,7 +123,7 @@ func TestValidateEndpoint(t *testing.T) {
 func TestValidateRuntime(t *testing.T) {
 	t.Parallel()
 
-	valid := []string{"node", "bun", "python", "go", "docker"}
+	valid := []string{"go", "python", "typescript", "ruby", "rust", "node", "bun", "docker"}
 	for _, rt := range valid {
 		t.Run("valid_"+rt, func(t *testing.T) {
 			t.Parallel()
@@ -133,7 +133,7 @@ func TestValidateRuntime(t *testing.T) {
 		})
 	}
 
-	invalid := []string{"java", "rust", ""}
+	invalid := []string{"java", "elixir", ""}
 	for _, rt := range invalid {
 		t.Run("invalid_"+rt, func(t *testing.T) {
 			t.Parallel()
@@ -252,10 +252,13 @@ func TestRuntimes(t *testing.T) {
 	t.Parallel()
 
 	runtimes := Runtimes()
-	if len(runtimes) != 5 {
-		t.Fatalf("expected 5 runtimes, got %d", len(runtimes))
+	if len(runtimes) != 8 {
+		t.Fatalf("expected 8 runtimes, got %d", len(runtimes))
 	}
-	expected := map[string]bool{"node": true, "bun": true, "python": true, "go": true, "docker": true}
+	expected := map[string]bool{
+		"go": true, "python": true, "typescript": true,
+		"ruby": true, "rust": true, "node": true, "bun": true, "docker": true,
+	}
 	for _, rt := range runtimes {
 		if !expected[rt] {
 			t.Fatalf("unexpected runtime: %q", rt)

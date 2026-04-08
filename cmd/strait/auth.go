@@ -60,9 +60,9 @@ an API key directly, or --with-token to read one from stdin.`,
 				return loginWithAPIKey(cmd, state, apiKey, withToken, targetContext, targetServer)
 			}
 
-			// Non-TTY without explicit token: error with guidance.
-			if !term.IsTerminal(syscall.Stdin) {
-				return fmt.Errorf("non-interactive terminal detected; use --token <api-key> or pipe a key via --with-token")
+			// Non-interactive or non-TTY without explicit token: error with guidance.
+			if state.opts.nonInteractive || !term.IsTerminal(syscall.Stdin) {
+				return fmt.Errorf("non-interactive mode: use --token <api-key> or STRAIT_API_KEY env var to authenticate")
 			}
 
 			// Browser-based device code flow (default for interactive terminals).

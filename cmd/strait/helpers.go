@@ -3,12 +3,31 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/strait-dev/cli/internal/client"
 	cliconfig "github.com/strait-dev/cli/internal/config"
 )
+
+// debugTransport wraps an http.RoundTripper and logs method, URL, status, and
+// latency to stderr for each request. It is activated by --debug.
+type debugTransport struct {
+	next http.RoundTripper
+}
+
+func (d *debugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	start := time.Now()
+	resp, err := d.next.RoundTrip(req)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "debug: %s %s → error: %v (%s)\n", req.Method, req.URL, err, time.Since(start).Round(time.Millisecond))
+		return resp, err
+	}
+	fmt.Fprintf(os.Stderr, "debug: %s %s → %d (%s)\n", req.Method, req.URL, resp.StatusCode, time.Since(start).Round(time.Millisecond))
+	return resp, err
+}
 
 func loadConfigForWrite(state *appState) (*cliconfig.File, string, error) {
 	path := state.configPath
@@ -56,17 +75,24 @@ func isTTYRich(state *appState) bool {
 }
 
 func newAPIClient(state *appState) (*client.Client, error) {
-	return client.New(state.opts.serverURL, state.opts.apiKey, state.opts.timeout)
+	c, err := client.New(state.opts.serverURL, state.opts.apiKey, state.opts.timeout)
+	if err != nil {
+		return nil, err
+	}
+	if state.opts.debug {
+		c.SetTransport(&debugTransport{next: http.DefaultTransport})
+	}
+	return c, nil
 }
 
-// requireConfirmation checks CI mode and prompts interactively if needed.
+// requireConfirmation checks CI/non-interactive mode and prompts interactively if needed.
 // Pass yes=true when the user provided --yes flag.
 func requireConfirmation(state *appState, msg string, yes bool) error {
 	if yes {
 		return nil
 	}
-	if state.opts.ciMode {
-		return fmt.Errorf("interactive prompt blocked in CI mode; use --yes to confirm")
+	if state.opts.nonInteractive || state.opts.ciMode {
+		return fmt.Errorf("interactive prompt blocked in non-interactive mode; use --yes to confirm")
 	}
 	if !stdoutIsTTY() {
 		return fmt.Errorf("non-interactive terminal detected; use --yes to confirm")

@@ -440,10 +440,14 @@ func TestDoctorCommand_HasFlags(t *testing.T) {
 	t.Parallel()
 	state := &appState{opts: &rootOptions{outputFormat: "json"}}
 	cmd := newDoctorCommand(state)
-	for _, name := range []string{"verbose", "json", "fix", "check-endpoints", "check-manifests"} {
+	for _, name := range []string{"verbose", "fix", "check-endpoints", "check-manifests"} {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("doctor missing --%s flag", name)
 		}
+	}
+	// --json was removed; use global --format json instead.
+	if cmd.Flags().Lookup("json") != nil {
+		t.Error("doctor should not have --json flag (removed in favour of --format json)")
 	}
 }
 
@@ -460,12 +464,12 @@ func TestDoctorCommand_RunsAndProducesOutput(t *testing.T) {
 			respondJSON(t, w, http.StatusOK, map[string]int{"queued": 0, "executing": 0, "delayed": 0})
 		},
 	})
-	state := newTestState(t, srv)
-	cmd := newDoctorCommand(state)
-	cmd.SetArgs([]string{"--json"})
+	// Use root command so --format is a known persistent flag.
+	root := newRootCommand()
+	root.SetArgs([]string{"--format", "json", "--server", srv.URL, "--api-key", "test-key", "--project", "proj-1", "doctor"})
 	out := captureCommandOutput(t, func() {
 		// Doctor may fail due to env var checks, that's OK.
-		_ = cmd.Execute()
+		_ = root.Execute()
 	})
 	// Should produce JSON array of check results.
 	var checks []map[string]any
