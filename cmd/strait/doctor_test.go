@@ -228,3 +228,96 @@ func TestDoctorCommand_NoJSONFlag(t *testing.T) {
 		}
 	})
 }
+
+func TestDoctorCheckEndpoints_StandaloneIncludesLiveJobCheck(t *testing.T) {
+	t.Parallel()
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /health": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, map[string]string{"status": "ok"})
+		},
+		"GET /ready": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, map[string]string{"status": "ok"})
+		},
+		"GET /v1/stats": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, map[string]int{"queued": 0, "executing": 0, "delayed": 0})
+		},
+		"GET /v1/system/capabilities": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, map[string]any{"code_deploy_enabled": true})
+		},
+		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []map[string]any{
+				{"id": "job-1", "slug": "my-job", "name": "My Job", "endpoint_url": "http://localhost:3000/jobs/my-job", "enabled": true},
+			})
+		},
+	})
+
+	root := newRootCommand()
+	root.SetArgs([]string{
+		"--format", "json",
+		"--server", srv.URL,
+		"--api-key", "test-key",
+		"--project", "proj-1",
+		"doctor",
+		"--check-endpoints",
+	})
+
+	out := captureCommandOutput(t, func() {
+		_ = root.Execute()
+	})
+
+	// Endpoint check for the live job should appear (will fail since localhost:3000 isn't running).
+	if !strings.Contains(out, "endpoint:my-job") {
+		t.Errorf("expected endpoint check for my-job in output, got: %s", out)
+	}
+}
+
+func TestDoctorCheckEndpoints_StandaloneNoJobsReturnsWarn(t *testing.T) {
+	t.Parallel()
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /health": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, map[string]string{"status": "ok"})
+		},
+		"GET /ready": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, map[string]string{"status": "ok"})
+		},
+		"GET /v1/stats": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, map[string]int{"queued": 0, "executing": 0, "delayed": 0})
+		},
+		"GET /v1/system/capabilities": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, map[string]any{"code_deploy_enabled": true})
+		},
+		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []map[string]any{})
+		},
+	})
+
+	root := newRootCommand()
+	root.SetArgs([]string{
+		"--format", "json",
+		"--server", srv.URL,
+		"--api-key", "test-key",
+		"--project", "proj-1",
+		"doctor",
+		"--check-endpoints",
+	})
+
+	out := captureCommandOutput(t, func() {
+		_ = root.Execute()
+	})
+
+	if !strings.Contains(out, "endpoints_live") {
+		t.Errorf("expected endpoints_live check in output, got: %s", out)
+	}
+}
+
+func TestDoctorCommand_HasCheckEndpointsFlag(t *testing.T) {
+	t.Parallel()
+
+	state := &appState{opts: &rootOptions{}}
+	cmd := newDoctorCommand(state)
+	if cmd.Flags().Lookup("check-endpoints") == nil {
+		t.Error("expected --check-endpoints flag on doctor command")
+	}
+}

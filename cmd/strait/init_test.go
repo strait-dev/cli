@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -481,5 +482,161 @@ func TestInit_CreatesStraitIgnore(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "node_modules/") {
 		t.Fatal(".straitignore missing node_modules/ for typescript runtime")
+	}
+}
+
+func TestInitFromServer_RequiresProject(t *testing.T) {
+	t.Parallel()
+
+	state := &appState{opts: &rootOptions{}} // no project ID
+	cmd := newInitCommand(state)
+	cmd.SetArgs([]string{"--from-server"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when --from-server used without --project")
+	}
+	if !strings.Contains(err.Error(), "project") {
+		t.Errorf("expected 'project' in error, got: %v", err)
+	}
+}
+
+func TestInitFromServer_ScaffoldsJobManifest(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+	_ = os.Chdir(dir)
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []map[string]any{
+				{
+					"id": "job-1", "slug": "my-job", "name": "My Job",
+					"endpoint_url": "http://localhost:3000/jobs/my-job",
+					"timeout_secs": 60, "max_attempts": 3, "enabled": true,
+				},
+			})
+		},
+		"GET /v1/workflows": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []map[string]any{})
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.projectID = "proj-1"
+	state.opts.outputFormat = "json"
+	cmd := newInitCommand(state)
+	cmd.SetArgs([]string{"--from-server"})
+
+	out := captureCommandOutput(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	// Check JSON output
+	var result map[string]any
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		t.Fatalf("output not valid JSON: %v\noutput: %s", err, out)
+	}
+	if result["jobs"].(float64) != 1 {
+		t.Errorf("expected 1 job, got: %v", result["jobs"])
+	}
+
+	// Check file was created
+	jobsFile := filepath.Join(dir, "definitions", "jobs.yaml")
+	if _, err := os.Stat(jobsFile); err != nil {
+		t.Fatalf("expected definitions/jobs.yaml to be created: %v", err)
+	}
+
+	content, _ := os.ReadFile(jobsFile)
+	if !strings.Contains(string(content), "my-job") {
+		t.Errorf("expected job slug 'my-job' in manifest, got: %s", content)
+	}
+}
+
+func TestInitFromServer_FailsOnExistingFileWithoutForce(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+	_ = os.Chdir(dir)
+
+	// Pre-create the definitions directory and jobs.yaml
+	_ = os.MkdirAll(filepath.Join(dir, "definitions"), 0o750)
+	_ = os.WriteFile(filepath.Join(dir, "definitions", "jobs.yaml"), []byte("existing"), 0o600)
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []map[string]any{
+				{"id": "job-1", "slug": "my-job", "name": "My Job", "endpoint_url": "http://x"},
+			})
+		},
+		"GET /v1/workflows": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []map[string]any{})
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.projectID = "proj-1"
+	cmd := newInitCommand(state)
+	cmd.SetArgs([]string{"--from-server"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected error when jobs.yaml already exists")
+	}
+	if !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("expected 'already exists' in error, got: %v", err)
+	}
+}
+
+func TestInitFromServer_ForceOverwrites(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+	_ = os.Chdir(dir)
+
+	_ = os.MkdirAll(filepath.Join(dir, "definitions"), 0o750)
+	_ = os.WriteFile(filepath.Join(dir, "definitions", "jobs.yaml"), []byte("old content"), 0o600)
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []map[string]any{
+				{"id": "job-1", "slug": "new-job", "name": "New Job", "endpoint_url": "http://x"},
+			})
+		},
+		"GET /v1/workflows": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []map[string]any{})
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.projectID = "proj-1"
+	state.opts.outputFormat = "json"
+	cmd := newInitCommand(state)
+	cmd.SetArgs([]string{"--from-server", "--force"})
+
+	captureCommandOutput(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error with --force: %v", err)
+		}
+	})
+
+	content, _ := os.ReadFile(filepath.Join(dir, "definitions", "jobs.yaml"))
+	if strings.Contains(string(content), "old content") {
+		t.Error("expected old content to be overwritten by --force")
+	}
+	if !strings.Contains(string(content), "new-job") {
+		t.Errorf("expected new-job in overwritten file, got: %s", content)
+	}
+}
+
+func TestInitFromServer_HasFlag(t *testing.T) {
+	t.Parallel()
+
+	state := &appState{opts: &rootOptions{}}
+	cmd := newInitCommand(state)
+	if cmd.Flags().Lookup("from-server") == nil {
+		t.Error("expected --from-server flag on init command")
 	}
 }

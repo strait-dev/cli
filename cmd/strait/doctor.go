@@ -38,6 +38,8 @@ authentication, and environment variables to diagnose common issues.`,
   strait doctor --verbose
   strait doctor --format json
   strait doctor --check-endpoints
+  strait doctor --check-endpoints --project proj-1
+  strait doctor --check-endpoints --check-manifests ./manifests/
   strait doctor --check-manifests ./manifests/`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			var mu sync.Mutex
@@ -311,7 +313,7 @@ authentication, and environment variables to diagnose common issues.`,
 				})
 			}
 
-			// 12. Optional: check endpoints from manifests
+			// 12a. Optional: check endpoints from manifests (when --check-manifests provided)
 			if checkEndpoints && checkManifests != "" {
 				p.Go(func() {
 					manifests, err := loadManifestInputs([]string{checkManifests})
@@ -338,6 +340,59 @@ authentication, and environment variables to diagnose common issues.`,
 								Check:   "endpoint:" + item.Data.Metadata.Name,
 								Status:  "pass",
 								Message: endpointURL,
+							})
+						}
+					}
+				})
+			}
+
+			// 12b. Optional: check endpoints from live server jobs (when --check-endpoints used standalone)
+			if checkEndpoints && checkManifests == "" {
+				p.Go(func() {
+					if sharedCliErr != nil {
+						addCheck(doctorCheck{
+							Check:   "endpoints_live",
+							Status:  "fail",
+							Message: "cannot reach API: " + sharedCliErr.Error(),
+							Fix:     "fix API connectivity before checking endpoints",
+						})
+						return
+					}
+					jobs, listErr := sharedCli.ListJobs(cmd.Context(), state.opts.projectID)
+					if listErr != nil {
+						addCheck(doctorCheck{
+							Check:   "endpoints_live",
+							Status:  "fail",
+							Message: "could not list jobs: " + listErr.Error(),
+							Fix:     "check API key and project ID",
+						})
+						return
+					}
+					if len(jobs) == 0 {
+						addCheck(doctorCheck{
+							Check:   "endpoints_live",
+							Status:  "warn",
+							Message: "no jobs found in project",
+							Fix:     "create jobs with `strait jobs create` or `strait deploy`",
+						})
+						return
+					}
+					for _, job := range jobs {
+						if job.EndpointURL == "" {
+							continue
+						}
+						if reachErr := checkEndpointReachable(job.EndpointURL, 3*time.Second); reachErr != nil {
+							addCheck(doctorCheck{
+								Check:   "endpoint:" + job.Slug,
+								Status:  "fail",
+								Message: reachErr.Error(),
+								Fix:     "verify endpoint URL is correct and reachable",
+							})
+						} else {
+							addCheck(doctorCheck{
+								Check:   "endpoint:" + job.Slug,
+								Status:  "pass",
+								Message: job.EndpointURL,
 							})
 						}
 					}
@@ -466,7 +521,7 @@ authentication, and environment variables to diagnose common issues.`,
 
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "show detailed check output")
 	cmd.Flags().BoolVar(&fix, "fix", false, "attempt to auto-fix issues where possible")
-	cmd.Flags().BoolVar(&checkEndpoints, "check-endpoints", false, "test endpoint URL reachability from manifests")
+	cmd.Flags().BoolVar(&checkEndpoints, "check-endpoints", false, "test endpoint URL reachability — uses --check-manifests if provided, otherwise fetches live jobs from the server")
 	cmd.Flags().StringVar(&checkManifests, "check-manifests", "", "path to manifest files or directory to validate")
 
 	return cmd
