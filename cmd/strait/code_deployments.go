@@ -172,17 +172,22 @@ func newCodeDeploymentLogsCommand(state *appState) *cobra.Command {
 
 			deploymentID := args[0]
 
-			if stream {
+			// Fetch deployment to check current status.
+			d, err := cli.GetCodeDeployment(cmd.Context(), job.ID, deploymentID)
+			if err != nil {
+				return err
+			}
+
+			// Auto-stream when the build is still running and caller did not
+			// explicitly request non-streaming output.
+			wantStream := stream || d.Status == "building"
+			if wantStream {
 				return cli.StreamDeploymentLogs(cmd.Context(), job.ID, deploymentID, func(chunk string) error {
 					fmt.Fprint(os.Stdout, chunk)
 					return nil
 				})
 			}
 
-			d, err := cli.GetCodeDeployment(cmd.Context(), job.ID, deploymentID)
-			if err != nil {
-				return err
-			}
 			fmt.Print(d.BuildLogs)
 			return nil
 		},

@@ -5,13 +5,55 @@ package codedeploy
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/pack"
 )
+
+// maxSourceBytes is the maximum tarball size accepted by the server (256 MB).
+const maxSourceBytes = 256 * 1024 * 1024
+
+// serverRuntimes is the set of runtime values the server accepts.
+var serverRuntimes = map[string]bool{
+	"go": true, "python": true, "typescript": true, "ruby": true, "rust": true,
+}
+
+// NormalizeRuntime maps CLI-friendly aliases (node, bun, js) to the canonical
+// server runtime names. Returns the original value unchanged if no mapping exists.
+func NormalizeRuntime(r string) string {
+	switch r {
+	case "node", "bun", "js":
+		return "typescript"
+	}
+	return r
+}
+
+// DetectRuntime inspects dir for well-known project files and returns the
+// best-matching server runtime. Returns ("", false) when nothing is recognised.
+func DetectRuntime(dir string) (runtime string, ok bool) {
+	markers := []struct {
+		file    string
+		runtime string
+	}{
+		{"go.mod", "go"},
+		{"Cargo.toml", "rust"},
+		{"Gemfile", "ruby"},
+		{"requirements.txt", "python"},
+		{"pyproject.toml", "python"},
+		{"setup.py", "python"},
+		{"package.json", "typescript"},
+		{"bun.lockb", "typescript"},
+	}
+	for _, m := range markers {
+		if _, err := os.Stat(filepath.Join(dir, m.file)); err == nil {
+			return m.runtime, true
+		}
+	}
+	return "", false
+}
 
 // Options controls a code-first deployment.
 type Options struct {
@@ -25,8 +67,6 @@ type Options struct {
 	SourceDir string
 	// IgnoreFile overrides the default .straitignore discovery.
 	IgnoreFile string
-	// DryRun stops after packing and prints what would be uploaded.
-	DryRun bool
 	// OnProgress is called with status updates; may be nil.
 	OnProgress func(msg string)
 	// OnLogChunk is called with each raw log line from the build; may be nil.
@@ -51,7 +91,13 @@ func Run(ctx context.Context, cli *client.Client, opts Options) (*Result, error)
 		progress = func(string) {}
 	}
 
-	// 1. Pack source code.
+	// 1. Resolve and validate runtime.
+	runtime := NormalizeRuntime(opts.Runtime)
+	if !serverRuntimes[runtime] {
+		return nil, fmt.Errorf("unsupported runtime %q: must be one of go, python, typescript, ruby, rust", opts.Runtime)
+	}
+
+	// 2. Pack source code.
 	progress("Packing source directory...")
 	packed, err := pack.Pack(opts.SourceDir, opts.IgnoreFile)
 	if err != nil {
@@ -59,28 +105,30 @@ func Run(ctx context.Context, cli *client.Client, opts Options) (*Result, error)
 	}
 	defer os.Remove(packed.Path)
 
+	// 3. Client-side size gate (server enforces 256 MB; fail fast before upload).
+	if packed.Size > maxSourceBytes {
+		return nil, fmt.Errorf(
+			"packed archive is %.1f MB — exceeds the 256 MB server limit; add more entries to .straitignore",
+			float64(packed.Size)/1024/1024,
+		)
+	}
+
 	progress(fmt.Sprintf("Packed %s (SHA-256: %s, size: %s)",
 		opts.SourceDir, packed.Hash[:12]+"...", formatSize(packed.Size)))
 
-	if opts.DryRun {
-		progress(fmt.Sprintf("[dry-run] would upload %s (%d bytes, hash: %s) for job %s/%s runtime %s",
-			opts.SourceDir, packed.Size, packed.Hash, opts.ProjectID, opts.JobSlug, opts.Runtime))
-		return &Result{}, nil
-	}
-
-	// 2. Resolve job ID from slug.
+	// 4. Resolve job ID from slug.
 	progress(fmt.Sprintf("Looking up job %q...", opts.JobSlug))
 	job, err := cli.GetJobBySlug(ctx, opts.ProjectID, opts.JobSlug)
 	if err != nil {
 		return nil, fmt.Errorf("look up job: %w", err)
 	}
 
-	// 3. Create deployment record and get presigned URL.
+	// 5. Create deployment record and get presigned URL.
 	progress("Creating deployment record...")
 	createResp, err := cli.CreateCodeDeployment(ctx, job.ID, client.CreateCodeDeploymentRequest{
 		ProjectID:       opts.ProjectID,
 		JobID:           job.ID,
-		Runtime:         opts.Runtime,
+		Runtime:         runtime,
 		SourceHash:      packed.Hash,
 		SourceSizeBytes: packed.Size,
 	})
@@ -90,7 +138,7 @@ func Run(ctx context.Context, cli *client.Client, opts Options) (*Result, error)
 	deploymentID := createResp.Deployment.ID
 	progress(fmt.Sprintf("Created deployment %s", deploymentID))
 
-	// 4. Upload tarball to presigned URL.
+	// 6. Upload tarball to presigned URL.
 	progress("Uploading source tarball...")
 	f, err := os.Open(packed.Path)
 	if err != nil {
@@ -103,7 +151,7 @@ func Run(ctx context.Context, cli *client.Client, opts Options) (*Result, error)
 	}
 	progress("Upload complete")
 
-	// 5. Confirm deployment (triggers build).
+	// 7. Confirm deployment (triggers build).
 	progress("Confirming deployment (triggering build)...")
 	d, err := cli.ConfirmCodeDeployment(ctx, job.ID, deploymentID, client.ConfirmCodeDeploymentRequest{
 		ProjectID: opts.ProjectID,
@@ -113,7 +161,9 @@ func Run(ctx context.Context, cli *client.Client, opts Options) (*Result, error)
 	}
 	progress(fmt.Sprintf("Build started (deployment %s, status: %s)", d.ID, d.Status))
 
-	// 6. Stream build logs.
+	// 8. Stream build logs; a successful stream (done sentinel received) means
+	// the build has reached a terminal state — skip polling in that case.
+	streamCompleted := false
 	if opts.OnLogChunk != nil {
 		progress("Streaming build logs...")
 		onChunk := opts.OnLogChunk
@@ -121,34 +171,48 @@ func Run(ctx context.Context, cli *client.Client, opts Options) (*Result, error)
 			onChunk(chunk)
 			return nil
 		})
-		if streamErr != nil && ctx.Err() == nil {
-			// Non-fatal: logs stream ended early; fall through to polling.
+		if streamErr == nil {
+			streamCompleted = true
+		} else if ctx.Err() == nil {
+			// Non-fatal: stream ended early; fall through to polling.
 			progress(fmt.Sprintf("Log stream ended: %v", streamErr))
 		}
 	}
 
-	// 7. Poll until terminal status.
-	progress("Waiting for build to complete...")
-	final, err := pollUntilTerminal(ctx, cli, job.ID, deploymentID, progress)
-	if err != nil {
-		return nil, err
+	// 9. Fetch final status (single GET if stream completed; polling otherwise).
+	var final *client.CodeDeployment
+	if streamCompleted {
+		final, err = cli.GetCodeDeployment(ctx, job.ID, deploymentID)
+		if err != nil {
+			return nil, fmt.Errorf("fetch final deployment status: %w", err)
+		}
+	} else {
+		progress("Waiting for build to complete...")
+		final, err = pollUntilTerminal(ctx, cli, job.ID, deploymentID, progress)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	switch final.Status {
+	return resultFromDeployment(final)
+}
+
+func resultFromDeployment(d *client.CodeDeployment) (*Result, error) {
+	switch d.Status {
 	case "ready":
 		return &Result{
-			DeploymentID: final.ID,
-			Status:       final.Status,
-			ImageURI:     final.BuiltImageURI,
+			DeploymentID: d.ID,
+			Status:       d.Status,
+			ImageURI:     d.BuiltImageURI,
 		}, nil
 	case "timed_out":
-		return nil, fmt.Errorf("build timed out (deployment %s)", final.ID)
+		return nil, fmt.Errorf("build timed out (deployment %s)", d.ID)
 	default:
-		msg := final.ErrorMessage
+		msg := d.ErrorMessage
 		if msg == "" {
 			msg = "build failed"
 		}
-		return nil, fmt.Errorf("deployment %s failed: %s", final.ID, msg)
+		return nil, fmt.Errorf("deployment %s failed: %s", d.ID, msg)
 	}
 }
 
@@ -212,25 +276,4 @@ func formatSize(bytes int64) string {
 	default:
 		return fmt.Sprintf("%d B", bytes)
 	}
-}
-
-// GetBuildLogs retrieves stored build logs for a terminal deployment.
-func GetBuildLogs(ctx context.Context, cli *client.Client, jobID, deploymentID string) (string, error) {
-	d, err := cli.GetCodeDeployment(ctx, jobID, deploymentID)
-	if err != nil {
-		return "", err
-	}
-	return d.BuildLogs, nil
-}
-
-// ReadLogsNonStreaming fetches the logs body as plain text via GET without streaming.
-func ReadLogsNonStreaming(ctx context.Context, httpClient interface {
-	GetCodeDeployment(context.Context, string, string) (*client.CodeDeployment, error)
-}, jobID, deploymentID string) (string, error) {
-	d, err := httpClient.GetCodeDeployment(ctx, jobID, deploymentID)
-	if err != nil {
-		return "", err
-	}
-	_ = io.Discard
-	return d.BuildLogs, nil
 }

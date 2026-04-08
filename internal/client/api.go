@@ -567,15 +567,15 @@ func (c *Client) ListAuditEvents(ctx context.Context, params ListAuditEventsPara
 }
 
 // GetJobBySlug looks up a job by its slug within a project.
-// It passes slug as a query parameter; if the server returns multiple jobs
-// (older server without slug filtering), it filters client-side.
+// It passes slug as a query parameter and auto-paginates through all pages
+// so that projects with many jobs never silently miss the target.
 func (c *Client) GetJobBySlug(ctx context.Context, projectID, slug string) (*types.Job, error) {
 	query := url.Values{}
 	query.Set("project_id", projectID)
 	query.Set("slug", slug)
 
 	var jobs []types.Job
-	if err := c.doListJSON(ctx, "/v1/jobs", query, &jobs); err != nil {
+	if err := c.doListAllJSON(ctx, "/v1/jobs", query, &jobs); err != nil {
 		return nil, err
 	}
 	for i := range jobs {

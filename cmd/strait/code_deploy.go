@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/strait-dev/cli/internal/codedeploy"
+	"github.com/strait-dev/cli/internal/pack"
 	"github.com/strait-dev/cli/internal/styles"
 
 	"github.com/spf13/cobra"
@@ -32,8 +34,17 @@ On success the job switches to use the newly built image.`,
 			if jobSlug == "" {
 				return fmt.Errorf("--job is required")
 			}
+
+			// Auto-detect runtime when not provided.
 			if runtime == "" {
-				return fmt.Errorf("--runtime is required (go, python, typescript, ruby, rust)")
+				detected, ok := codedeploy.DetectRuntime(sourceDir)
+				if !ok {
+					return fmt.Errorf("--runtime is required: could not detect runtime from %s (expected go.mod, package.json, requirements.txt, Cargo.toml, or Gemfile)", sourceDir)
+				}
+				runtime = detected
+				if isTTYRich(state) {
+					fmt.Fprintln(os.Stderr, styles.MutedStyle.Render(fmt.Sprintf("Detected runtime: %s", runtime)))
+				}
 			}
 
 			resolvedProject, err := requireProjectID(state, projectID)
@@ -41,13 +52,36 @@ On success the job switches to use the newly built image.`,
 				return err
 			}
 
+			// Dry-run: list files without uploading.
+			if dryRun {
+				files, listErr := pack.ListContents(sourceDir, ignoreFile)
+				if listErr != nil {
+					return fmt.Errorf("list source contents: %w", listErr)
+				}
+				sort.Strings(files)
+				normalised := codedeploy.NormalizeRuntime(runtime)
+				if isTTYRich(state) {
+					fmt.Fprintf(os.Stderr, "[dry-run] %d files would be packed from %s (runtime: %s)\n", len(files), sourceDir, normalised)
+					for _, f := range files {
+						fmt.Fprintf(os.Stderr, "  %s\n", styles.MutedStyle.Render(f))
+					}
+				} else {
+					rows := make([]map[string]any, 0, len(files))
+					for _, f := range files {
+						rows = append(rows, map[string]any{"file": f})
+					}
+					return printData(state, rows)
+				}
+				return nil
+			}
+
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
 			}
 
-			if !dryRun && isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Info(fmt.Sprintf("Deploying source for job %s (runtime: %s)", jobSlug, runtime)))
+			if isTTYRich(state) {
+				fmt.Fprintln(os.Stderr, styles.Info(fmt.Sprintf("Deploying source for job %s (runtime: %s)", jobSlug, codedeploy.NormalizeRuntime(runtime))))
 			}
 
 			var onLog func(string)
@@ -63,7 +97,6 @@ On success the job switches to use the newly built image.`,
 				Runtime:    runtime,
 				SourceDir:  sourceDir,
 				IgnoreFile: ignoreFile,
-				DryRun:     dryRun,
 				OnProgress: func(msg string) {
 					if isTTYRich(state) && !state.opts.quiet {
 						fmt.Fprintln(os.Stderr, styles.MutedStyle.Render(msg))
@@ -73,10 +106,6 @@ On success the job switches to use the newly built image.`,
 			})
 			if runErr != nil {
 				return runErr
-			}
-
-			if dryRun {
-				return nil
 			}
 
 			if isTTYRich(state) {
@@ -97,7 +126,7 @@ On success the job switches to use the newly built image.`,
 	}
 
 	cmd.Flags().StringVar(&jobSlug, "job", "", "job slug to deploy (required)")
-	cmd.Flags().StringVar(&runtime, "runtime", "", "language runtime: go, python, typescript, ruby, rust (required)")
+	cmd.Flags().StringVar(&runtime, "runtime", "", "language runtime: go, python, typescript (node/bun), ruby, rust (auto-detected when omitted)")
 	cmd.Flags().StringVar(&sourceDir, "dir", ".", "source directory to pack (default: current directory)")
 	cmd.Flags().StringVar(&ignoreFile, "ignore-file", "", "custom ignore file (default: .straitignore in source dir)")
 	cmd.Flags().StringVar(&projectID, "project", "", "project ID (overrides --project from root)")

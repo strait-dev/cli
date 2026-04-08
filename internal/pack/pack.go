@@ -93,6 +93,65 @@ func Pack(dir string, ignoreFile string) (*Result, error) {
 	}, nil
 }
 
+// ListContents returns the file paths that Pack would include for the given dir.
+// It applies the same ignore rules as Pack without writing an archive.
+func ListContents(dir string, ignoreFile string) ([]string, error) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, fmt.Errorf("resolve source dir: %w", err)
+	}
+
+	patterns := defaultIgnorePatterns()
+	if ignoreFile != "" {
+		extra, readErr := loadIgnoreFile(ignoreFile)
+		if readErr != nil {
+			return nil, fmt.Errorf("read ignore file: %w", readErr)
+		}
+		patterns = append(patterns, extra...)
+	} else {
+		candidate := filepath.Join(abs, ".straitignore")
+		if _, statErr := os.Stat(candidate); statErr == nil {
+			extra, readErr := loadIgnoreFile(candidate)
+			if readErr != nil {
+				return nil, fmt.Errorf("read .straitignore: %w", readErr)
+			}
+			patterns = append(patterns, extra...)
+		}
+	}
+
+	var files []string
+	if err := filepath.WalkDir(abs, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(abs, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		if rel == "." {
+			return nil
+		}
+		if shouldIgnore(rel, d.IsDir(), patterns) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if info.Mode().IsRegular() {
+			files = append(files, rel)
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("walk source dir: %w", err)
+	}
+	return files, nil
+}
+
 // writeArchive creates a deterministic gzipped tar from dir into w.
 func writeArchive(w io.Writer, dir string, patterns []ignorePattern) error {
 	gz := gzip.NewWriter(w)

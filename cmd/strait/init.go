@@ -81,8 +81,8 @@ func newInitCommand(state *appState) *cobra.Command {
 In interactive mode (default when TTY), a wizard guides you through setup.
 In non-interactive mode (--yes), all values come from flags.`,
 		Example: `  strait init
-  strait init --yes --name my-api --runtime node
-  strait init --yes --name my-api --runtime bun --with-job --job-name process-payment --job-endpoint http://localhost:3000/jobs/payment
+  strait init --yes --name my-api --runtime typescript
+  strait init --yes --name my-api --runtime go --with-job --job-name process-payment --job-endpoint http://localhost:3000/jobs/payment
   strait init --template full --name demo`,
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Interactive mode: TTY + no --yes flag
@@ -213,7 +213,7 @@ In non-interactive mode (--yes), all values come from flags.`,
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing config files")
 	cmd.Flags().StringVar(&template, "template", "", "template mode (minimal|full) for legacy definitions")
 	cmd.Flags().StringVar(&name, "name", "", "project name")
-	cmd.Flags().StringVar(&runtime, "runtime", "", "project runtime (node, bun, python, go, docker)")
+	cmd.Flags().StringVar(&runtime, "runtime", "", "project runtime (go, python, typescript, ruby, rust, node, bun, docker)")
 	cmd.Flags().BoolVar(&withJob, "with-job", false, "include a starter job")
 	cmd.Flags().StringVar(&jobName, "job-name", "", "starter job name (requires --with-job)")
 	cmd.Flags().StringVar(&jobEndpoint, "job-endpoint", "", "starter job endpoint URL (requires --with-job)")

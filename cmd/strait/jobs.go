@@ -512,8 +512,8 @@ func newJobsCreateCommand(state *appState) *cobra.Command {
 			if req.ProjectID == "" {
 				req.ProjectID = state.opts.projectID
 			}
-			if req.ProjectID == "" || req.Name == "" || req.Slug == "" || req.EndpointURL == "" {
-				return fmt.Errorf("project, name, slug, and endpoint are required")
+			if req.ProjectID == "" || req.Name == "" || req.Slug == "" {
+				return fmt.Errorf("project, name, and slug are required")
 			}
 
 			cli, err := newAPIClient(state)

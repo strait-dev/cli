@@ -170,7 +170,8 @@ func FuzzValidateRuntime(f *testing.F) {
 		// If accepted, the lowered/trimmed value must be one of the valid runtimes.
 		normalized := strings.TrimSpace(strings.ToLower(runtime))
 		valid := map[string]bool{
-			"node": true, "bun": true, "python": true, "go": true, "docker": true,
+			"go": true, "python": true, "typescript": true,
+			"ruby": true, "rust": true, "node": true, "bun": true, "docker": true,
 		}
 		if !valid[normalized] {
 			t.Fatalf("ValidateRuntime accepted invalid runtime: %q (normalized: %q)", runtime, normalized)
