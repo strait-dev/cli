@@ -36,11 +36,18 @@ func run(ctx context.Context) (exitCode int) {
 		code := exitCodeFromError(err)
 		if isJSONOutputMode() {
 			enc := json.NewEncoder(os.Stdout)
-			_ = enc.Encode(map[string]any{
+			out := map[string]any{
 				"error":     err.Error(),
 				"exit_code": code,
 				"code":      exitCodeName(code),
-			})
+			}
+			if s := errorSuggestion(code); s != "" {
+				out["suggestion"] = s
+			}
+			if u := errorDocsURL(code); u != "" {
+				out["docs_url"] = u
+			}
+			_ = enc.Encode(out)
 		} else {
 			fmt.Fprintln(os.Stderr, formatCLIError(err))
 		}

@@ -105,6 +105,12 @@ func TestJSONErrorOutput_StructureIsValid(t *testing.T) {
 		"exit_code": code,
 		"code":      exitCodeName(code),
 	}
+	if s := errorSuggestion(code); s != "" {
+		payload["suggestion"] = s
+	}
+	if u := errorDocsURL(code); u != "" {
+		payload["docs_url"] = u
+	}
 
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -124,5 +130,58 @@ func TestJSONErrorOutput_StructureIsValid(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "exit_code") {
 		t.Errorf("missing exit_code field in: %s", data)
+	}
+	if parsed["suggestion"] == "" {
+		t.Error("expected non-empty suggestion for not_found error")
+	}
+	if !strings.Contains(string(data), "docs_url") {
+		t.Errorf("missing docs_url field in: %s", data)
+	}
+}
+
+func TestErrorSuggestion_KnownCodes(t *testing.T) {
+	t.Parallel()
+
+	for _, code := range []int{ExitAuthError, ExitNotFound, ExitConflict, ExitValidation, ExitServerError, ExitConfigError} {
+		s := errorSuggestion(code)
+		if s == "" {
+			t.Errorf("expected non-empty suggestion for exit code %d (%s)", code, exitCodeName(code))
+		}
+	}
+}
+
+func TestErrorDocsURL_KnownCodes(t *testing.T) {
+	t.Parallel()
+
+	for _, code := range []int{ExitAuthError, ExitNotFound, ExitConflict, ExitValidation, ExitServerError, ExitConfigError} {
+		u := errorDocsURL(code)
+		if u == "" {
+			t.Errorf("expected non-empty docs_url for exit code %d (%s)", code, exitCodeName(code))
+		}
+		if !strings.HasPrefix(u, "https://") {
+			t.Errorf("expected https:// URL for exit code %d, got %q", code, u)
+		}
+	}
+}
+
+func TestErrorSuggestion_UnknownCodeReturnsEmpty(t *testing.T) {
+	t.Parallel()
+
+	if s := errorSuggestion(ExitOK); s != "" {
+		t.Errorf("expected empty suggestion for ExitOK, got %q", s)
+	}
+	if s := errorSuggestion(ExitGeneralError); s != "" {
+		t.Errorf("expected empty suggestion for ExitGeneralError, got %q", s)
+	}
+}
+
+func TestErrorDocsURL_UnknownCodeReturnsEmpty(t *testing.T) {
+	t.Parallel()
+
+	if u := errorDocsURL(ExitOK); u != "" {
+		t.Errorf("expected empty docs_url for ExitOK, got %q", u)
+	}
+	if u := errorDocsURL(ExitGeneralError); u != "" {
+		t.Errorf("expected empty docs_url for ExitGeneralError, got %q", u)
 	}
 }

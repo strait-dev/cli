@@ -57,6 +57,47 @@ func exitCodeName(code int) string {
 	}
 }
 
+// errorSuggestion returns a short human-readable fix hint for a given exit code.
+func errorSuggestion(code int) string {
+	switch code {
+	case ExitAuthError:
+		return "Run `strait login` to authenticate, or set the STRAIT_API_KEY environment variable."
+	case ExitNotFound:
+		return "Check the resource ID or slug with `strait jobs list` or `strait runs list`."
+	case ExitConflict:
+		return "Use a different name or slug, or update the existing resource with `strait jobs update`."
+	case ExitValidation:
+		return "Review the request fields. Use `strait schema job` (or `run`, `workflow`) to see valid field names and types."
+	case ExitServerError:
+		return "This is a server-side error. Check server health with `strait doctor` and try again."
+	case ExitConfigError:
+		return "Check your configuration. Run `strait doctor` to diagnose common issues."
+	default:
+		return ""
+	}
+}
+
+// errorDocsURL returns a documentation URL for a given exit code.
+func errorDocsURL(code int) string {
+	const base = "https://docs.strait.dev/cli"
+	switch code {
+	case ExitAuthError:
+		return base + "/auth"
+	case ExitNotFound:
+		return base + "/errors#not-found"
+	case ExitConflict:
+		return base + "/errors#conflict"
+	case ExitValidation:
+		return base + "/errors#validation"
+	case ExitServerError:
+		return base + "/errors#server-error"
+	case ExitConfigError:
+		return base + "/configuration"
+	default:
+		return ""
+	}
+}
+
 var reRequestFailed = regexp.MustCompile(`request failed \((\d{3})\)`)
 
 // exitCodeFromError maps a CLI error to a specific exit code.
