@@ -297,6 +297,53 @@ type ListAuditEventsParams struct {
 	Order        string
 }
 
+// CodeDeployment represents a code-first job deployment as returned by the API.
+type CodeDeployment struct {
+	ID               string     `json:"id"`
+	JobID            string     `json:"job_id"`
+	ProjectID        string     `json:"project_id"`
+	Version          int        `json:"version"`
+	Status           string     `json:"status"`
+	Runtime          string     `json:"runtime"`
+	SourceHash       string     `json:"source_hash"`
+	SourceSizeBytes  int64      `json:"source_size_bytes"`
+	SourceURI        string     `json:"source_uri"`
+	BuiltImageURI    string     `json:"built_image_uri,omitempty"`
+	BuiltImageDigest string     `json:"built_image_digest,omitempty"`
+	BuildLogs        string     `json:"build_logs,omitempty"`
+	ErrorMessage     string     `json:"error_message,omitempty"`
+	CreatedBy        string     `json:"created_by,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	FinishedAt       *time.Time `json:"finished_at,omitempty"`
+}
+
+// CreateCodeDeploymentRequest is the request body for creating a code deployment.
+type CreateCodeDeploymentRequest struct {
+	ProjectID       string `json:"project_id"`
+	JobID           string `json:"job_id"`
+	Runtime         string `json:"runtime"`
+	SourceHash      string `json:"source_hash"`
+	SourceSizeBytes int64  `json:"source_size_bytes"`
+}
+
+// CreateCodeDeploymentResponse is returned when creating a code deployment.
+type CreateCodeDeploymentResponse struct {
+	Deployment *CodeDeployment `json:"deployment"`
+	UploadURL  string          `json:"upload_url"`
+}
+
+// ConfirmCodeDeploymentRequest is the request body for confirming a code deployment.
+type ConfirmCodeDeploymentRequest struct {
+	ProjectID string `json:"project_id"`
+}
+
+// DeploymentLogChunk is a single chunk published on the build log SSE stream.
+type DeploymentLogChunk struct {
+	Chunk string `json:"chunk,omitempty"`
+	Done  bool   `json:"done,omitempty"`
+}
+
 // DeviceCodeResponse is returned by the device authorization endpoint.
 type DeviceCodeResponse struct {
 	DeviceCode      string `json:"device_code"`

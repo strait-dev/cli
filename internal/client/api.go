@@ -565,3 +565,75 @@ func (c *Client) ListAuditEvents(ctx context.Context, params ListAuditEventsPara
 	}
 	return out, nil
 }
+
+// GetJobBySlug looks up a job by its slug within a project.
+// It passes slug as a query parameter; if the server returns multiple jobs
+// (older server without slug filtering), it filters client-side.
+func (c *Client) GetJobBySlug(ctx context.Context, projectID, slug string) (*types.Job, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	query.Set("slug", slug)
+
+	var jobs []types.Job
+	if err := c.doListJSON(ctx, "/v1/jobs", query, &jobs); err != nil {
+		return nil, err
+	}
+	for i := range jobs {
+		if jobs[i].Slug == slug {
+			return &jobs[i], nil
+		}
+	}
+	return nil, fmt.Errorf("job with slug %q not found in project", slug)
+}
+
+// CreateCodeDeployment creates a new code-first deployment and returns the
+// deployment record plus a presigned PUT URL for uploading the source tarball.
+func (c *Client) CreateCodeDeployment(ctx context.Context, jobID string, req CreateCodeDeploymentRequest) (*CreateCodeDeploymentResponse, error) {
+	var out CreateCodeDeploymentResponse
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ConfirmCodeDeployment marks the tarball upload complete, triggering the build.
+func (c *Client) ConfirmCodeDeployment(ctx context.Context, jobID, deploymentID string, req ConfirmCodeDeploymentRequest) (*CodeDeployment, error) {
+	var out CodeDeployment
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments", deploymentID, "confirm"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetCodeDeployment fetches a single code deployment by ID.
+func (c *Client) GetCodeDeployment(ctx context.Context, jobID, deploymentID string) (*CodeDeployment, error) {
+	var out CodeDeployment
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/jobs", jobID, "deployments", deploymentID), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListCodeDeployments lists code deployments for a job.
+func (c *Client) ListCodeDeployments(ctx context.Context, jobID string, limit int) ([]CodeDeployment, error) {
+	query := url.Values{}
+	if limit > 0 {
+		query.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	var out []CodeDeployment
+	if err := c.doListJSON(ctx, path.Join("/v1/jobs", jobID, "deployments"), query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RollbackCodeDeployment activates a previously ready deployment as the active
+// deployment for the job, effectively rolling back to that version.
+func (c *Client) RollbackCodeDeployment(ctx context.Context, jobID, deploymentID, projectID string) (*CodeDeployment, error) {
+	body := ConfirmCodeDeploymentRequest{ProjectID: projectID}
+	var out CodeDeployment
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments", deploymentID, "rollback"), nil, body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}

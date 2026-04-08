@@ -196,6 +196,7 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newBackupCommand(state))
 	cmd.AddCommand(newProfileCommand(state))
 	cmd.AddCommand(newDeployCommand(state))
+	cmd.AddCommand(newCodeDeploymentsCommand(state))
 	cmd.AddCommand(newProjectCommand(state))
 	cmd.AddCommand(newBuildCommand(state))
 	cmd.AddCommand(newDoctorCommand(state))

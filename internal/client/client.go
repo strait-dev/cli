@@ -209,6 +209,30 @@ func (c *Client) doJSONWithHeaders(ctx context.Context, method, endpoint string,
 	return lastErr
 }
 
+// UploadFile performs an HTTP PUT of r to the given (presigned) URL.
+// size must be the exact byte count that will be read from r.
+// No authorization header is added; the URL is expected to be self-authenticating (presigned).
+func (c *Client) UploadFile(ctx context.Context, uploadURL string, r io.Reader, size int64) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, r)
+	if err != nil {
+		return fmt.Errorf("create upload request: %w", err)
+	}
+	req.ContentLength = size
+	req.Header.Set("Content-Type", "application/octet-stream")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("upload: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return fmt.Errorf("upload failed (%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return nil
+}
+
 // jitter returns a random duration in [0, maxJitter) using crypto/rand.
 func jitter(maxJitter time.Duration) time.Duration {
 	if maxJitter <= 0 {
