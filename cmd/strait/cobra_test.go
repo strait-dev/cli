@@ -277,7 +277,7 @@ func TestDebugCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	debug := findSubcommand(t, cmd, "debug")
 
-	expected := []string{"bundle"}
+	expected := []string{"bundle", "request"}
 	assertSubcommands(t, debug, expected)
 }
 

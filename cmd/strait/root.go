@@ -32,6 +32,7 @@ type rootOptions struct {
 	timeout        time.Duration
 	ciMode         bool
 	nonInteractive bool
+	debug          bool
 }
 
 type appState struct {
@@ -166,6 +167,7 @@ func newRootCommand() *cobra.Command {
 	cmd.PersistentFlags().DurationVar(&opts.timeout, "timeout", 30*time.Second, "API request timeout")
 	cmd.PersistentFlags().BoolVar(&opts.ciMode, "ci", false, "enable CI mode (no color, no prompts)")
 	cmd.PersistentFlags().BoolVar(&opts.nonInteractive, "non-interactive", false, "disable interactive prompts (also set via STRAIT_NON_INTERACTIVE=1)")
+	cmd.PersistentFlags().BoolVar(&opts.debug, "debug", false, "print HTTP request/response details to stderr")
 	cmd.Flags().BoolVar(&llms, "llms", false, "print full CLI command manifest as JSON for LLM consumption and exit")
 
 	// CLI commands only (no server commands: serve, server, migrate, db)

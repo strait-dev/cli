@@ -61,6 +61,12 @@ func New(baseURL, apiKey string, timeout time.Duration) (*Client, error) {
 	}, nil
 }
 
+// SetTransport replaces the transport used by the non-streaming HTTP client.
+// This is primarily used to inject a debug-logging transport.
+func (c *Client) SetTransport(rt http.RoundTripper) {
+	c.http.Transport = rt
+}
+
 func (c *Client) doJSON(ctx context.Context, method, endpoint string, query url.Values, body any, out any) error {
 	return c.doJSONWithHeaders(ctx, method, endpoint, query, body, nil, out)
 }
@@ -229,6 +235,62 @@ func (c *Client) UploadFile(ctx context.Context, uploadURL string, r io.Reader, 
 	if resp.StatusCode >= http.StatusBadRequest {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return fmt.Errorf("upload failed (%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return nil
+}
+
+// RawRequest sends an authenticated HTTP request to the given path (relative to
+// the base URL) with an optional JSON body. The response body is written to w
+// as indented JSON when parseable, otherwise as-is. This is used by the
+// `debug request` subcommand for interactive API inspection.
+func (c *Client) RawRequest(ctx context.Context, method, urlPath string, body string, w io.Writer) error {
+	fullURL := strings.TrimRight(c.baseURL, "/") + "/" + strings.TrimLeft(urlPath, "/")
+
+	var bodyReader io.Reader
+	if strings.TrimSpace(body) != "" {
+		bodyReader = bytes.NewBufferString(body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, fullURL, bodyReader)
+	if err != nil {
+		return fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+	if bodyReader != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if c.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	const maxBody = 10 * 1024 * 1024
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxBody))
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
+
+	// Print status line to stderr so stdout stays clean for piping.
+	fmt.Fprintf(os.Stderr, "HTTP %d\n", resp.StatusCode)
+
+	// Pretty-print JSON if parseable; otherwise raw.
+	var pretty bytes.Buffer
+	if json.Indent(&pretty, respBody, "", "  ") == nil {
+		_, err = io.Copy(w, &pretty)
+	} else {
+		_, err = w.Write(respBody)
+	}
+	if err != nil {
+		return fmt.Errorf("write output: %w", err)
+	}
+	// Ensure trailing newline.
+	if len(respBody) > 0 && respBody[len(respBody)-1] != '\n' {
+		_, _ = fmt.Fprintln(w)
 	}
 	return nil
 }
