@@ -221,6 +221,7 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newAuditCommand(state))
 	cmd.AddCommand(newWhoamiCommand(state))
 	cmd.AddCommand(newConfigCommand(state))
+	cmd.AddCommand(newSchemaCommand(state))
 
 	rawArgs := os.Args[1:]
 	configPath := extractConfigPath(rawArgs)
@@ -319,6 +320,7 @@ func normalizeLegacyArgs(args []string) []string {
 		"triggers":      {},
 		"whoami":        {},
 		"config":        {},
+		"schema":        {},
 	}
 
 	first := args[0]
