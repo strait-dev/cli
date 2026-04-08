@@ -49,10 +49,11 @@ func TestRequireConfirmation_YesFlag(t *testing.T) {
 
 func TestRequireConfirmation_CIMode(t *testing.T) {
 	t.Parallel()
-	state := &appState{opts: &rootOptions{ciMode: true}}
+	// CI mode implies nonInteractive; both must be set when constructing state directly in tests.
+	state := &appState{opts: &rootOptions{ciMode: true, nonInteractive: true}}
 	err := requireConfirmation(state, "Delete?", false)
-	if err == nil || !strings.Contains(err.Error(), "CI mode") {
-		t.Fatalf("expected CI mode error, got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "non-interactive") {
+		t.Fatalf("expected non-interactive error, got: %v", err)
 	}
 }
 

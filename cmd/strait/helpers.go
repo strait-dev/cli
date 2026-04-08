@@ -59,14 +59,14 @@ func newAPIClient(state *appState) (*client.Client, error) {
 	return client.New(state.opts.serverURL, state.opts.apiKey, state.opts.timeout)
 }
 
-// requireConfirmation checks CI mode and prompts interactively if needed.
+// requireConfirmation checks CI/non-interactive mode and prompts interactively if needed.
 // Pass yes=true when the user provided --yes flag.
 func requireConfirmation(state *appState, msg string, yes bool) error {
 	if yes {
 		return nil
 	}
-	if state.opts.ciMode {
-		return fmt.Errorf("interactive prompt blocked in CI mode; use --yes to confirm")
+	if state.opts.nonInteractive || state.opts.ciMode {
+		return fmt.Errorf("interactive prompt blocked in non-interactive mode; use --yes to confirm")
 	}
 	if !stdoutIsTTY() {
 		return fmt.Errorf("non-interactive terminal detected; use --yes to confirm")

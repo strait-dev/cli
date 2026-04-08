@@ -98,6 +98,9 @@ In non-interactive mode (--yes), all values come from flags.`,
 				jobEndpoint = result.JobEndpoint
 				jobCron = result.JobCron
 			} else if !yes {
+				if state.opts.nonInteractive {
+					return fmt.Errorf("non-interactive mode: use --yes with flags for non-interactive init")
+				}
 				return fmt.Errorf("interactive mode requires a TTY; use --yes with flags for non-interactive init")
 			}
 

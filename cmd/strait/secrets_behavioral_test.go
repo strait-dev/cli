@@ -162,7 +162,7 @@ func TestSecretsDelete_CIBlocksPrompt(t *testing.T) {
 	cmd.SetArgs([]string{"sec-1"})
 
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "CI mode") {
-		t.Fatalf("expected CI mode error, got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "non-interactive") {
+		t.Fatalf("expected non-interactive error, got: %v", err)
 	}
 }

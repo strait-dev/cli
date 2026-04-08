@@ -17,20 +17,21 @@ import (
 )
 
 type rootOptions struct {
-	serverURL    string
-	apiKey       string
-	projectID    string
-	outputFormat string
-	noHeaders    bool
-	outputTpl    string
-	outputPath   string
-	noColor      bool
-	quiet        bool
-	verbose      bool
-	contextName  string
-	configPath   string
-	timeout      time.Duration
-	ciMode       bool
+	serverURL      string
+	apiKey         string
+	projectID      string
+	outputFormat   string
+	noHeaders      bool
+	outputTpl      string
+	outputPath     string
+	noColor        bool
+	quiet          bool
+	verbose        bool
+	contextName    string
+	configPath     string
+	timeout        time.Duration
+	ciMode         bool
+	nonInteractive bool
 }
 
 type appState struct {
@@ -125,6 +126,15 @@ func newRootCommand() *cobra.Command {
 				opts.noColor = true
 			}
 
+			if opts.nonInteractive || os.Getenv("STRAIT_NON_INTERACTIVE") == "1" || os.Getenv("STRAIT_NON_INTERACTIVE") == "true" {
+				opts.nonInteractive = true
+			}
+
+			// CI mode implies non-interactive.
+			if opts.ciMode {
+				opts.nonInteractive = true
+			}
+
 			if opts.noColor {
 				styles.ForceNoColor()
 			}
@@ -147,6 +157,7 @@ func newRootCommand() *cobra.Command {
 	cmd.PersistentFlags().StringVar(&opts.configPath, "config", "", "config file path")
 	cmd.PersistentFlags().DurationVar(&opts.timeout, "timeout", 30*time.Second, "API request timeout")
 	cmd.PersistentFlags().BoolVar(&opts.ciMode, "ci", false, "enable CI mode (no color, no prompts)")
+	cmd.PersistentFlags().BoolVar(&opts.nonInteractive, "non-interactive", false, "disable interactive prompts (also set via STRAIT_NON_INTERACTIVE=1)")
 
 	// CLI commands only (no server commands: serve, server, migrate, db)
 	cmd.AddCommand(newDevCommand(state))
@@ -453,12 +464,13 @@ func newCompletionCommand(root *cobra.Command) *cobra.Command {
 
 func cliEnv() map[string]string {
 	return map[string]string{
-		"STRAIT_SERVER":  strings.TrimSpace(os.Getenv("STRAIT_SERVER")),
-		"STRAIT_API_KEY": strings.TrimSpace(os.Getenv("STRAIT_API_KEY")),
-		"STRAIT_PROJECT": strings.TrimSpace(os.Getenv("STRAIT_PROJECT")),
-		"STRAIT_FORMAT":  strings.TrimSpace(os.Getenv("STRAIT_FORMAT")),
-		"STRAIT_CONTEXT": strings.TrimSpace(os.Getenv("STRAIT_CONTEXT")),
-		"NO_COLOR":       strings.TrimSpace(os.Getenv("NO_COLOR")),
-		"STRAIT_CI":      strings.TrimSpace(os.Getenv("STRAIT_CI")),
+		"STRAIT_SERVER":          strings.TrimSpace(os.Getenv("STRAIT_SERVER")),
+		"STRAIT_API_KEY":         strings.TrimSpace(os.Getenv("STRAIT_API_KEY")),
+		"STRAIT_PROJECT":         strings.TrimSpace(os.Getenv("STRAIT_PROJECT")),
+		"STRAIT_FORMAT":          strings.TrimSpace(os.Getenv("STRAIT_FORMAT")),
+		"STRAIT_CONTEXT":         strings.TrimSpace(os.Getenv("STRAIT_CONTEXT")),
+		"NO_COLOR":               strings.TrimSpace(os.Getenv("NO_COLOR")),
+		"STRAIT_CI":              strings.TrimSpace(os.Getenv("STRAIT_CI")),
+		"STRAIT_NON_INTERACTIVE": strings.TrimSpace(os.Getenv("STRAIT_NON_INTERACTIVE")),
 	}
 }
