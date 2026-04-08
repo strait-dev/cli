@@ -374,8 +374,27 @@ func TestDeploymentsCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	deps := findSubcommand(t, cmd, "deployments")
 
-	expected := []string{"list", "get", "logs", "rollback"}
+	expected := []string{"list", "get", "logs", "rollback", "watch"}
 	assertSubcommands(t, deps, expected)
+}
+
+func TestDeploymentsWatchCommand_Flags(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCommand()
+	deps := findSubcommand(t, cmd, "deployments")
+	watch := findSubcommand(t, deps, "watch")
+
+	for _, name := range []string{"job", "project", "timeout"} {
+		if watch.Flags().Lookup(name) == nil {
+			t.Errorf("deployments watch missing --%s flag", name)
+		}
+	}
+
+	// Default timeout should be 30m.
+	if f := watch.Flags().Lookup("timeout"); f.DefValue != "30m0s" {
+		t.Errorf("watch --timeout default: got %q, want 30m0s", f.DefValue)
+	}
 }
 
 func TestDeploymentsGetCommand_Flags(t *testing.T) {

@@ -262,6 +262,50 @@ func pollUntilTerminal(ctx context.Context, cli *client.Client, jobID, deploymen
 	}
 }
 
+// WatchUntilTerminal polls GetCodeDeployment with exponential backoff and calls
+// onTick with the current status and elapsed time on each poll iteration.
+// The context deadline is respected (use context.WithTimeout for a custom ceiling).
+func WatchUntilTerminal(ctx context.Context, cli *client.Client, jobID, deploymentID string, onTick func(status string, elapsed time.Duration)) (*client.CodeDeployment, error) {
+	const (
+		minInterval = 3 * time.Second
+		maxInterval = 30 * time.Second
+	)
+
+	start := time.Now()
+	interval := minInterval
+
+	for {
+		d, err := cli.GetCodeDeployment(ctx, jobID, deploymentID)
+		if err != nil {
+			return nil, fmt.Errorf("poll deployment status: %w", err)
+		}
+
+		switch d.Status {
+		case "ready", "failed", "timed_out":
+			return d, nil
+		case "building", "pending":
+			// continue polling
+		default:
+			return nil, fmt.Errorf("unexpected deployment status: %s", d.Status)
+		}
+
+		if onTick != nil {
+			onTick(d.Status, time.Since(start))
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("watch cancelled after %s: %w", time.Since(start).Round(time.Second), ctx.Err())
+		case <-time.After(interval):
+		}
+
+		interval *= 2
+		if interval > maxInterval {
+			interval = maxInterval
+		}
+	}
+}
+
 // formatSize returns a human-readable file size.
 func formatSize(bytes int64) string {
 	const (
