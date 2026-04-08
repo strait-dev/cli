@@ -12,6 +12,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// formatUploadSize formats bytes as a human-readable string for upload progress display.
+func formatUploadSize(bytes int64) string {
+	const (
+		kb = 1024
+		mb = 1024 * kb
+	)
+	switch {
+	case bytes >= mb:
+		return fmt.Sprintf("%.1f MB", float64(bytes)/mb)
+	case bytes >= kb:
+		return fmt.Sprintf("%.1f KB", float64(bytes)/kb)
+	default:
+		return fmt.Sprintf("%d B", bytes)
+	}
+}
+
 func newDeploySourceCommand(state *appState) *cobra.Command {
 	var (
 		jobSlug    string
@@ -91,12 +107,38 @@ On success the job switches to use the newly built image.`,
 				}
 			}
 
+			// Upload progress: only in TTY-rich mode, printed inline using \r.
+			var onUploadProgress func(read, total int64)
+			if isTTYRich(state) && !state.opts.quiet {
+				var lastPct int
+				onUploadProgress = func(read, total int64) {
+					if total <= 0 {
+						return
+					}
+					pct := int(float64(read) / float64(total) * 100)
+					if pct == lastPct && read < total {
+						return // throttle: only print on 1% increments or completion
+					}
+					lastPct = pct
+					fmt.Fprintf(os.Stderr, "\r  %s %s / %s (%d%%)     ",
+						styles.MutedStyle.Render("Uploading..."),
+						formatUploadSize(read),
+						formatUploadSize(total),
+						pct,
+					)
+					if read >= total {
+						fmt.Fprintln(os.Stderr) // newline on completion
+					}
+				}
+			}
+
 			res, runErr := codedeploy.Run(cmd.Context(), cli, codedeploy.Options{
-				ProjectID:  resolvedProject,
-				JobSlug:    jobSlug,
-				Runtime:    runtime,
-				SourceDir:  sourceDir,
-				IgnoreFile: ignoreFile,
+				ProjectID:        resolvedProject,
+				JobSlug:          jobSlug,
+				Runtime:          runtime,
+				SourceDir:        sourceDir,
+				IgnoreFile:       ignoreFile,
+				OnUploadProgress: onUploadProgress,
 				OnProgress: func(msg string) {
 					if isTTYRich(state) && !state.opts.quiet {
 						fmt.Fprintln(os.Stderr, styles.MutedStyle.Render(msg))

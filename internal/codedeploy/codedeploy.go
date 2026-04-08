@@ -5,6 +5,7 @@ package codedeploy
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -69,8 +70,28 @@ type Options struct {
 	IgnoreFile string
 	// OnProgress is called with status updates; may be nil.
 	OnProgress func(msg string)
+	// OnUploadProgress is called during tarball upload with bytes read and total size.
+	// May be nil. Called frequently — throttle rendering on the caller side if needed.
+	OnUploadProgress func(read, total int64)
 	// OnLogChunk is called with each raw log line from the build; may be nil.
 	OnLogChunk func(chunk string)
+}
+
+// progressReader wraps an io.Reader and calls onProgress with cumulative bytes read.
+type progressReader struct {
+	r          io.Reader
+	total      int64
+	read       int64
+	onProgress func(read, total int64)
+}
+
+func (p *progressReader) Read(b []byte) (int, error) {
+	n, err := p.r.Read(b)
+	if n > 0 {
+		p.read += int64(n)
+		p.onProgress(p.read, p.total)
+	}
+	return n, err
 }
 
 // Result is returned on success.
@@ -146,7 +167,15 @@ func Run(ctx context.Context, cli *client.Client, opts Options) (*Result, error)
 	}
 	defer f.Close()
 
-	if err := cli.UploadFile(ctx, createResp.UploadURL, f, packed.Size); err != nil {
+	var uploadReader io.Reader = f
+	if opts.OnUploadProgress != nil {
+		uploadReader = &progressReader{
+			r:          f,
+			total:      packed.Size,
+			onProgress: opts.OnUploadProgress,
+		}
+	}
+	if err := cli.UploadFile(ctx, createResp.UploadURL, uploadReader, packed.Size); err != nil {
 		return nil, fmt.Errorf("upload tarball: %w", err)
 	}
 	progress("Upload complete")
