@@ -31,6 +31,32 @@ const (
 	ExitServerError = 8
 )
 
+// exitCodeName maps a numeric exit code to a stable slug used in JSON error output.
+func exitCodeName(code int) string {
+	switch code {
+	case ExitOK:
+		return "ok"
+	case ExitGeneralError:
+		return "error"
+	case ExitPanic:
+		return "panic"
+	case ExitConfigError:
+		return "config_error"
+	case ExitAuthError:
+		return "auth_error"
+	case ExitNotFound:
+		return "not_found"
+	case ExitConflict:
+		return "conflict"
+	case ExitValidation:
+		return "validation_error"
+	case ExitServerError:
+		return "server_error"
+	default:
+		return "error"
+	}
+}
+
 var reRequestFailed = regexp.MustCompile(`request failed \((\d{3})\)`)
 
 // exitCodeFromError maps a CLI error to a specific exit code.
