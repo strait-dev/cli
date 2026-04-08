@@ -44,6 +44,7 @@ type appState struct {
 func newRootCommand() *cobra.Command {
 	opts := &rootOptions{}
 	state := &appState{opts: opts}
+	var llms bool
 
 	cmd := &cobra.Command{
 		Use:           "strait",
@@ -51,6 +52,13 @@ func newRootCommand() *cobra.Command {
 		Long:          "Strait CLI manages jobs, runs, workflows, and other resources via the Strait REST API.",
 		SilenceUsage:  true,
 		SilenceErrors: true,
+		// RunE handles `strait --llms` (no subcommand).
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if llms {
+				return printLLMSManifest(cmd)
+			}
+			return cmd.Help()
+		},
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			loaded, err := cliconfig.Load(opts.configPath)
 			if err != nil {
@@ -158,6 +166,7 @@ func newRootCommand() *cobra.Command {
 	cmd.PersistentFlags().DurationVar(&opts.timeout, "timeout", 30*time.Second, "API request timeout")
 	cmd.PersistentFlags().BoolVar(&opts.ciMode, "ci", false, "enable CI mode (no color, no prompts)")
 	cmd.PersistentFlags().BoolVar(&opts.nonInteractive, "non-interactive", false, "disable interactive prompts (also set via STRAIT_NON_INTERACTIVE=1)")
+	cmd.Flags().BoolVar(&llms, "llms", false, "print full CLI command manifest as JSON for LLM consumption and exit")
 
 	// CLI commands only (no server commands: serve, server, migrate, db)
 	cmd.AddCommand(newDevCommand(state))
