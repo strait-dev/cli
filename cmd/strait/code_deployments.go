@@ -9,6 +9,7 @@ import (
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/codedeploy"
 	"github.com/strait-dev/cli/internal/styles"
+	"github.com/strait-dev/cli/internal/validate"
 
 	"github.com/spf13/cobra"
 )
@@ -123,6 +124,10 @@ func newCodeDeploymentGetCommand(state *appState) (*cobra.Command, *string) {
 				return err
 			}
 
+			if err := validate.ResourceID(args[0]); err != nil {
+				return fmt.Errorf("invalid deployment ID: %w", err)
+			}
+
 			job, err := cli.GetJobBySlug(cmd.Context(), resolvedProject, jobSlug)
 			if err != nil {
 				return fmt.Errorf("look up job: %w", err)
@@ -181,6 +186,10 @@ func newCodeDeploymentLogsCommand(state *appState) (*cobra.Command, *string) {
 				return err
 			}
 
+			if err := validate.ResourceID(args[0]); err != nil {
+				return fmt.Errorf("invalid deployment ID: %w", err)
+			}
+
 			job, err := cli.GetJobBySlug(cmd.Context(), resolvedProject, jobSlug)
 			if err != nil {
 				return fmt.Errorf("look up job: %w", err)
@@ -227,6 +236,10 @@ func newCodeDeploymentRollbackCommand(state *appState) (*cobra.Command, *string)
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if jobSlug == "" {
 				return fmt.Errorf("--job is required")
+			}
+
+			if err := validate.ResourceID(args[0]); err != nil {
+				return fmt.Errorf("invalid deployment ID: %w", err)
 			}
 
 			resolvedProject, err := requireProjectID(state, projectID)
@@ -297,6 +310,10 @@ Safe to use in CI pipelines and agent workflows.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if jobSlug == "" {
 				return fmt.Errorf("--job is required")
+			}
+
+			if err := validate.ResourceID(args[0]); err != nil {
+				return fmt.Errorf("invalid deployment ID: %w", err)
 			}
 
 			resolvedProject, err := requireProjectID(state, projectID)

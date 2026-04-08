@@ -11,6 +11,7 @@ import (
 
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
+	"github.com/strait-dev/cli/internal/validate"
 
 	"github.com/spf13/cobra"
 )
@@ -97,6 +98,9 @@ func stdinPiped() bool {
 }
 
 func resolveJobIdentifier(ctx context.Context, cli *client.Client, state *appState, idOrSlug string) (string, error) {
+	if err := validate.SlugOrID(idOrSlug); err != nil {
+		return "", fmt.Errorf("invalid job identifier: %w", err)
+	}
 	if _, err := cli.GetJob(ctx, idOrSlug); err == nil {
 		return idOrSlug, nil
 	}
