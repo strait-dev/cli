@@ -17,9 +17,18 @@ func newCodeDeploymentsCommand(state *appState) *cobra.Command {
 	}
 
 	cmd.AddCommand(newCodeDeploymentsListCommand(state))
-	cmd.AddCommand(newCodeDeploymentLogsCommand(state))
-	cmd.AddCommand(newCodeDeploymentRollbackCommand(state))
-	cmd.AddCommand(newCodeDeploymentGetCommand(state))
+
+	getCmd, getJobSlug := newCodeDeploymentGetCommand(state)
+	getCmd.ValidArgsFunction = completeDeploymentIDs(state, func() string { return *getJobSlug })
+	cmd.AddCommand(getCmd)
+
+	logsCmd, logsJobSlug := newCodeDeploymentLogsCommand(state)
+	logsCmd.ValidArgsFunction = completeDeploymentIDs(state, func() string { return *logsJobSlug })
+	cmd.AddCommand(logsCmd)
+
+	rollbackCmd, rollbackJobSlug := newCodeDeploymentRollbackCommand(state)
+	rollbackCmd.ValidArgsFunction = completeDeploymentIDs(state, func() string { return *rollbackJobSlug })
+	cmd.AddCommand(rollbackCmd)
 
 	return cmd
 }
@@ -85,7 +94,7 @@ func newCodeDeploymentsListCommand(state *appState) *cobra.Command {
 	return cmd
 }
 
-func newCodeDeploymentGetCommand(state *appState) *cobra.Command {
+func newCodeDeploymentGetCommand(state *appState) (*cobra.Command, *string) {
 	var jobSlug, projectID string
 
 	cmd := &cobra.Command{
@@ -139,10 +148,10 @@ func newCodeDeploymentGetCommand(state *appState) *cobra.Command {
 	cmd.Flags().StringVar(&jobSlug, "job", "", "job slug (required)")
 	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
 
-	return cmd
+	return cmd, &jobSlug
 }
 
-func newCodeDeploymentLogsCommand(state *appState) *cobra.Command {
+func newCodeDeploymentLogsCommand(state *appState) (*cobra.Command, *string) {
 	var jobSlug, projectID string
 	var stream bool
 
@@ -197,10 +206,10 @@ func newCodeDeploymentLogsCommand(state *appState) *cobra.Command {
 	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
 	cmd.Flags().BoolVar(&stream, "stream", false, "stream logs in real time (for in-progress builds)")
 
-	return cmd
+	return cmd, &jobSlug
 }
 
-func newCodeDeploymentRollbackCommand(state *appState) *cobra.Command {
+func newCodeDeploymentRollbackCommand(state *appState) (*cobra.Command, *string) {
 	var jobSlug, projectID string
 	var yes bool
 
@@ -262,7 +271,7 @@ func newCodeDeploymentRollbackCommand(state *appState) *cobra.Command {
 	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
 	cmd.Flags().BoolVar(&yes, "yes", false, "skip confirmation prompt")
 
-	return cmd
+	return cmd, &jobSlug
 }
 
 func deploymentToRow(d client.CodeDeployment) map[string]any {

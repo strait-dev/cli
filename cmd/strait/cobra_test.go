@@ -368,6 +368,44 @@ func assertSubcommands(t *testing.T, parent interface{ Commands() []*cobra.Comma
 	}
 }
 
+func TestDeploymentsCommand_HasSubcommands(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCommand()
+	deps := findSubcommand(t, cmd, "deployments")
+
+	expected := []string{"list", "get", "logs", "rollback"}
+	assertSubcommands(t, deps, expected)
+}
+
+func TestDeploymentsGetCommand_Flags(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCommand()
+	deps := findSubcommand(t, cmd, "deployments")
+	get := findSubcommand(t, deps, "get")
+
+	for _, name := range []string{"job", "project"} {
+		if get.Flags().Lookup(name) == nil {
+			t.Errorf("deployments get missing --%s flag", name)
+		}
+	}
+}
+
+func TestDeploymentsLogsCommand_Flags(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCommand()
+	deps := findSubcommand(t, cmd, "deployments")
+	logs := findSubcommand(t, deps, "logs")
+
+	for _, name := range []string{"job", "project", "stream"} {
+		if logs.Flags().Lookup(name) == nil {
+			t.Errorf("deployments logs missing --%s flag", name)
+		}
+	}
+}
+
 func TestRunsDiffCommand_Flags(t *testing.T) {
 	t.Parallel()
 
