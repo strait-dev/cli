@@ -181,7 +181,9 @@ func newJobsDescribeCommand(state *appState) *cobra.Command {
 					styles.DetailLine("Name", job.Name),
 					styles.DetailLine("Slug", job.Slug),
 					styles.DetailLine("Enabled", styles.Enabled(job.Enabled)),
+					styles.DetailLine("Source", jobSourceDisplay(job.SourceType)),
 					styles.DetailLine("Endpoint", job.EndpointURL),
+					styles.DetailLine("Active Deploy", job.ActiveDeploymentID),
 					styles.DetailLine("Cron", job.Cron),
 					styles.DetailLine("Timeout", fmt.Sprintf("%ds", job.TimeoutSecs)),
 					styles.DetailLine("Max Retry", fmt.Sprintf("%d", job.MaxAttempts)),
@@ -402,6 +404,18 @@ func runInteractiveJobEdit(ctx context.Context, cli *client.Client, state *appSt
 	return printData(state, patched)
 }
 
+// jobSourceDisplay returns a short label for a job's source type, e.g. "code" or "endpoint".
+func jobSourceDisplay(sourceType string) string {
+	switch sourceType {
+	case "code":
+		return "code"
+	case "endpoint", "":
+		return "endpoint"
+	default:
+		return sourceType
+	}
+}
+
 func newJobsListCommand(state *appState) *cobra.Command {
 	var projectID string
 
@@ -427,13 +441,18 @@ func newJobsListCommand(state *appState) *cobra.Command {
 
 			rows := make([]map[string]any, 0, len(jobs))
 			for _, job := range jobs {
-				rows = append(rows, map[string]any{
-					"id":      job.ID,
-					"name":    job.Name,
-					"slug":    job.Slug,
-					"cron":    job.Cron,
-					"enabled": styles.Enabled(job.Enabled),
-				})
+				row := map[string]any{
+					"id":          job.ID,
+					"name":        job.Name,
+					"slug":        job.Slug,
+					"cron":        job.Cron,
+					"enabled":     job.Enabled,
+					"source_type": jobSourceDisplay(job.SourceType),
+				}
+				if job.ActiveDeploymentID != "" {
+					row["active_deployment_id"] = job.ActiveDeploymentID
+				}
+				rows = append(rows, row)
 			}
 
 			if isTTYRich(state) {
@@ -443,9 +462,11 @@ func newJobsListCommand(state *appState) *cobra.Command {
 					if cron == "" {
 						cron = "--"
 					}
-					fmt.Fprintf(os.Stderr, "  %s  %-20s  cron=%s  %s\n",
+					src := jobSourceDisplay(job.SourceType)
+					fmt.Fprintf(os.Stderr, "  %s  %-20s  source=%-8s  cron=%s  %s\n",
 						styles.Enabled(job.Enabled),
 						styles.Bold.Render(job.Slug),
+						styles.MutedStyle.Render(src),
 						styles.MutedStyle.Render(cron),
 						styles.MutedStyle.Render(job.ID),
 					)
@@ -486,7 +507,9 @@ func newJobsGetCommand(state *appState) *cobra.Command {
 					styles.DetailLine("Name", job.Name),
 					styles.DetailLine("Slug", job.Slug),
 					styles.DetailLine("Enabled", styles.Enabled(job.Enabled)),
+					styles.DetailLine("Source", jobSourceDisplay(job.SourceType)),
 					styles.DetailLine("Endpoint", job.EndpointURL),
+					styles.DetailLine("Active Deploy", job.ActiveDeploymentID),
 					styles.DetailLine("Cron", job.Cron),
 					styles.DetailLine("Timeout", fmt.Sprintf("%ds", job.TimeoutSecs)),
 					styles.DetailLine("Max Retry", fmt.Sprintf("%d", job.MaxAttempts)),

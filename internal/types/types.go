@@ -372,6 +372,8 @@ type Job struct {
 	MaxIterationsPerRun       int               `json:"max_iterations_per_run,omitempty"`
 	AllowedTools              []string          `json:"allowed_tools,omitempty"`
 	BlockedTools              []string          `json:"blocked_tools,omitempty"`
+	SourceType                string            `json:"source_type,omitempty"`
+	ActiveDeploymentID        string            `json:"active_deployment_id,omitempty"`
 	CreatedBy                 string            `json:"created_by,omitempty"`
 	UpdatedBy                 string            `json:"updated_by,omitempty"`
 	CreatedAt                 time.Time         `json:"created_at"`

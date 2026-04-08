@@ -454,3 +454,97 @@ func TestResolveJobIdentifier_NotFound(t *testing.T) {
 		t.Fatalf("expected not found error, got: %v", err)
 	}
 }
+
+func TestJobsList_ShowsSourceType(t *testing.T) {
+	t.Parallel()
+
+	codeJob := types.Job{
+		ID:                 "job-code",
+		ProjectID:          "proj-test",
+		Name:               "Code Job",
+		Slug:               "code-job",
+		EndpointURL:        "",
+		MaxAttempts:        3,
+		TimeoutSecs:        60,
+		Enabled:            true,
+		Version:            3,
+		SourceType:         "code",
+		ActiveDeploymentID: "dep-abc",
+		CreatedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
+	endpointJob := types.Job{
+		ID:          "job-ep",
+		ProjectID:   "proj-test",
+		Name:        "Endpoint Job",
+		Slug:        "endpoint-job",
+		EndpointURL: "https://example.com/hook",
+		MaxAttempts: 3,
+		TimeoutSecs: 60,
+		Enabled:     true,
+		Version:     1,
+		SourceType:  "endpoint",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs": func(w http.ResponseWriter, r *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []types.Job{codeJob, endpointJob})
+		},
+	})
+
+	state := newTestState(t, srv)
+	cmd := newJobsListCommand(state)
+	cmd.SetArgs([]string{"--project", "proj-test"})
+
+	var rows []map[string]any
+	out := captureCommandOutput(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if err := json.Unmarshal([]byte(out), &rows); err != nil {
+		t.Fatalf("invalid JSON output: %v\nraw: %s", err, out)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(rows))
+	}
+
+	// First row should be code job.
+	src, _ := rows[0]["source_type"].(string)
+	if src != "code" {
+		t.Fatalf("expected source_type=code, got %q", src)
+	}
+	dep, _ := rows[0]["active_deployment_id"].(string)
+	if dep != "dep-abc" {
+		t.Fatalf("expected active_deployment_id=dep-abc, got %q", dep)
+	}
+
+	// Second row should be endpoint job.
+	src2, _ := rows[1]["source_type"].(string)
+	if src2 != "endpoint" {
+		t.Fatalf("expected source_type=endpoint, got %q", src2)
+	}
+}
+
+func TestJobSourceDisplay(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"code", "code"},
+		{"endpoint", "endpoint"},
+		{"", "endpoint"},
+		{"custom", "custom"},
+	}
+	for _, tc := range tests {
+		got := jobSourceDisplay(tc.input)
+		if got != tc.want {
+			t.Errorf("jobSourceDisplay(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
