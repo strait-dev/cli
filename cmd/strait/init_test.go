@@ -362,3 +362,124 @@ func TestInit_TemplateFullCreatesDefinitions(t *testing.T) {
 		t.Fatal("definitions/workflows.yaml not created for full template")
 	}
 }
+
+func TestWriteStraitIgnore_CreatesFile(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+	_ = os.Chdir(dir)
+
+	status, err := writeStraitIgnore("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status != "created" {
+		t.Fatalf("expected 'created', got %q", status)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, ".straitignore"))
+	if err != nil {
+		t.Fatal(".straitignore not created")
+	}
+	for _, pattern := range []string{".git/", ".env", "*.log", "dist/"} {
+		if !strings.Contains(string(content), pattern) {
+			t.Fatalf(".straitignore missing pattern %q", pattern)
+		}
+	}
+}
+
+func TestWriteStraitIgnore_SkipsIfExists(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+	_ = os.Chdir(dir)
+
+	if err := os.WriteFile(filepath.Join(dir, ".straitignore"), []byte("existing"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	status, err := writeStraitIgnore("go")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if status != "skipped" {
+		t.Fatalf("expected 'skipped', got %q", status)
+	}
+
+	// Original content must be untouched.
+	content, _ := os.ReadFile(filepath.Join(dir, ".straitignore"))
+	if string(content) != "existing" {
+		t.Fatal("existing .straitignore was overwritten")
+	}
+}
+
+// TestWriteStraitIgnore_RuntimePatterns is not parallel: os.Chdir is process-global.
+func TestWriteStraitIgnore_RuntimePatterns(t *testing.T) {
+	tests := []struct {
+		runtime  string
+		expected string
+	}{
+		{"typescript", "node_modules/"},
+		{"node", "node_modules/"},
+		{"bun", "node_modules/"},
+		{"python", "__pycache__/"},
+		{"go", "vendor/"},
+		{"rust", "target/"},
+		{"ruby", ".bundle/"},
+		{"docker", ""},
+		{"", ""},
+	}
+
+	origDir, _ := os.Getwd()
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+
+	for _, tc := range tests {
+		t.Run("runtime="+tc.runtime, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.Chdir(dir); err != nil {
+				t.Fatal(err)
+			}
+
+			_, err := writeStraitIgnore(tc.runtime)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			content, _ := os.ReadFile(filepath.Join(dir, ".straitignore"))
+			if tc.expected != "" && !strings.Contains(string(content), tc.expected) {
+				t.Fatalf("expected pattern %q in .straitignore for runtime %q", tc.expected, tc.runtime)
+			}
+			// Common patterns always present.
+			if !strings.Contains(string(content), ".git/") {
+				t.Fatal(".straitignore missing common .git/ pattern")
+			}
+		})
+	}
+}
+
+func TestInit_CreatesStraitIgnore(t *testing.T) {
+	dir := t.TempDir()
+	origDir, _ := os.Getwd()
+	t.Cleanup(func() { _ = os.Chdir(origDir) })
+	_ = os.Chdir(dir)
+
+	state := &appState{opts: &rootOptions{}}
+	cmd := newInitCommand(state)
+	cmd.SetArgs([]string{"--yes", "--name", "my-api", "--runtime", "typescript"})
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, ".straitignore"))
+	if err != nil {
+		t.Fatal(".straitignore not created by init command")
+	}
+	if !strings.Contains(string(content), "node_modules/") {
+		t.Fatal(".straitignore missing node_modules/ for typescript runtime")
+	}
+}

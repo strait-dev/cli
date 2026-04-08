@@ -152,6 +152,12 @@ In non-interactive mode (--yes), all values come from flags.`,
 			// Update .gitignore
 			gitignoreStatus := updateGitignore()
 
+			// Write .straitignore
+			straitignoreStatus, straitignoreErr := writeStraitIgnore(runtime)
+			if straitignoreErr != nil {
+				return fmt.Errorf("writing .straitignore: %w", straitignoreErr)
+			}
+
 			// Write declarative definitions (legacy template mode)
 			if template == "full" || template == "minimal" {
 				envStatus, envErr := writeInitEnv()
@@ -179,6 +185,7 @@ In non-interactive mode (--yes), all values come from flags.`,
 						{"path": configPath, "status": "created"},
 						{"path": ".strait.yaml", "status": configStatus},
 						{"path": ".gitignore", "status": gitignoreStatus},
+						{"path": ".straitignore", "status": straitignoreStatus},
 						{"path": ".env", "status": envStatus},
 						{"path": "docker-compose.yml", "status": dcStatus},
 						{"path": "definitions/jobs.yaml", "status": manifestStatus},
@@ -191,6 +198,7 @@ In non-interactive mode (--yes), all values come from flags.`,
 				{"path": configPath, "status": "created"},
 				{"path": ".strait.yaml", "status": configStatus},
 				{"path": ".gitignore", "status": gitignoreStatus},
+				{"path": ".straitignore", "status": straitignoreStatus},
 			}
 
 			if isTTYRich(state) {
@@ -409,5 +417,102 @@ func writeInitWorkflowManifest(template, projectName string) (string, error) {
 		return "", err
 	}
 
+	return "created", nil
+}
+
+// writeStraitIgnore writes a .straitignore file with common and runtime-specific
+// patterns. Returns "skipped" if the file already exists.
+func writeStraitIgnore(runtime string) (string, error) {
+	path := ".straitignore"
+	if _, err := os.Stat(path); err == nil {
+		return "skipped", nil
+	}
+
+	lines := []string{
+		"# Common — always excluded from source packs",
+		".git/",
+		".DS_Store",
+		"*.log",
+		"*.tmp",
+		".env",
+		".env.*",
+		"",
+		"# Build outputs",
+		"dist/",
+		"build/",
+		"out/",
+		"tmp/",
+		".tmp/",
+		"",
+		"# Secrets and certificates",
+		"*.pem",
+		"*.key",
+		"*.crt",
+		"*.p12",
+	}
+
+	// Normalise aliases to canonical names.
+	normalised := runtime
+	switch runtime {
+	case "node", "bun", "js":
+		normalised = "typescript"
+	}
+
+	switch normalised {
+	case "typescript":
+		lines = append(lines,
+			"",
+			"# Node.js / TypeScript",
+			"node_modules/",
+			".next/",
+			".nuxt/",
+			".turbo/",
+			"coverage/",
+			"*.tsbuildinfo",
+			".cache/",
+		)
+	case "python":
+		lines = append(lines,
+			"",
+			"# Python",
+			"__pycache__/",
+			"*.pyc",
+			"*.pyo",
+			".venv/",
+			"venv/",
+			".pytest_cache/",
+			"*.egg-info/",
+			".mypy_cache/",
+		)
+	case "go":
+		lines = append(lines,
+			"",
+			"# Go",
+			"vendor/",
+			"*.test",
+			"*.prof",
+		)
+	case "rust":
+		lines = append(lines,
+			"",
+			"# Rust",
+			"target/",
+		)
+	case "ruby":
+		lines = append(lines,
+			"",
+			"# Ruby",
+			".bundle/",
+			"vendor/bundle/",
+			"tmp/",
+			"log/",
+			"*.gem",
+		)
+	}
+
+	content := strings.Join(lines, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		return "", err
+	}
 	return "created", nil
 }
