@@ -51,6 +51,8 @@ func Render(w io.Writer, data any, opts Options) error {
 		return err
 	case "csv":
 		return renderCSV(w, data)
+	case "jsonl":
+		return renderJSONL(w, data)
 	case "go-template":
 		return renderTemplate(w, data, opts.Template)
 	case "jsonpath":
@@ -58,6 +60,29 @@ func Render(w io.Writer, data any, opts Options) error {
 	default:
 		return fmt.Errorf("unsupported output format %q", format)
 	}
+}
+
+// renderJSONL emits one compact JSON object per line (newline-delimited JSON).
+// Slices are unwrapped so each element becomes its own line.
+// Single objects are emitted as a single line.
+func renderJSONL(w io.Writer, data any) error {
+	enc := json.NewEncoder(w)
+	v := reflect.ValueOf(data)
+	for v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
+	if v.Kind() == reflect.Slice {
+		for i := range v.Len() {
+			if err := enc.Encode(v.Index(i).Interface()); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	return enc.Encode(data)
 }
 
 func renderTable(w io.Writer, data any, noHeaders bool) error {

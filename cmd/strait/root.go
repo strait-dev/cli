@@ -236,7 +236,7 @@ func newRootCommand() *cobra.Command {
 
 func registerRootCompletions(cmd *cobra.Command) {
 	_ = cmd.RegisterFlagCompletionFunc("format", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return []string{"table", "json", "yaml", "csv", "wide", "go-template", "jsonpath"}, cobra.ShellCompDirectiveNoFileComp
+		return []string{"table", "json", "jsonl", "compact", "yaml", "csv", "wide", "go-template", "jsonpath"}, cobra.ShellCompDirectiveNoFileComp
 	})
 
 	_ = cmd.RegisterFlagCompletionFunc("context", func(c *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
