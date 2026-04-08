@@ -244,10 +244,10 @@ type agentSkill struct {
 	Abstract string `json:"abstract"`
 }
 
-func newAgentSkillsCommand(_ *appState) *cobra.Command {
-	return &cobra.Command{
+func newAgentSkillsCommand(state *appState) *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "skills",
-		Short: "List available agent skill files as JSON",
+		Short: "List and generate agent skill reference files",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			// Locate the skills/ directory relative to the binary or CWD.
 			candidates := []string{
@@ -289,6 +289,146 @@ func newAgentSkillsCommand(_ *appState) *cobra.Command {
 			return enc.Encode(skills)
 		},
 	}
+	cmd.AddCommand(newAgentSkillsGenerateCommand(state))
+	return cmd
+}
+
+// skillFileResult summarises one generated (or skipped) skill file.
+type skillFileResult struct {
+	Command string `json:"command"`
+	File    string `json:"file"`
+	Status  string `json:"status"` // "created" | "skipped"
+}
+
+func newAgentSkillsGenerateCommand(_ *appState) *cobra.Command {
+	var outputDir string
+	var overwrite bool
+
+	cmd := &cobra.Command{
+		Use:   "generate",
+		Short: "Generate Markdown skill files from the live CLI command tree",
+		Long: `Introspects the cobra command tree and writes one Markdown skill file per
+top-level command into the output directory. Existing files are skipped by
+default; use --overwrite to replace them.`,
+		Example: `  strait agent skills generate
+  strait agent skills generate --output-dir ./docs/skills
+  strait agent skills generate --overwrite`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if err := os.MkdirAll(outputDir, 0o750); err != nil {
+				return fmt.Errorf("create output dir %s: %w", outputDir, err)
+			}
+
+			results := make([]skillFileResult, 0)
+			root := cmd.Root()
+
+			for _, sub := range root.Commands() {
+				if sub.Hidden || sub.Name() == "help" || sub.Name() == "completion" {
+					continue
+				}
+
+				filename := sub.Name() + ".md"
+				dest := filepath.Join(outputDir, filename)
+
+				status := "created"
+				if !overwrite {
+					if _, err := os.Stat(dest); err == nil {
+						status = "skipped"
+						results = append(results, skillFileResult{
+							Command: sub.Name(),
+							File:    dest,
+							Status:  status,
+						})
+						continue
+					}
+				}
+
+				content := buildSkillMarkdown(sub)
+				if err := os.WriteFile(dest, []byte(content), 0o644); err != nil { //nolint:gosec // 0644 is intentional for docs
+					return fmt.Errorf("write %s: %w", dest, err)
+				}
+				results = append(results, skillFileResult{
+					Command: sub.Name(),
+					File:    dest,
+					Status:  status,
+				})
+			}
+
+			enc := json.NewEncoder(os.Stdout)
+			enc.SetIndent("", "  ")
+			return enc.Encode(results)
+		},
+	}
+
+	cmd.Flags().StringVar(&outputDir, "output-dir", "skills", "directory to write skill files into")
+	cmd.Flags().BoolVar(&overwrite, "overwrite", false, "overwrite existing skill files")
+	return cmd
+}
+
+// buildSkillMarkdown generates Markdown documentation for a single cobra command.
+func buildSkillMarkdown(cmd *cobra.Command) string {
+	var b strings.Builder
+
+	b.WriteString("# Skill: " + cmd.Name() + "\n\n")
+	if cmd.Short != "" {
+		b.WriteString(cmd.Short + "\n\n")
+	}
+	if cmd.Long != "" {
+		b.WriteString("## Description\n\n")
+		b.WriteString(strings.TrimSpace(cmd.Long) + "\n\n")
+	}
+
+	b.WriteString("## Usage\n\n```\n" + cmd.Use + "\n```\n\n")
+
+	if cmd.Example != "" {
+		b.WriteString("## Examples\n\n```\n" + strings.TrimSpace(cmd.Example) + "\n```\n\n")
+	}
+
+	// Local flags table.
+	var flagLines []string
+	cmd.LocalFlags().VisitAll(func(f *pflag.Flag) {
+		if f.Hidden {
+			return
+		}
+		name := "--" + f.Name
+		if f.Shorthand != "" {
+			name = "-" + f.Shorthand + ", " + name
+		}
+		def := ""
+		if f.DefValue != "" && f.DefValue != "false" && f.DefValue != "0" {
+			def = f.DefValue
+		}
+		flagLines = append(flagLines, fmt.Sprintf("| `%s` | %s | %s | %s |", name, f.Value.Type(), def, f.Usage))
+	})
+	if len(flagLines) > 0 {
+		b.WriteString("## Flags\n\n")
+		b.WriteString("| Flag | Type | Default | Description |\n")
+		b.WriteString("|------|------|---------|-------------|\n")
+		for _, line := range flagLines {
+			b.WriteString(line + "\n")
+		}
+		b.WriteString("\n")
+	}
+
+	// Subcommands table.
+	subs := cmd.Commands()
+	if len(subs) > 0 {
+		b.WriteString("## Subcommands\n\n")
+		b.WriteString("| Subcommand | Description |\n")
+		b.WriteString("|------------|-------------|\n")
+		for _, sub := range subs {
+			if !sub.Hidden {
+				fmt.Fprintf(&b, "| `%s` | %s |\n", sub.Name(), sub.Short)
+			}
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString("## Agent notes\n\n")
+	b.WriteString("- Pass `--format json` or `--format jsonl` for machine-readable output.\n")
+	b.WriteString("- Pass `--non-interactive` or `--yes` to suppress confirmation prompts.\n")
+	b.WriteString("- Exit codes: 0=ok, 3=config error, 4=auth error, 5=not found, 6=conflict, 7=validation error, 8=server error.\n")
+
+	return b.String()
 }
 
 // extractSkillAbstract reads the first non-heading, non-empty line from a

@@ -3,8 +3,11 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/spf13/cobra"
 )
 
 func TestAgentCommand_RegisteredOnRoot(t *testing.T) {
@@ -169,4 +172,184 @@ func TestAgentSkills_OutputIsValidJSON(t *testing.T) {
 	}
 	// Skills list may be empty if skills/ dir is not in CWD — that's OK,
 	// but it must be a valid JSON array.
+}
+
+func TestAgentSkillsGenerate_CreatesFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	root := newRootCommand()
+	root.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir})
+
+	out := captureCommandOutput(t, func() {
+		if err := root.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	var results []skillFileResult
+	if err := json.Unmarshal([]byte(out), &results); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, out)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected at least one skill file to be generated")
+	}
+
+	// Every result should be "created".
+	for _, r := range results {
+		if r.Status != "created" {
+			t.Errorf("expected status=created for %q, got %q", r.Command, r.Status)
+		}
+		if r.File == "" {
+			t.Errorf("result for %q has empty file path", r.Command)
+		}
+	}
+}
+
+func TestAgentSkillsGenerate_SkipsExistingWithoutOverwrite(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	root := newRootCommand()
+
+	// First run — creates files.
+	root.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir})
+	captureCommandOutput(t, func() {
+		if err := root.Execute(); err != nil {
+			t.Fatalf("first generate: %v", err)
+		}
+	})
+
+	// Second run — should skip all files.
+	root2 := newRootCommand()
+	root2.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir})
+
+	out := captureCommandOutput(t, func() {
+		if err := root2.Execute(); err != nil {
+			t.Fatalf("second generate: %v", err)
+		}
+	})
+
+	var results []skillFileResult
+	if err := json.Unmarshal([]byte(out), &results); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, out)
+	}
+	for _, r := range results {
+		if r.Status != "skipped" {
+			t.Errorf("expected status=skipped on second run for %q, got %q", r.Command, r.Status)
+		}
+	}
+}
+
+func TestAgentSkillsGenerate_OverwriteReplacesFiles(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	root := newRootCommand()
+	root.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir})
+	captureCommandOutput(t, func() {
+		if err := root.Execute(); err != nil {
+			t.Fatalf("first generate: %v", err)
+		}
+	})
+
+	root2 := newRootCommand()
+	root2.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir, "--overwrite"})
+	out := captureCommandOutput(t, func() {
+		if err := root2.Execute(); err != nil {
+			t.Fatalf("overwrite generate: %v", err)
+		}
+	})
+
+	var results []skillFileResult
+	if err := json.Unmarshal([]byte(out), &results); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, out)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected results with --overwrite")
+	}
+	for _, r := range results {
+		if r.Status != "created" {
+			t.Errorf("expected status=created with --overwrite for %q, got %q", r.Command, r.Status)
+		}
+	}
+}
+
+func TestAgentSkillsGenerate_FileContainsSkillHeader(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	root := newRootCommand()
+	root.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir})
+	captureCommandOutput(t, func() {
+		if err := root.Execute(); err != nil {
+			t.Fatalf("generate: %v", err)
+		}
+	})
+
+	// Find the jobs.md file specifically.
+	content, err := os.ReadFile(dir + "/jobs.md")
+	if err != nil {
+		t.Fatalf("jobs.md not found: %v", err)
+	}
+	s := string(content)
+
+	if !strings.HasPrefix(s, "# Skill: jobs") {
+		t.Errorf("expected file to start with '# Skill: jobs', got: %.100s", s)
+	}
+	if !strings.Contains(s, "## Usage") {
+		t.Error("expected ## Usage section")
+	}
+	if !strings.Contains(s, "## Agent notes") {
+		t.Error("expected ## Agent notes section")
+	}
+}
+
+func TestAgentSkillsGenerate_HiddenCommandsExcluded(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	root := newRootCommand()
+	root.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir})
+	captureCommandOutput(t, func() {
+		if err := root.Execute(); err != nil {
+			t.Fatalf("generate: %v", err)
+		}
+	})
+
+	// "help" and "completion" should not be generated.
+	for _, name := range []string{"help", "completion"} {
+		if _, err := os.Stat(dir + "/" + name + ".md"); err == nil {
+			t.Errorf("unexpected skill file generated for hidden command %q", name)
+		}
+	}
+}
+
+func TestBuildSkillMarkdown_ContainsSections(t *testing.T) {
+	t.Parallel()
+
+	root := newRootCommand()
+	var jobsCmd *cobra.Command
+	for _, sub := range root.Commands() {
+		if sub.Name() == "jobs" {
+			jobsCmd = sub
+			break
+		}
+	}
+	if jobsCmd == nil {
+		t.Fatal("jobs command not found")
+	}
+
+	md := buildSkillMarkdown(jobsCmd)
+
+	for _, want := range []string{
+		"# Skill: jobs",
+		"## Usage",
+		"## Agent notes",
+		"Exit codes",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("missing %q in generated Markdown", want)
+		}
+	}
 }
