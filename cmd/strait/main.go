@@ -27,15 +27,15 @@ func run(ctx context.Context) (exitCode int) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Fprintf(os.Stderr, "fatal: %v\n", r)
-			exitCode = 2
+			exitCode = ExitPanic
 		}
 	}()
 
 	if err := newRootCommand().ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, formatCLIError(err))
-		return 1
+		return exitCodeFromError(err)
 	}
-	return 0
+	return ExitOK
 }
 
 // formatCLIError turns a raw Go error into a human-friendly styled message.
