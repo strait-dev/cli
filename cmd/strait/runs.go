@@ -278,11 +278,19 @@ func newRunsLogsCommand(state *appState) *cobra.Command {
 func newRunsWatchCommand(state *appState) *cobra.Command {
 	var interval time.Duration
 	var timeout time.Duration
+	var until string
 
 	cmd := &cobra.Command{
 		Use:   "watch <run-id>",
 		Short: "Watch a run until it reaches a terminal state",
-		Args:  cobra.ExactArgs(1),
+		Long: `Polls a run until it reaches a terminal state, then exits.
+
+By default exits 0 only when the run completes successfully.
+Use --until to accept specific terminal statuses as success (e.g. --until completed,failed).`,
+		Args: cobra.ExactArgs(1),
+		Example: `  strait runs watch run-abc123
+  strait runs watch run-abc123 --until completed,failed
+  strait runs watch run-abc123 --timeout 10m --interval 5s`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cli, err := newAPIClient(state)
 			if err != nil {
@@ -290,6 +298,9 @@ func newRunsWatchCommand(state *appState) *cobra.Command {
 			}
 			ctx := cmd.Context()
 			ttyMode := isTTYRich(state)
+
+			// Parse --until into a set of accepted terminal statuses.
+			acceptedStatuses := parseUntilStatuses(until)
 
 			deadline := time.Now().Add(timeout)
 			for {
@@ -312,14 +323,29 @@ func newRunsWatchCommand(state *appState) *cobra.Command {
 				if run.Status.IsTerminal() {
 					if ttyMode {
 						fmt.Fprintln(os.Stderr)
-						if run.Status == types.StatusCompleted {
-							fmt.Fprintln(os.Stderr, styles.Success("Run completed"))
-						} else {
-							fmt.Fprintln(os.Stderr, styles.Err("Run reached terminal status "+string(run.Status)))
-						}
 					}
+					// If --until was specified, succeed when run status is in accepted set.
+					if len(acceptedStatuses) > 0 {
+						if acceptedStatuses[string(run.Status)] {
+							if ttyMode {
+								fmt.Fprintln(os.Stderr, styles.Success("Run reached status "+string(run.Status)))
+							}
+							return nil
+						}
+						if ttyMode {
+							fmt.Fprintln(os.Stderr, styles.Err("Run reached status "+string(run.Status)+" (not in --until set)"))
+						}
+						return fmt.Errorf("run reached terminal status %q", run.Status)
+					}
+					// Default: only completed is success.
 					if run.Status == types.StatusCompleted {
+						if ttyMode {
+							fmt.Fprintln(os.Stderr, styles.Success("Run completed"))
+						}
 						return nil
+					}
+					if ttyMode {
+						fmt.Fprintln(os.Stderr, styles.Err("Run reached terminal status "+string(run.Status)))
 					}
 					return fmt.Errorf("run reached terminal status %q", run.Status)
 				}
@@ -342,8 +368,27 @@ func newRunsWatchCommand(state *appState) *cobra.Command {
 
 	cmd.Flags().DurationVar(&interval, "interval", 2*time.Second, "poll interval")
 	cmd.Flags().DurationVar(&timeout, "timeout", 5*time.Minute, "max watch duration (0 disables timeout)")
+	cmd.Flags().StringVar(&until, "until", "", "comma-separated list of terminal statuses to treat as success (e.g. completed,failed)")
 
 	return cmd
+}
+
+// parseUntilStatuses parses a comma-separated list of run statuses into a lookup set.
+// Returns nil if the input is empty.
+func parseUntilStatuses(s string) map[string]bool {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, ",")
+	m := make(map[string]bool, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			m[p] = true
+		}
+	}
+	return m
 }
 
 // watchRunUntilDone polls a run until it reaches a terminal state. It is used by
