@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/strait-dev/cli/internal/codedeploy"
 	"github.com/strait-dev/cli/internal/styles"
 
 	"github.com/sourcegraph/conc/pool"
@@ -344,6 +345,62 @@ authentication, and environment variables to diagnose common issues.`,
 					}
 				})
 			}
+
+			// 13. Code-deploy server support
+			p.Go(func() {
+				if sharedCliErr != nil {
+					addCheck(doctorCheck{
+						Check:   "code_deploy_supported",
+						Status:  "fail",
+						Message: sharedCliErr.Error(),
+						Fix:     "check API client configuration",
+					})
+					return
+				}
+				caps, capsErr := sharedCli.GetServerCapabilities(cmd.Context())
+				if capsErr != nil {
+					addCheck(doctorCheck{
+						Check:   "code_deploy_supported",
+						Status:  "warn",
+						Message: "capabilities endpoint unavailable (server may be older)",
+						Fix:     "upgrade the Strait server to enable code-first deployments",
+					})
+					return
+				}
+				if !caps.CodeDeployEnabled {
+					addCheck(doctorCheck{
+						Check:   "code_deploy_supported",
+						Status:  "fail",
+						Message: "disabled on server",
+						Fix:     "set BUILDKIT_ADDRESS and REGISTRY_HOST on the server to enable code-first deployments",
+					})
+					return
+				}
+				addCheck(doctorCheck{
+					Check:   "code_deploy_supported",
+					Status:  "pass",
+					Message: "enabled",
+				})
+			})
+
+			// 14. Runtime auto-detect in current directory
+			p.Go(func() {
+				detectedRuntime, ok := codedeploy.DetectRuntime(".")
+				if !ok {
+					addCheck(doctorCheck{
+						Check:   "runtime_detected",
+						Status:  "warn",
+						Message: "no runtime marker found in current directory",
+						Fix:     "add go.mod, package.json, requirements.txt, Cargo.toml, or Gemfile; or pass --runtime to deploy source",
+					})
+					return
+				}
+				addCheck(doctorCheck{
+					Check:   "runtime_detected",
+					Status:  "pass",
+					Message: detectedRuntime,
+				})
+			})
 
 			p.Wait()
 

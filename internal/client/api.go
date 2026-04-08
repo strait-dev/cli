@@ -637,3 +637,20 @@ func (c *Client) RollbackCodeDeployment(ctx context.Context, jobID, deploymentID
 	}
 	return &out, nil
 }
+
+// ServerCapabilities represents the capabilities reported by a Strait server instance.
+type ServerCapabilities struct {
+	CodeDeployEnabled bool   `json:"code_deploy_enabled"`
+	BuildKitAddress   string `json:"buildkit_address,omitempty"`
+	RegistryHost      string `json:"registry_host,omitempty"`
+}
+
+// GetServerCapabilities returns the server's feature capabilities.
+// Returns an error when the capabilities endpoint is unavailable (e.g. older servers).
+func (c *Client) GetServerCapabilities(ctx context.Context) (*ServerCapabilities, error) {
+	var out ServerCapabilities
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/system/capabilities", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
