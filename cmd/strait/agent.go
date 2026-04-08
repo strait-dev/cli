@@ -84,7 +84,7 @@ func newAgentCapabilitiesCommand(_ *appState) *cobra.Command {
 					Name:        "health_diagnosis",
 					Description: "Run comprehensive health and configuration checks",
 					Commands:    []string{"doctor", "health", "health --ready"},
-					Flags:       []string{"--json", "--verbose", "--check-endpoints", "--check-manifests"},
+					Flags:       []string{"--format json", "--verbose", "--check-endpoints", "--check-manifests"},
 				},
 				{
 					Name:        "workflow_management",

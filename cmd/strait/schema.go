@@ -1,10 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +31,10 @@ types, and enum values without hitting the API.`,
   strait schema job
   strait schema deployment
   strait schema workflow
-  strait schema run`,
+  strait schema run
+  strait schema trigger
+  strait schema secret
+  strait schema api-key`,
 	}
 
 	cmd.AddCommand(newSchemaRuntimesCommand(state))
@@ -43,11 +42,14 @@ types, and enum values without hitting the API.`,
 	cmd.AddCommand(newSchemaDeploymentCommand(state))
 	cmd.AddCommand(newSchemaWorkflowCommand(state))
 	cmd.AddCommand(newSchemaRunCommand(state))
+	cmd.AddCommand(newSchemaTriggerCommand(state))
+	cmd.AddCommand(newSchemaSecretCommand(state))
+	cmd.AddCommand(newSchemaAPIKeyCommand(state))
 
 	return cmd
 }
 
-func newSchemaRuntimesCommand(_ *appState) *cobra.Command {
+func newSchemaRuntimesCommand(state *appState) *cobra.Command {
 	return &cobra.Command{
 		Use:   "runtimes",
 		Short: "List supported code-first deployment runtimes",
@@ -59,14 +61,12 @@ func newSchemaRuntimesCommand(_ *appState) *cobra.Command {
 				{"runtime": "ruby", "aliases": "ruby", "marker": "Gemfile"},
 				{"runtime": "rust", "aliases": "rust", "marker": "Cargo.toml"},
 			}
-			enc := json.NewEncoder(os.Stdout)
-			enc.SetIndent("", "  ")
-			return enc.Encode(runtimes)
+			return printData(state, runtimes)
 		},
 	}
 }
 
-func newSchemaJobCommand(_ *appState) *cobra.Command {
+func newSchemaJobCommand(state *appState) *cobra.Command {
 	return &cobra.Command{
 		Use:   "job",
 		Short: "Print the schema for a Strait job resource",
@@ -93,12 +93,12 @@ func newSchemaJobCommand(_ *appState) *cobra.Command {
 					{Name: "updated_at", Type: "string (RFC3339)", Required: false, Description: "Last update timestamp"},
 				},
 			}
-			return printSchema(s)
+			return printData(state, s)
 		},
 	}
 }
 
-func newSchemaDeploymentCommand(_ *appState) *cobra.Command {
+func newSchemaDeploymentCommand(state *appState) *cobra.Command {
 	return &cobra.Command{
 		Use:   "deployment",
 		Short: "Print the schema for a Strait code deployment resource",
@@ -121,12 +121,12 @@ func newSchemaDeploymentCommand(_ *appState) *cobra.Command {
 					{Name: "finished_at", Type: "string (RFC3339)", Required: false, Description: "Build completion timestamp"},
 				},
 			}
-			return printSchema(s)
+			return printData(state, s)
 		},
 	}
 }
 
-func newSchemaWorkflowCommand(_ *appState) *cobra.Command {
+func newSchemaWorkflowCommand(state *appState) *cobra.Command {
 	return &cobra.Command{
 		Use:   "workflow",
 		Short: "Print the schema for a Strait workflow resource",
@@ -147,12 +147,12 @@ func newSchemaWorkflowCommand(_ *appState) *cobra.Command {
 					{Name: "updated_at", Type: "string (RFC3339)", Required: false, Description: "Last update timestamp"},
 				},
 			}
-			return printSchema(s)
+			return printData(state, s)
 		},
 	}
 }
 
-func newSchemaRunCommand(_ *appState) *cobra.Command {
+func newSchemaRunCommand(state *appState) *cobra.Command {
 	return &cobra.Command{
 		Use:   "run",
 		Short: "Print the schema for a Strait job run resource",
@@ -177,16 +177,82 @@ func newSchemaRunCommand(_ *appState) *cobra.Command {
 					{Name: "created_at", Type: "string (RFC3339)", Required: false, Description: "Creation timestamp"},
 				},
 			}
-			return printSchema(s)
+			return printData(state, s)
 		},
 	}
 }
 
-func printSchema(s schemaResource) error {
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(s); err != nil {
-		return fmt.Errorf("encode schema: %w", err)
+func newSchemaTriggerCommand(state *appState) *cobra.Command {
+	return &cobra.Command{
+		Use:   "trigger",
+		Short: "Print the schema for a Strait trigger resource",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			s := schemaResource{
+				Resource:    "trigger",
+				Description: "An event trigger that fires a job or workflow run when a matching event is received.",
+				Fields: []schemaField{
+					{Name: "id", Type: "string", Required: false, Description: "Unique trigger identifier (server-assigned UUID)"},
+					{Name: "name", Type: "string", Required: true, Description: "Human-readable trigger name"},
+					{Name: "slug", Type: "string", Required: true, Description: "URL-safe identifier used in API paths"},
+					{Name: "project_id", Type: "string", Required: true, Description: "Project the trigger belongs to"},
+					{Name: "event", Type: "string", Required: true, Description: "Event name this trigger listens for"},
+					{Name: "filter", Type: "object", Required: false, Description: "CEL or JSON-match filter applied to incoming event payload"},
+					{Name: "target_type", Type: "string", Required: true, Description: "Type of target to fire on match", Enum: []string{"job", "workflow"}},
+					{Name: "target_id", Type: "string", Required: true, Description: "ID of the job or workflow to trigger"},
+					{Name: "payload_template", Type: "object", Required: false, Description: "Go template applied to event payload to produce the run payload"},
+					{Name: "enabled", Type: "boolean", Required: false, Description: "Whether the trigger is active (default: true)"},
+					{Name: "created_at", Type: "string (RFC3339)", Required: false, Description: "Creation timestamp"},
+					{Name: "updated_at", Type: "string (RFC3339)", Required: false, Description: "Last update timestamp"},
+				},
+			}
+			return printData(state, s)
+		},
 	}
-	return nil
+}
+
+func newSchemaSecretCommand(state *appState) *cobra.Command {
+	return &cobra.Command{
+		Use:   "secret",
+		Short: "Print the schema for a Strait secret resource",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			s := schemaResource{
+				Resource:    "secret",
+				Description: "A named secret value scoped to a project, injected as an environment variable at run time.",
+				Fields: []schemaField{
+					{Name: "id", Type: "string", Required: false, Description: "Unique secret identifier (server-assigned UUID)"},
+					{Name: "key", Type: "string", Required: true, Description: "Environment variable name (e.g. DATABASE_URL); must be uppercase with underscores"},
+					{Name: "value", Type: "string", Required: true, Description: "Secret value; write-only — never returned by the API after creation"},
+					{Name: "project_id", Type: "string", Required: true, Description: "Project the secret belongs to"},
+					{Name: "description", Type: "string", Required: false, Description: "Optional human-readable description"},
+					{Name: "created_at", Type: "string (RFC3339)", Required: false, Description: "Creation timestamp"},
+					{Name: "updated_at", Type: "string (RFC3339)", Required: false, Description: "Last update timestamp"},
+				},
+			}
+			return printData(state, s)
+		},
+	}
+}
+
+func newSchemaAPIKeyCommand(state *appState) *cobra.Command {
+	return &cobra.Command{
+		Use:   "api-key",
+		Short: "Print the schema for a Strait API key resource",
+		RunE: func(_ *cobra.Command, _ []string) error {
+			s := schemaResource{
+				Resource:    "api_key",
+				Description: "An API key used to authenticate CLI and programmatic access to the Strait API.",
+				Fields: []schemaField{
+					{Name: "id", Type: "string", Required: false, Description: "Unique API key identifier"},
+					{Name: "name", Type: "string", Required: true, Description: "Human-readable label for the key"},
+					{Name: "prefix", Type: "string", Required: false, Description: "First 8 characters of the key token (for identification; full token only returned on creation)"},
+					{Name: "scopes", Type: "array", Required: false, Description: "Permission scopes granted to this key", Enum: []string{"read", "write", "admin"}},
+					{Name: "project_id", Type: "string", Required: false, Description: "Project scope (omit for org-level key)"},
+					{Name: "expires_at", Type: "string (RFC3339)", Required: false, Description: "Expiry timestamp (null = never expires)"},
+					{Name: "last_used_at", Type: "string (RFC3339)", Required: false, Description: "When the key was last used to authenticate"},
+					{Name: "created_at", Type: "string (RFC3339)", Required: false, Description: "Creation timestamp"},
+				},
+			}
+			return printData(state, s)
+		},
+	}
 }

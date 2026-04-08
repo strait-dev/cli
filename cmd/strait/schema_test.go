@@ -19,7 +19,7 @@ func TestSchemaCommand_HasSubcommands(t *testing.T) {
 		names[sub.Name()] = true
 	}
 
-	for _, want := range []string{"runtimes", "job", "deployment", "workflow", "run"} {
+	for _, want := range []string{"runtimes", "job", "deployment", "workflow", "run", "trigger", "secret", "api-key"} {
 		if !names[want] {
 			t.Errorf("missing subcommand %q", want)
 		}
@@ -175,6 +175,102 @@ func TestSchemaRun_ContainsRunStatuses(t *testing.T) {
 	for _, status := range []string{"queued", "executing", "completed", "failed", "timed_out", "canceled"} {
 		if !strings.Contains(out, status) {
 			t.Errorf("expected run status %q in schema output", status)
+		}
+	}
+}
+
+func TestSchemaTrigger_OutputIsValidJSON(t *testing.T) {
+	t.Parallel()
+
+	srv := newTestServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	state := newTestState(t, srv)
+	cmd := newSchemaCommand(state)
+	cmd.SetArgs([]string{"trigger"})
+
+	out := captureCommandOutput(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	var schema schemaResource
+	if err := json.Unmarshal([]byte(out), &schema); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, out)
+	}
+	if schema.Resource != "trigger" {
+		t.Errorf("expected resource=trigger, got %q", schema.Resource)
+	}
+	fieldNames := make(map[string]bool)
+	for _, f := range schema.Fields {
+		fieldNames[f.Name] = true
+	}
+	for _, want := range []string{"event", "target_type", "target_id", "enabled"} {
+		if !fieldNames[want] {
+			t.Errorf("missing field %q in trigger schema", want)
+		}
+	}
+}
+
+func TestSchemaSecret_OutputIsValidJSON(t *testing.T) {
+	t.Parallel()
+
+	srv := newTestServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	state := newTestState(t, srv)
+	cmd := newSchemaCommand(state)
+	cmd.SetArgs([]string{"secret"})
+
+	out := captureCommandOutput(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	var schema schemaResource
+	if err := json.Unmarshal([]byte(out), &schema); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, out)
+	}
+	if schema.Resource != "secret" {
+		t.Errorf("expected resource=secret, got %q", schema.Resource)
+	}
+	fieldNames := make(map[string]bool)
+	for _, f := range schema.Fields {
+		fieldNames[f.Name] = true
+	}
+	for _, want := range []string{"key", "value", "project_id"} {
+		if !fieldNames[want] {
+			t.Errorf("missing field %q in secret schema", want)
+		}
+	}
+}
+
+func TestSchemaAPIKey_OutputIsValidJSON(t *testing.T) {
+	t.Parallel()
+
+	srv := newTestServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	state := newTestState(t, srv)
+	cmd := newSchemaCommand(state)
+	cmd.SetArgs([]string{"api-key"})
+
+	out := captureCommandOutput(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	var schema schemaResource
+	if err := json.Unmarshal([]byte(out), &schema); err != nil {
+		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, out)
+	}
+	if schema.Resource != "api_key" {
+		t.Errorf("expected resource=api_key, got %q", schema.Resource)
+	}
+	fieldNames := make(map[string]bool)
+	for _, f := range schema.Fields {
+		fieldNames[f.Name] = true
+	}
+	for _, want := range []string{"name", "prefix", "scopes", "expires_at"} {
+		if !fieldNames[want] {
+			t.Errorf("missing field %q in api-key schema", want)
 		}
 	}
 }

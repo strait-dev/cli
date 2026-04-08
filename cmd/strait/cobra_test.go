@@ -214,7 +214,7 @@ func TestDoctorCommand_Flags(t *testing.T) {
 	cmd := newRootCommand()
 	doctor := findSubcommand(t, cmd, "doctor")
 
-	for _, name := range []string{"verbose", "json", "fix", "check-endpoints", "check-manifests"} {
+	for _, name := range []string{"verbose", "fix", "check-endpoints", "check-manifests"} {
 		if doctor.Flags().Lookup(name) == nil {
 			t.Errorf("doctor missing --%s flag", name)
 		}

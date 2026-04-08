@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
@@ -26,7 +25,6 @@ type doctorCheck struct {
 
 func newDoctorCommand(state *appState) *cobra.Command {
 	var verbose bool
-	var asJSON bool
 	var fix bool
 	var checkEndpoints bool
 	var checkManifests string
@@ -38,7 +36,7 @@ func newDoctorCommand(state *appState) *cobra.Command {
 authentication, and environment variables to diagnose common issues.`,
 		Example: `  strait doctor
   strait doctor --verbose
-  strait doctor --json
+  strait doctor --format json
   strait doctor --check-endpoints
   strait doctor --check-manifests ./manifests/`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -416,12 +414,6 @@ authentication, and environment variables to diagnose common issues.`,
 				}
 			}
 
-			if asJSON {
-				enc := json.NewEncoder(os.Stdout)
-				enc.SetIndent("", "  ")
-				return enc.Encode(checks)
-			}
-
 			// Summary counts
 			passed, warned, failed := 0, 0, 0
 			for _, c := range checks {
@@ -473,7 +465,6 @@ authentication, and environment variables to diagnose common issues.`,
 	}
 
 	cmd.Flags().BoolVar(&verbose, "verbose", false, "show detailed check output")
-	cmd.Flags().BoolVar(&asJSON, "json", false, "output results as JSON")
 	cmd.Flags().BoolVar(&fix, "fix", false, "attempt to auto-fix issues where possible")
 	cmd.Flags().BoolVar(&checkEndpoints, "check-endpoints", false, "test endpoint URL reachability from manifests")
 	cmd.Flags().StringVar(&checkManifests, "check-manifests", "", "path to manifest files or directory to validate")
