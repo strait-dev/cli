@@ -56,7 +56,7 @@ func newFixturesCreateCommand(state *appState) *cobra.Command {
 				EndpointURL: "http://localhost:3000/webhook",
 				TimeoutSecs: 30,
 				MaxAttempts: 1,
-			})
+			}, "")
 			if err != nil {
 				if !strings.Contains(strings.ToLower(err.Error()), "duplicate") && !strings.Contains(strings.ToLower(err.Error()), "exists") {
 					return err

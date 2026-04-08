@@ -34,9 +34,13 @@ func (c *Client) GetJob(ctx context.Context, id string) (*types.Job, error) {
 }
 
 // CreateJob creates a new job.
-func (c *Client) CreateJob(ctx context.Context, req CreateJobRequest) (*types.Job, error) {
+func (c *Client) CreateJob(ctx context.Context, req CreateJobRequest, idempotencyKey string) (*types.Job, error) {
 	var out types.Job
-	if err := c.doJSON(ctx, http.MethodPost, "/v1/jobs", nil, req, &out); err != nil {
+	headers := map[string]string{}
+	if strings.TrimSpace(idempotencyKey) != "" {
+		headers["X-Idempotency-Key"] = strings.TrimSpace(idempotencyKey)
+	}
+	if err := c.doJSONWithHeaders(ctx, http.MethodPost, "/v1/jobs", nil, req, headers, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
@@ -204,9 +208,13 @@ func (c *Client) GetWorkflow(ctx context.Context, workflowID string) (*WorkflowR
 }
 
 // CreateWorkflow creates a new workflow.
-func (c *Client) CreateWorkflow(ctx context.Context, req CreateWorkflowRequest) (*WorkflowResponse, error) {
+func (c *Client) CreateWorkflow(ctx context.Context, req CreateWorkflowRequest, idempotencyKey string) (*WorkflowResponse, error) {
 	var out WorkflowResponse
-	if err := c.doJSON(ctx, http.MethodPost, "/v1/workflows", nil, req, &out); err != nil {
+	headers := map[string]string{}
+	if strings.TrimSpace(idempotencyKey) != "" {
+		headers["X-Idempotency-Key"] = strings.TrimSpace(idempotencyKey)
+	}
+	if err := c.doJSONWithHeaders(ctx, http.MethodPost, "/v1/workflows", nil, req, headers, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

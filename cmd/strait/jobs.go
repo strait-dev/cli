@@ -536,6 +536,7 @@ func newJobsGetCommand(state *appState) *cobra.Command {
 
 func newJobsCreateCommand(state *appState) *cobra.Command {
 	var req client.CreateJobRequest
+	var idempotencyKey string
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -553,7 +554,7 @@ func newJobsCreateCommand(state *appState) *cobra.Command {
 				return err
 			}
 
-			job, err := cli.CreateJob(cmd.Context(), req)
+			job, err := cli.CreateJob(cmd.Context(), req, idempotencyKey)
 			if err != nil {
 				return err
 			}
@@ -576,6 +577,7 @@ func newJobsCreateCommand(state *appState) *cobra.Command {
 	cmd.Flags().IntVar(&req.TimeoutSecs, "timeout-secs", 60, "execution timeout in seconds")
 	cmd.Flags().IntVar(&req.MaxAttempts, "max-attempts", 3, "max attempts")
 	cmd.Flags().IntVar(&req.RunTTLSecs, "run-ttl-secs", 0, "run TTL in seconds")
+	cmd.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "idempotency key to prevent duplicate creates (passed as X-Idempotency-Key header)")
 
 	return cmd
 }

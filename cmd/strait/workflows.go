@@ -225,6 +225,7 @@ func newWorkflowsCreateCommand(state *appState) *cobra.Command {
 	var slug string
 	var description string
 	var stepsJSON string
+	var idempotencyKey string
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -253,7 +254,7 @@ func newWorkflowsCreateCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			wf, err := cli.CreateWorkflow(cmd.Context(), req)
+			wf, err := cli.CreateWorkflow(cmd.Context(), req, idempotencyKey)
 			if err != nil {
 				return err
 			}
@@ -272,6 +273,7 @@ func newWorkflowsCreateCommand(state *appState) *cobra.Command {
 	cmd.Flags().StringVar(&slug, "slug", "", "workflow slug")
 	cmd.Flags().StringVar(&description, "description", "", "workflow description")
 	cmd.Flags().StringVar(&stepsJSON, "steps-json", "", "JSON array of workflow steps")
+	cmd.Flags().StringVar(&idempotencyKey, "idempotency-key", "", "idempotency key to prevent duplicate creates (passed as X-Idempotency-Key header)")
 
 	return cmd
 }
