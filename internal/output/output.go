@@ -53,6 +53,8 @@ func Render(w io.Writer, data any, opts Options) error {
 		return renderCSV(w, data)
 	case "jsonl":
 		return renderJSONL(w, data)
+	case "compact":
+		return renderCompact(w, data)
 	case "go-template":
 		return renderTemplate(w, data, opts.Template)
 	case "jsonpath":
@@ -83,6 +85,66 @@ func renderJSONL(w io.Writer, data any) error {
 		return nil
 	}
 	return enc.Encode(data)
+}
+
+// renderCompact emits compact single-line JSON with zero/empty fields stripped.
+// Useful for agent consumers where token efficiency matters.
+func renderCompact(w io.Writer, data any) error {
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	var generic any
+	if err := json.Unmarshal(raw, &generic); err != nil {
+		return err
+	}
+	stripped := stripZeroValues(generic)
+	enc := json.NewEncoder(w)
+	return enc.Encode(stripped)
+}
+
+// stripZeroValues recursively removes keys whose values are nil, "", 0, false,
+// empty slice, or empty map from JSON-decoded data structures.
+func stripZeroValues(v any) any {
+	switch val := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(val))
+		for k, child := range val {
+			if isZero(child) {
+				continue
+			}
+			out[k] = stripZeroValues(child)
+		}
+		return out
+	case []any:
+		out := make([]any, 0, len(val))
+		for _, item := range val {
+			out = append(out, stripZeroValues(item))
+		}
+		return out
+	default:
+		return v
+	}
+}
+
+// isZero reports whether a JSON-decoded value should be considered zero/empty.
+func isZero(v any) bool {
+	if v == nil {
+		return true
+	}
+	switch val := v.(type) {
+	case string:
+		return val == ""
+	case float64:
+		return val == 0
+	case bool:
+		return !val
+	case []any:
+		return len(val) == 0
+	case map[string]any:
+		return len(val) == 0
+	}
+	return false
 }
 
 func renderTable(w io.Writer, data any, noHeaders bool) error {
