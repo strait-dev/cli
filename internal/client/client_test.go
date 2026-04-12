@@ -2120,3 +2120,93 @@ func TestDoListAllJSON_NoWarningOnNormalPagination(t *testing.T) {
 		t.Fatalf("should not warn on normal pagination, got: %q", stderrOutput)
 	}
 }
+
+func TestVerifyAuditChain_Passed(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodGet)
+		assertPath(t, r, "/v1/audit-events/verify")
+		assertAuth(t, r, "test-key")
+		if r.URL.Query().Get("project_id") != "proj-1" {
+			t.Fatalf("expected project_id=proj-1, got %q", r.URL.Query().Get("project_id"))
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"project_id":"proj-1","valid":true,"events_checked":42,"first_event_id":"ae-a","last_event_id":"ae-z"}`))
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	got, err := c.VerifyAuditChain(context.Background(), VerifyAuditChainParams{ProjectID: "proj-1"})
+	if err != nil {
+		t.Fatalf("VerifyAuditChain: %v", err)
+	}
+	if !got.Valid {
+		t.Fatalf("expected valid=true, got %+v", got)
+	}
+	if got.EventsChecked != 42 {
+		t.Fatalf("expected 42 events checked, got %d", got.EventsChecked)
+	}
+	if got.ProjectID != "proj-1" {
+		t.Fatalf("unexpected project_id: %q", got.ProjectID)
+	}
+}
+
+func TestVerifyAuditChain_Failed(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodGet)
+		assertPath(t, r, "/v1/audit-events/verify")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"project_id":"proj-2","valid":false,"events_checked":17,"broken_at_id":"ae-bad","error":"hmac mismatch"}`))
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	got, err := c.VerifyAuditChain(context.Background(), VerifyAuditChainParams{ProjectID: "proj-2"})
+	if err != nil {
+		t.Fatalf("VerifyAuditChain: %v", err)
+	}
+	if got.Valid {
+		t.Fatalf("expected valid=false, got %+v", got)
+	}
+	if got.BrokenAtID != "ae-bad" || got.Error != "hmac mismatch" {
+		t.Fatalf("unexpected break info: %+v", got)
+	}
+}
+
+func TestVerifyAuditChain_ServerError(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"boom"}`))
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	_, err := c.VerifyAuditChain(context.Background(), VerifyAuditChainParams{ProjectID: "proj-3"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestVerifyAuditChain_SincePassedAsQuery(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("since") == "" {
+			t.Fatalf("expected since query param, got %q", r.URL.RawQuery)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"project_id":"p","valid":true,"events_checked":0}`))
+	}))
+	defer srv.Close()
+
+	since := time.Now().Add(-time.Hour).UTC()
+	c := mustClient(t, srv.URL)
+	if _, err := c.VerifyAuditChain(context.Background(), VerifyAuditChainParams{ProjectID: "p", Since: &since}); err != nil {
+		t.Fatalf("VerifyAuditChain: %v", err)
+	}
+}

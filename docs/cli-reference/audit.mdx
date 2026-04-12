@@ -23,3 +23,41 @@ strait audit --project proj_1 --resource-type job --from 2026-03-01T00:00:00Z
 | `--to` | End time (RFC3339 or duration) | |
 | `--order` | Sort order (`asc` or `desc`) | `desc` |
 | `--limit` | Max entries to return | `50` |
+
+## strait audit verify
+
+Verify the integrity of the project's audit event HMAC chain. The command calls
+the server's `GET /v1/audit-events/verify` endpoint, which recomputes each
+event's signature and returns a pass/fail report. The server also records a
+`audit.chain_verified` self-audit event for the call.
+
+```bash
+strait audit verify --project proj_1
+strait audit verify --project proj_1 --output json
+strait audit verify --project proj_1 --since 2026-01-01T00:00:00Z
+```
+
+Exit codes:
+- `0` — chain is intact
+- `1` — chain is broken (a break was detected)
+
+| Flag | Description | Default |
+|---|---|---|
+| `--project` | Project ID | from config |
+| `--since` | Only verify events at or after this RFC3339 timestamp | |
+| `--output` | Output format: `text` or `json` | `text` |
+
+JSON output shape:
+
+```json
+{
+  "project_id": "proj_1",
+  "status": "passed",
+  "events_checked": 42,
+  "first_break": null,
+  "duration_ms": 18
+}
+```
+
+When the chain is broken, `status` is `"failed"` and `first_break` contains
+`{ "event_id": "...", "reason": "..." }`.

@@ -297,6 +297,25 @@ type ListAuditEventsParams struct {
 	Order        string
 }
 
+// AuditChainVerification is the result returned by GET /v1/audit-events/verify.
+// It mirrors the server's domain.AuditChainVerification JSON shape.
+type AuditChainVerification struct {
+	ProjectID     string `json:"project_id"`
+	Valid         bool   `json:"valid"`
+	EventsChecked int    `json:"events_checked"`
+	FirstEventID  string `json:"first_event_id,omitempty"`
+	LastEventID   string `json:"last_event_id,omitempty"`
+	BrokenAtID    string `json:"broken_at_id,omitempty"`
+	Error         string `json:"error,omitempty"`
+	ChainStart    string `json:"chain_start,omitempty"`
+}
+
+// VerifyAuditChainParams contains parameters for verifying an audit chain.
+type VerifyAuditChainParams struct {
+	ProjectID string
+	Since     *time.Time
+}
+
 // CodeDeployment represents a code-first job deployment as returned by the API.
 type CodeDeployment struct {
 	ID               string     `json:"id"`
