@@ -310,6 +310,20 @@ func TestAuditCommand_Flags(t *testing.T) {
 	}
 }
 
+func TestAuditVerifyCommand_Flags(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCommand()
+	audit := findSubcommand(t, cmd, "audit")
+	verify := findSubcommand(t, audit, "verify")
+
+	for _, name := range []string{"project", "since", "output"} {
+		if verify.Flags().Lookup(name) == nil {
+			t.Errorf("audit verify missing --%s flag", name)
+		}
+	}
+}
+
 func TestTeamAddCommand_UsesUserAndRoleIDs(t *testing.T) {
 	t.Parallel()
 

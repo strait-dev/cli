@@ -574,6 +574,24 @@ func (c *Client) ListAuditEvents(ctx context.Context, params ListAuditEventsPara
 	return out, nil
 }
 
+// VerifyAuditChain calls GET /v1/audit-events/verify and returns the server's
+// integrity report for the project's audit event HMAC chain.
+func (c *Client) VerifyAuditChain(ctx context.Context, params VerifyAuditChainParams) (*AuditChainVerification, error) {
+	query := url.Values{}
+	if strings.TrimSpace(params.ProjectID) != "" {
+		query.Set("project_id", strings.TrimSpace(params.ProjectID))
+	}
+	if params.Since != nil {
+		query.Set("since", params.Since.UTC().Format(time.RFC3339Nano))
+	}
+
+	var out AuditChainVerification
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/audit-events/verify", query, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // GetJobBySlug looks up a job by its slug within a project.
 // It passes slug as a query parameter and auto-paginates through all pages
 // so that projects with many jobs never silently miss the target.
