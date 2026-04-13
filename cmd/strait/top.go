@@ -12,6 +12,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	topTimeNow = time.Now
+	topAfter   = time.After
+)
+
 func newTopCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "top [jobs|queue]",
@@ -56,7 +61,7 @@ func newTopQueueCommand(state *appState) *cobra.Command {
 
 			ttyMode := isTTYRich(state)
 			return runTopLoop(cmd, watch, interval, func() error {
-				sampledAt := time.Now().UTC().Format(time.RFC3339)
+				sampledAt := topTimeNow().UTC().Format(time.RFC3339)
 				rows := make([]map[string]any, 0)
 
 				if projectID == "" {
@@ -227,7 +232,7 @@ func newTopJobsCommand(state *appState) *cobra.Command {
 					return nil
 				}
 
-				sampledAt := time.Now().UTC().Format(time.RFC3339)
+				sampledAt := topTimeNow().UTC().Format(time.RFC3339)
 				out := make([]map[string]any, 0, len(rows))
 				for _, r := range rows {
 					out = append(out, map[string]any{
@@ -269,7 +274,7 @@ func runTopLoop(cmd *cobra.Command, watch bool, interval time.Duration, render f
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(interval):
+		case <-topAfter(interval):
 		}
 	}
 }

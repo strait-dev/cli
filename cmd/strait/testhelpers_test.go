@@ -212,6 +212,24 @@ func forceLogsTimeNow(t *testing.T, fn func() time.Time) {
 	})
 }
 
+func forceTopTimeNow(t *testing.T, fn func() time.Time) {
+	t.Helper()
+	prev := topTimeNow
+	topTimeNow = fn
+	t.Cleanup(func() {
+		topTimeNow = prev
+	})
+}
+
+func forceTopAfter(t *testing.T, fn func(time.Duration) <-chan time.Time) {
+	t.Helper()
+	prev := topAfter
+	topAfter = fn
+	t.Cleanup(func() {
+		topAfter = prev
+	})
+}
+
 // newRouterServer creates an httptest server that routes requests to handler
 // functions based on "METHOD PATH" keys. Unmatched requests get 404.
 func newRouterServer(t *testing.T, routes map[string]http.HandlerFunc) *httptest.Server {
