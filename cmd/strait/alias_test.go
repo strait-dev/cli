@@ -8,8 +8,7 @@ import (
 )
 
 func TestExpandAliasArgs_IgnoresLocalConfig(t *testing.T) {
-	t.Parallel()
-
+	// Not parallel: os.Chdir mutates process-global state.
 	// Create a temp dir with a local .strait.yaml containing an alias
 	dir := t.TempDir()
 	localConfig := filepath.Join(dir, ".strait.yaml")
@@ -49,8 +48,7 @@ func TestExpandAliasArgs_HonorsExplicitConfig(t *testing.T) {
 }
 
 func TestAliasSet_AlwaysWritesToHomeConfig(t *testing.T) {
-	t.Parallel()
-
+	// Not parallel: os.Chdir mutates process-global state.
 	// Create a temp dir with a local .strait.yaml
 	dir := t.TempDir()
 	localConfig := filepath.Join(dir, ".strait.yaml")
@@ -77,7 +75,9 @@ func TestAliasSet_AlwaysWritesToHomeConfig(t *testing.T) {
 	// loadHomeConfigForWrite will use HomePath() which points to ~/.config/strait/config.yaml
 	// In tests, this may not exist, so the command might error, which is fine -
 	// the important thing is that it does NOT write to the local config.
-	_ = cmd.Execute()
+	captureCommandOutput(t, func() {
+		_ = cmd.Execute()
+	})
 
 	// Read the local config and verify no alias was written there
 	content, err := os.ReadFile(localConfig)

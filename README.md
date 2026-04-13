@@ -74,9 +74,13 @@ strait tui                                         # Open the dashboard
 make build         # Build binary to bin/strait
 make test          # Run tests with race detector
 make lint          # Run golangci-lint
+make mutation-dry  # Run Gremlins coverage analysis without mutating code
+make mutation      # Run Gremlins mutation testing and write bin/gremlins-report.json
 make check         # vet + lint + test
 make hooks         # Install lefthook pre-commit hooks
 ```
+
+Mutation testing is pinned to `go-gremlins/gremlins` `v0.6.0` and runs through `go run`, so contributors do not need a separate install step. You can scope local runs with `MUTATION_ARGS`, for example `make mutation MUTATION_ARGS="--diff origin/main"` to mutate only changes against `origin/main`.
 
 ## License
 

@@ -246,9 +246,11 @@ func TestJobsDelete_WithYes(t *testing.T) {
 	cmd := newJobsDeleteCommand(state)
 	cmd.SetArgs([]string{"job-1", "--yes"})
 
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	captureCommandOutput(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 	if !deleteCalled {
 		t.Fatal("expected DELETE to be called")
 	}

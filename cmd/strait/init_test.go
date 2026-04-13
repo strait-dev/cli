@@ -365,8 +365,7 @@ func TestInit_TemplateFullCreatesDefinitions(t *testing.T) {
 }
 
 func TestWriteStraitIgnore_CreatesFile(t *testing.T) {
-	t.Parallel()
-
+	// Not parallel: os.Chdir mutates process-global state.
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
 	t.Cleanup(func() { _ = os.Chdir(origDir) })
@@ -392,8 +391,7 @@ func TestWriteStraitIgnore_CreatesFile(t *testing.T) {
 }
 
 func TestWriteStraitIgnore_SkipsIfExists(t *testing.T) {
-	t.Parallel()
-
+	// Not parallel: os.Chdir mutates process-global state.
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
 	t.Cleanup(func() { _ = os.Chdir(origDir) })

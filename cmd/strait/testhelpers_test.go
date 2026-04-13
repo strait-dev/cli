@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,14 @@ import (
 	"testing"
 	"time"
 )
+
+func TestMain(m *testing.M) {
+	// Command tests still exercise process-global stdout and cwd paths.
+	// Keep package-level test parallelism at 1 so race and mutation runs are stable
+	// until the command output layer is fully writer-injected.
+	_ = flag.Set("test.parallel", "1")
+	os.Exit(m.Run())
+}
 
 // newTestServer creates an httptest.Server and registers cleanup.
 func newTestServer(t *testing.T, handler http.Handler) *httptest.Server {
@@ -65,8 +74,6 @@ func respondError(t *testing.T, w http.ResponseWriter, status int, msg string) {
 }
 
 // assertMethod fails the test if the request method does not match want.
-//
-//nolint:unused // available for use in future command tests
 func assertMethod(t *testing.T, r *http.Request, want string) {
 	t.Helper()
 	if r.Method != want {
@@ -75,8 +82,6 @@ func assertMethod(t *testing.T, r *http.Request, want string) {
 }
 
 // assertPath fails the test if the request path does not match want.
-//
-//nolint:unused // available for use in future command tests
 func assertPath(t *testing.T, r *http.Request, want string) {
 	t.Helper()
 	if r.URL.Path != want {
