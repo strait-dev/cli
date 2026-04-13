@@ -17,6 +17,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	runsTimeNow = time.Now
+	runsAfter   = time.After
+)
+
 func newRunsCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "runs",
@@ -302,7 +307,7 @@ Use --until to accept specific terminal statuses as success (e.g. --until comple
 			// Parse --until into a set of accepted terminal statuses.
 			acceptedStatuses := parseUntilStatuses(until)
 
-			deadline := time.Now().Add(timeout)
+			deadline := runsTimeNow().Add(timeout)
 			for {
 				run, err := cli.GetRun(ctx, args[0])
 				if err != nil {
@@ -350,7 +355,7 @@ Use --until to accept specific terminal statuses as success (e.g. --until comple
 					return fmt.Errorf("run reached terminal status %q", run.Status)
 				}
 
-				if timeout > 0 && time.Now().After(deadline) {
+				if timeout > 0 && runsTimeNow().After(deadline) {
 					if ttyMode {
 						fmt.Fprintln(os.Stderr)
 					}
@@ -360,7 +365,7 @@ Use --until to accept specific terminal statuses as success (e.g. --until comple
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
-				case <-time.After(interval):
+				case <-runsAfter(interval):
 				}
 			}
 		},
@@ -400,7 +405,7 @@ func watchRunUntilDone(ctx context.Context, state *appState, runID string, inter
 	}
 
 	ttyMode := isTTYRich(state)
-	deadline := time.Now().Add(timeout)
+	deadline := runsTimeNow().Add(timeout)
 	for {
 		run, err := cli.GetRun(ctx, runID)
 		if err != nil {
@@ -433,14 +438,14 @@ func watchRunUntilDone(ctx context.Context, state *appState, runID string, inter
 			return fmt.Errorf("run reached terminal status %q", run.Status)
 		}
 
-		if timeout > 0 && time.Now().After(deadline) {
+		if timeout > 0 && runsTimeNow().After(deadline) {
 			return fmt.Errorf("watch timeout reached")
 		}
 
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(interval):
+		case <-runsAfter(interval):
 		}
 	}
 }
@@ -546,7 +551,7 @@ func newRunsLastCommand(state *appState) *cobra.Command {
 			}
 
 			if openInBrowser {
-				return openBrowser(buildDashboardURL(state, "/runs/"+run.ID))
+				return openBrowserFunc(buildDashboardURL(state, "/runs/"+run.ID))
 			}
 
 			return nil
@@ -632,12 +637,12 @@ func newRunsDiffCommand(state *appState) *cobra.Command {
 				var p1, p2 any
 				if len(run1.Payload) > 0 {
 					if err := json.Unmarshal(run1.Payload, &p1); err != nil {
-						p1 = string(run1.Payload) // Fall back to raw string.
+						return fmt.Errorf("decoding payload for %s: %w", run1.ID, err)
 					}
 				}
 				if len(run2.Payload) > 0 {
 					if err := json.Unmarshal(run2.Payload, &p2); err != nil {
-						p2 = string(run2.Payload) // Fall back to raw string.
+						return fmt.Errorf("decoding payload for %s: %w", run2.ID, err)
 					}
 				}
 				diff := cmp.Diff(p1, p2)
@@ -733,7 +738,7 @@ func runDuration(run *types.JobRun) time.Duration {
 	if run.StartedAt == nil {
 		return 0
 	}
-	end := time.Now()
+	end := runsTimeNow()
 	if run.FinishedAt != nil {
 		end = *run.FinishedAt
 	}

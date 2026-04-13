@@ -19,6 +19,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var logsTimeNow = time.Now
+
 func newLogsCommand(state *appState) *cobra.Command {
 	var runID string
 	var projectID string
@@ -53,7 +55,7 @@ func newLogsCommand(state *appState) *cobra.Command {
 				if parseErr != nil {
 					return fmt.Errorf("invalid --since duration %q: %w", since, parseErr)
 				}
-				sinceTime = time.Now().Add(-d)
+				sinceTime = logsTimeNow().Add(-d)
 			}
 
 			if follow {

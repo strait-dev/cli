@@ -12,6 +12,14 @@ import (
 	cliconfig "github.com/strait-dev/cli/internal/config"
 )
 
+var stdoutIsTTYFunc = func() bool {
+	fi, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
+}
+
 // debugTransport wraps an http.RoundTripper and logs method, URL, status, and
 // latency to stderr for each request. It is activated by --debug.
 type debugTransport struct {
@@ -56,11 +64,7 @@ func loadConfigForWrite(state *appState) (*cliconfig.File, string, error) {
 }
 
 func stdoutIsTTY() bool {
-	fi, err := os.Stdout.Stat()
-	if err != nil {
-		return false
-	}
-	return (fi.Mode() & os.ModeCharDevice) != 0
+	return stdoutIsTTYFunc()
 }
 
 // isTTYRich returns true when styled/rich output should be used.

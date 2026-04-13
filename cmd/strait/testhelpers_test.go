@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-var stdoutCaptureMu sync.Mutex
+var stdioCaptureMu sync.Mutex
 
 func TestMain(m *testing.M) {
 	// Command tests still exercise process-global stdout and cwd paths.
@@ -123,32 +123,93 @@ func readJSONBody(t *testing.T, r *http.Request, dest any) {
 	}
 }
 
-// captureCommandOutput captures everything written to os.Stdout during fn and
-// returns it as a string. Holds the shared stdoutCaptureMu for the entire
-// duration and restores os.Stdout before releasing the lock.
 func captureCommandOutput(t *testing.T, fn func()) string {
 	t.Helper()
-	stdoutCaptureMu.Lock()
-	defer stdoutCaptureMu.Unlock()
+	stdout, _ := captureCommandStreams(t, fn)
+	return stdout
+}
 
-	orig := os.Stdout
-	r, w, err := os.Pipe()
+func captureCommandErrorOutput(t *testing.T, fn func()) string {
+	t.Helper()
+	_, stderr := captureCommandStreams(t, fn)
+	return stderr
+}
+
+// captureCommandStreams captures everything written to os.Stdout and os.Stderr
+// during fn and restores both streams before releasing the shared lock.
+func captureCommandStreams(t *testing.T, fn func()) (string, string) {
+	t.Helper()
+	stdioCaptureMu.Lock()
+	defer stdioCaptureMu.Unlock()
+
+	origStdout := os.Stdout
+	origStderr := os.Stderr
+
+	stdoutR, stdoutW, err := os.Pipe()
 	if err != nil {
 		t.Fatalf("pipe: %v", err)
 	}
-	os.Stdout = w
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stdout = stdoutW
+	os.Stderr = stderrW
 
 	fn()
 
-	_ = w.Close()
-	os.Stdout = orig // restore before reading to avoid races
+	_ = stdoutW.Close()
+	_ = stderrW.Close()
+	os.Stdout = origStdout
+	os.Stderr = origStderr
 
-	data, err := io.ReadAll(r)
+	stdoutData, err := io.ReadAll(stdoutR)
 	if err != nil {
 		t.Fatalf("read pipe: %v", err)
 	}
-	_ = r.Close()
-	return string(data)
+	stderrData, err := io.ReadAll(stderrR)
+	if err != nil {
+		t.Fatalf("read pipe: %v", err)
+	}
+	_ = stdoutR.Close()
+	_ = stderrR.Close()
+	return string(stdoutData), string(stderrData)
+}
+
+func forceStdoutTTY(t *testing.T, tty bool) {
+	t.Helper()
+	prev := stdoutIsTTYFunc
+	stdoutIsTTYFunc = func() bool { return tty }
+	t.Cleanup(func() {
+		stdoutIsTTYFunc = prev
+	})
+}
+
+func forceRunsTimeNow(t *testing.T, fn func() time.Time) {
+	t.Helper()
+	prev := runsTimeNow
+	runsTimeNow = fn
+	t.Cleanup(func() {
+		runsTimeNow = prev
+	})
+}
+
+func forceRunsAfter(t *testing.T, fn func(time.Duration) <-chan time.Time) {
+	t.Helper()
+	prev := runsAfter
+	runsAfter = fn
+	t.Cleanup(func() {
+		runsAfter = prev
+	})
+}
+
+func forceLogsTimeNow(t *testing.T, fn func() time.Time) {
+	t.Helper()
+	prev := logsTimeNow
+	logsTimeNow = fn
+	t.Cleanup(func() {
+		logsTimeNow = prev
+	})
 }
 
 // newRouterServer creates an httptest server that routes requests to handler
