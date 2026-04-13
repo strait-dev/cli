@@ -8,9 +8,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
+
+var stdoutCaptureMu sync.Mutex
 
 func TestMain(m *testing.M) {
 	// Command tests still exercise process-global stdout and cwd paths.
