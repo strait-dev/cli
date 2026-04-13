@@ -230,6 +230,25 @@ func forceTopAfter(t *testing.T, fn func(time.Duration) <-chan time.Time) {
 	})
 }
 
+func withMockStdin(t *testing.T, input string, fn func()) {
+	t.Helper()
+	orig := os.Stdin
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	if _, err := io.WriteString(w, input); err != nil {
+		t.Fatalf("write stdin: %v", err)
+	}
+	_ = w.Close()
+	os.Stdin = r
+	t.Cleanup(func() {
+		os.Stdin = orig
+		_ = r.Close()
+	})
+	fn()
+}
+
 // newRouterServer creates an httptest server that routes requests to handler
 // functions based on "METHOD PATH" keys. Unmatched requests get 404.
 func newRouterServer(t *testing.T, routes map[string]http.HandlerFunc) *httptest.Server {

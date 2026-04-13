@@ -14,6 +14,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var watchCodeDeploymentUntilTerminal = codedeploy.WatchUntilTerminal
+
 func newCodeDeploymentsCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deployments",
@@ -393,7 +395,7 @@ Safe to use in CI pipelines and agent workflows.`,
 				}
 			} else {
 				// Poll until terminal, emitting NDJSON status ticks when not in TTY mode.
-				final, err = codedeploy.WatchUntilTerminal(ctx, cli, job.ID, deploymentID, func(status string, elapsed time.Duration) {
+				final, err = watchCodeDeploymentUntilTerminal(ctx, cli, job.ID, deploymentID, func(status string, elapsed time.Duration) {
 					if isTTYRich(state) && !state.opts.quiet {
 						fmt.Fprintf(os.Stderr, "  status: %s (elapsed: %s)\n",
 							styles.StatusBadge(status),

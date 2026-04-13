@@ -3,6 +3,9 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -256,6 +259,35 @@ func TestJobsDelete_WithYes(t *testing.T) {
 	}
 }
 
+func TestJobsDelete_TTYSuccessMessage(t *testing.T) {
+	t.Parallel()
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, testJob)
+		},
+		"DELETE /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.outputFormat = ""
+	forceStdoutTTY(t, true)
+
+	stderr := captureCommandErrorOutput(t, func() {
+		cmd := newJobsDeleteCommand(state)
+		cmd.SetArgs([]string{"job-1", "--yes"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(stderr, "Deleted job") || !strings.Contains(stderr, "job-1") {
+		t.Fatalf("expected tty delete message, got: %s", stderr)
+	}
+}
+
 func TestJobsDelete_CIBlocksPrompt(t *testing.T) {
 	t.Parallel()
 
@@ -332,6 +364,79 @@ func TestJobsEdit_FieldUpdate(t *testing.T) {
 	}
 }
 
+func TestJobsEdit_FieldValidationErrors(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		field   string
+		wantErr string
+	}{
+		{name: "enabled", field: "enabled=notabool", wantErr: "enabled must be true|false"},
+		{name: "max_attempts", field: "max_attempts=nope", wantErr: "max_attempts must be an integer"},
+		{name: "timeout_secs", field: "timeout_secs=nope", wantErr: "timeout_secs must be an integer"},
+		{name: "run_ttl_secs", field: "run_ttl_secs=nope", wantErr: "run_ttl_secs must be an integer"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			srv := newRouterServer(t, map[string]http.HandlerFunc{
+				"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+					respondJSON(t, w, http.StatusOK, testJob)
+				},
+			})
+
+			state := newTestState(t, srv)
+			cmd := newJobsEditCommand(state)
+			cmd.SetArgs([]string{"job-1", "--field", tc.field})
+
+			err := cmd.Execute()
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("expected error containing %q, got %v", tc.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestJobsEdit_FieldUpdateTTYSuccess(t *testing.T) {
+	t.Parallel()
+
+	var patchBody map[string]any
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, testJob)
+		},
+		"PATCH /v1/jobs/job-1": func(w http.ResponseWriter, r *http.Request) {
+			readJSONBody(t, r, &patchBody)
+			updated := testJob
+			updated.Version = 2
+			updated.Name = "Updated Name"
+			respondJSON(t, w, http.StatusOK, updated)
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.outputFormat = ""
+	forceStdoutTTY(t, true)
+
+	stderr := captureCommandErrorOutput(t, func() {
+		cmd := newJobsEditCommand(state)
+		cmd.SetArgs([]string{"job-1", "--field", "name=Updated Name"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if patchBody["name"] != "Updated Name" {
+		t.Fatalf("expected name=Updated Name in PATCH body, got: %#v", patchBody)
+	}
+	if !strings.Contains(stderr, "Updated job") || !strings.Contains(stderr, "version 2") {
+		t.Fatalf("expected tty edit success output, got: %s", stderr)
+	}
+}
+
 func TestJobsTriggerBulk_Success(t *testing.T) {
 	t.Parallel()
 
@@ -380,6 +485,48 @@ func TestJobsTriggerBulk_EmptyItems(t *testing.T) {
 	err := cmd.Execute()
 	if err == nil || !strings.Contains(err.Error(), "must not be empty") {
 		t.Fatalf("expected empty items error, got: %v", err)
+	}
+}
+
+func TestJobsTriggerBulk_UsesItemsFile(t *testing.T) {
+	t.Parallel()
+
+	itemsPath := filepath.Join(t.TempDir(), "items.json")
+	if err := os.WriteFile(itemsPath, []byte(`[{"payload":{"id":"from-file"}}]`), 0o600); err != nil {
+		t.Fatalf("write items file: %v", err)
+	}
+
+	var receivedBody map[string]any
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, testJob)
+		},
+		"POST /v1/jobs/job-1/trigger/bulk": func(w http.ResponseWriter, r *http.Request) {
+			readJSONBody(t, r, &receivedBody)
+			respondJSON(t, w, http.StatusOK, map[string]any{
+				"results": []map[string]any{{"id": "run-file", "status": "queued"}},
+				"total":   1,
+				"created": 1,
+			})
+		},
+	})
+
+	state := newTestState(t, srv)
+	cmd := newJobsTriggerBulkCommand(state)
+	cmd.SetArgs([]string{"job-1", "--items-file", itemsPath})
+
+	out := captureCommandOutput(t, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	items, ok := receivedBody["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("expected one bulk item from file, got: %#v", receivedBody)
+	}
+	if !strings.Contains(out, "run-file") {
+		t.Fatalf("expected bulk trigger response in output, got: %s", out)
 	}
 }
 
@@ -529,6 +676,199 @@ func TestJobsList_ShowsSourceType(t *testing.T) {
 	src2, _ := rows[1]["source_type"].(string)
 	if src2 != "endpoint" {
 		t.Fatalf("expected source_type=endpoint, got %q", src2)
+	}
+}
+
+func TestJobsList_TTYShowsCronFallback(t *testing.T) {
+	t.Parallel()
+
+	job := testJob
+	job.Cron = ""
+	job.SourceType = "code"
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []types.Job{job})
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.outputFormat = ""
+	forceStdoutTTY(t, true)
+
+	stderr := captureCommandErrorOutput(t, func() {
+		cmd := newJobsListCommand(state)
+		cmd.SetArgs([]string{"--project", "proj-test"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	for _, want := range []string{"Jobs", "test-job", "cron=--", "source=code"} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("expected %q in tty output, got: %s", want, stderr)
+		}
+	}
+}
+
+func TestJobsDescribe_TTYShowsRecentRunsAndLimitsToTen(t *testing.T) {
+	t.Parallel()
+
+	runs := make([]types.JobRun, 0, 12)
+	for i := 1; i <= 12; i++ {
+		runs = append(runs, types.JobRun{
+			ID:          "run-" + strconv.Itoa(i),
+			JobID:       "job-1",
+			Status:      types.StatusCompleted,
+			Attempt:     i,
+			TriggeredBy: "api",
+			CreatedAt:   time.Date(2026, 3, 20, 10, i, 0, 0, time.UTC),
+		})
+	}
+	runs = append([]types.JobRun{{
+		ID:          "other-run",
+		JobID:       "job-2",
+		Status:      types.StatusCompleted,
+		Attempt:     1,
+		TriggeredBy: "system",
+		CreatedAt:   time.Date(2026, 3, 20, 9, 59, 0, 0, time.UTC),
+	}}, runs...)
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, testJob)
+		},
+		"GET /v1/runs": func(w http.ResponseWriter, r *http.Request) {
+			assertQuery(t, r, "project_id", "proj-test")
+			assertQuery(t, r, "limit", "100")
+			respondPaginated(t, w, http.StatusOK, runs)
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.outputFormat = ""
+	forceStdoutTTY(t, true)
+
+	stderr := captureCommandErrorOutput(t, func() {
+		cmd := newJobsDescribeCommand(state)
+		cmd.SetArgs([]string{"job-1"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	for _, want := range []string{"Job Details", "Recent Runs", "run-1", "attempt=1", "run-10", "attempt=10"} {
+		if !strings.Contains(stderr, want) {
+			t.Fatalf("expected %q in tty output, got: %s", want, stderr)
+		}
+	}
+	if strings.Contains(stderr, "other-run") || strings.Contains(stderr, "run-11") || strings.Contains(stderr, "run-12") {
+		t.Fatalf("expected recent runs to filter to the job and stop at 10, got: %s", stderr)
+	}
+}
+
+func TestJobsCreate_UsesStateProjectAndTTYMessage(t *testing.T) {
+	t.Parallel()
+
+	var receivedBody map[string]any
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"POST /v1/jobs": func(w http.ResponseWriter, r *http.Request) {
+			readJSONBody(t, r, &receivedBody)
+			respondJSON(t, w, http.StatusCreated, testJob)
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.outputFormat = ""
+	state.opts.projectID = "proj-from-state"
+	forceStdoutTTY(t, true)
+
+	stderr := captureCommandErrorOutput(t, func() {
+		cmd := newJobsCreateCommand(state)
+		cmd.SetArgs([]string{"--name", "Test Job", "--slug", "test-job", "--endpoint", "https://example.com/hook"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if receivedBody["project_id"] != "proj-from-state" {
+		t.Fatalf("expected project_id from state, got: %#v", receivedBody)
+	}
+	if !strings.Contains(stderr, "Created job") || !strings.Contains(stderr, "ID") || !strings.Contains(stderr, "job-1") {
+		t.Fatalf("expected tty create message, got: %s", stderr)
+	}
+}
+
+func TestJobsTrigger_ValidatesScheduledAtAndPayloadFile(t *testing.T) {
+	t.Parallel()
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, testJob)
+		},
+	})
+
+	t.Run("invalid scheduled-at", func(t *testing.T) {
+		state := newTestState(t, srv)
+		cmd := newJobsTriggerCommand(state)
+		cmd.SetArgs([]string{"job-1", "--scheduled-at", "tomorrow"})
+		err := cmd.Execute()
+		if err == nil || !strings.Contains(err.Error(), "invalid scheduled-at") {
+			t.Fatalf("expected invalid scheduled-at error, got: %v", err)
+		}
+	})
+
+	t.Run("missing payload file", func(t *testing.T) {
+		state := newTestState(t, srv)
+		cmd := newJobsTriggerCommand(state)
+		cmd.SetArgs([]string{"job-1", "--payload-file", filepath.Join(t.TempDir(), "missing.json")})
+		err := cmd.Execute()
+		if err == nil || !strings.Contains(err.Error(), "no such file") {
+			t.Fatalf("expected payload file read error, got: %v", err)
+		}
+	})
+}
+
+func TestJobsTrigger_TTYUsesPayloadFileAndScheduledAt(t *testing.T) {
+	t.Parallel()
+
+	payloadPath := filepath.Join(t.TempDir(), "payload.json")
+	if err := os.WriteFile(payloadPath, []byte(`{"source":"file"}`), 0o600); err != nil {
+		t.Fatalf("write payload file: %v", err)
+	}
+
+	var triggerBody map[string]any
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, testJob)
+		},
+		"POST /v1/jobs/job-1/trigger": func(w http.ResponseWriter, r *http.Request) {
+			readJSONBody(t, r, &triggerBody)
+			respondJSON(t, w, http.StatusOK, map[string]any{"id": "run-tty", "status": "queued"})
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.outputFormat = ""
+	forceStdoutTTY(t, true)
+
+	stderr := captureCommandErrorOutput(t, func() {
+		cmd := newJobsTriggerCommand(state)
+		cmd.SetArgs([]string{"job-1", "--payload-file", payloadPath, "--scheduled-at", "2026-03-20T10:00:00Z"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if triggerBody["scheduled_at"] != "2026-03-20T10:00:00Z" {
+		t.Fatalf("expected scheduled_at in request, got: %#v", triggerBody)
+	}
+	payloadMap, ok := triggerBody["payload"].(map[string]any)
+	if !ok || payloadMap["source"] != "file" {
+		t.Fatalf("expected payload from file, got: %#v", triggerBody["payload"])
+	}
+	if !strings.Contains(stderr, "Triggered run") || !strings.Contains(stderr, "run-tty") {
+		t.Fatalf("expected tty trigger message, got: %s", stderr)
 	}
 }
 

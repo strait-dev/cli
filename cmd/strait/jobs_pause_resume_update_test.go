@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -45,6 +47,37 @@ func TestJobsPause_SetsEnabledFalse(t *testing.T) {
 	}
 }
 
+func TestJobsPause_TTYSuccessMessage(t *testing.T) {
+	t.Parallel()
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, testJob)
+		},
+		"PATCH /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			paused := testJob
+			paused.Enabled = false
+			respondJSON(t, w, http.StatusOK, paused)
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.outputFormat = ""
+	forceStdoutTTY(t, true)
+
+	stderr := captureCommandErrorOutput(t, func() {
+		cmd := newJobsPauseCommand(state)
+		cmd.SetArgs([]string{"job-1", "--yes"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(stderr, "Paused job") || !strings.Contains(stderr, "job-1") {
+		t.Fatalf("expected tty pause message, got: %s", stderr)
+	}
+}
+
 func TestJobsResume_SetsEnabledTrue(t *testing.T) {
 	t.Parallel()
 
@@ -78,6 +111,35 @@ func TestJobsResume_SetsEnabledTrue(t *testing.T) {
 
 	if capturedEnabled == nil || *capturedEnabled != true {
 		t.Errorf("expected enabled=true in PATCH request, got: %v", capturedEnabled)
+	}
+}
+
+func TestJobsResume_TTYSuccessMessage(t *testing.T) {
+	t.Parallel()
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, testJob)
+		},
+		"PATCH /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, testJob)
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.outputFormat = ""
+	forceStdoutTTY(t, true)
+
+	stderr := captureCommandErrorOutput(t, func() {
+		cmd := newJobsResumeCommand(state)
+		cmd.SetArgs([]string{"job-1", "--yes"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(stderr, "Resumed job") || !strings.Contains(stderr, "job-1") {
+		t.Fatalf("expected tty resume message, got: %s", stderr)
 	}
 }
 
@@ -183,6 +245,119 @@ func TestJobsUpdate_MultipleFields(t *testing.T) {
 	}
 }
 
+func TestRunInteractiveJobEdit_JSONNoChanges(t *testing.T) {
+	t.Parallel()
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, testJob)
+		},
+	})
+
+	state := newTestState(t, srv)
+	cli, err := newAPIClient(state)
+	if err != nil {
+		t.Fatalf("newAPIClient: %v", err)
+	}
+
+	out := captureCommandOutput(t, func() {
+		err := runInteractiveJobEdit(t.Context(), cli, state, "job-1", "true")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, `"updated": false`) || !strings.Contains(out, `"reason": "no changes"`) {
+		t.Fatalf("expected no-changes JSON output, got: %s", out)
+	}
+}
+
+func TestRunInteractiveJobEdit_InvalidYAML(t *testing.T) {
+	t.Parallel()
+
+	editorPath := filepath.Join(t.TempDir(), "editor.sh")
+	if err := os.WriteFile(editorPath, []byte("#!/bin/sh\nprintf 'name: [' > \"$1\"\n"), 0o700); err != nil {
+		t.Fatalf("write editor script: %v", err)
+	}
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, testJob)
+		},
+	})
+
+	state := newTestState(t, srv)
+	cli, err := newAPIClient(state)
+	if err != nil {
+		t.Fatalf("newAPIClient: %v", err)
+	}
+
+	err = runInteractiveJobEdit(t.Context(), cli, state, "job-1", editorPath)
+	if err == nil || !strings.Contains(err.Error(), "yaml") {
+		t.Fatalf("expected yaml parse error, got: %v", err)
+	}
+}
+
+func TestRunInteractiveJobEdit_TTYUpdatesJob(t *testing.T) {
+	t.Parallel()
+
+	editorPath := filepath.Join(t.TempDir(), "editor.sh")
+	script := `#!/bin/sh
+cat > "$1" <<'EOF'
+name: Updated Job
+slug: updated-job
+description: updated description
+cron: ""
+endpoint_url: https://example.com/hook
+max_attempts: 5
+timeout_secs: 120
+run_ttl_secs: 30
+enabled: true
+EOF
+`
+	if err := os.WriteFile(editorPath, []byte(script), 0o700); err != nil {
+		t.Fatalf("write editor script: %v", err)
+	}
+
+	var patchBody map[string]any
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, testJob)
+		},
+		"PATCH /v1/jobs/job-1": func(w http.ResponseWriter, r *http.Request) {
+			readJSONBody(t, r, &patchBody)
+			updated := testJob
+			updated.ID = "job-1"
+			updated.Version = 2
+			updated.Name = "Updated Job"
+			respondJSON(t, w, http.StatusOK, updated)
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.outputFormat = ""
+	forceStdoutTTY(t, true)
+
+	cli, err := newAPIClient(state)
+	if err != nil {
+		t.Fatalf("newAPIClient: %v", err)
+	}
+
+	stderr := captureCommandErrorOutput(t, func() {
+		err := runInteractiveJobEdit(t.Context(), cli, state, "job-1", editorPath)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if patchBody["name"] != "Updated Job" || patchBody["slug"] != "updated-job" {
+		t.Fatalf("expected updated patch body, got: %#v", patchBody)
+	}
+	if !strings.Contains(stderr, "Updated job") || !strings.Contains(stderr, "version 2") {
+		t.Fatalf("expected tty interactive edit success, got: %s", stderr)
+	}
+}
+
 func TestJobsUpdate_UnsupportedField(t *testing.T) {
 	t.Parallel()
 
@@ -209,6 +384,83 @@ func TestJobsUpdate_InvalidFieldFormat(t *testing.T) {
 		err := cmd.Execute()
 		if err == nil || !strings.Contains(err.Error(), "key=value") {
 			t.Fatalf("expected key=value format error, got: %v", err)
+		}
+	})
+}
+
+func TestJobsUpdate_FromStdinValidationAndTTYSuccess(t *testing.T) {
+	t.Parallel()
+
+	t.Run("invalid stdin json", func(t *testing.T) {
+		srv := newRouterServer(t, map[string]http.HandlerFunc{
+			"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+				respondJSON(t, w, http.StatusOK, testJob)
+			},
+		})
+
+		state := newTestState(t, srv)
+		withMockStdin(t, "{", func() {
+			cmd := newJobsUpdateCommand(state)
+			cmd.SetArgs([]string{"job-1", "--stdin"})
+			err := cmd.Execute()
+			if err == nil || !strings.Contains(err.Error(), "read stdin") {
+				t.Fatalf("expected stdin read error, got: %v", err)
+			}
+		})
+	})
+
+	t.Run("unsupported stdin patch field", func(t *testing.T) {
+		srv := newRouterServer(t, map[string]http.HandlerFunc{
+			"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+				respondJSON(t, w, http.StatusOK, testJob)
+			},
+		})
+
+		state := newTestState(t, srv)
+		withMockStdin(t, `{"unsupported":"value"}`, func() {
+			cmd := newJobsUpdateCommand(state)
+			cmd.SetArgs([]string{"job-1", "--stdin"})
+			err := cmd.Execute()
+			if err == nil || !strings.Contains(err.Error(), "unsupported field") {
+				t.Fatalf("expected unsupported field error, got: %v", err)
+			}
+		})
+	})
+
+	t.Run("tty success", func(t *testing.T) {
+		var capturedReq client.UpdateJobRequest
+		srv := newRouterServer(t, map[string]http.HandlerFunc{
+			"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+				respondJSON(t, w, http.StatusOK, testJob)
+			},
+			"PATCH /v1/jobs/job-1": func(w http.ResponseWriter, r *http.Request) {
+				if err := json.NewDecoder(r.Body).Decode(&capturedReq); err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
+				updated := testJob
+				updated.Version = 2
+				respondJSON(t, w, http.StatusOK, updated)
+			},
+		})
+
+		state := newTestState(t, srv)
+		state.opts.outputFormat = ""
+		forceStdoutTTY(t, true)
+
+		stderr := captureCommandErrorOutput(t, func() {
+			cmd := newJobsUpdateCommand(state)
+			cmd.SetArgs([]string{"job-1", "--field", "timeout_secs=120"})
+			if err := cmd.Execute(); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+
+		if capturedReq.TimeoutSecs == nil || *capturedReq.TimeoutSecs != 120 {
+			t.Fatalf("expected timeout_secs patch, got: %#v", capturedReq)
+		}
+		if !strings.Contains(stderr, "Updated job") || !strings.Contains(stderr, "version 2") {
+			t.Fatalf("expected tty update success, got: %s", stderr)
 		}
 	})
 }
@@ -256,5 +508,15 @@ func TestApplyJobField_InvalidInt(t *testing.T) {
 		if err := applyJobField(upd, key, "notanint"); err == nil {
 			t.Errorf("expected error for invalid int on field %q, got nil", key)
 		}
+	}
+}
+
+func TestApplyJobPatch_UnsupportedField(t *testing.T) {
+	t.Parallel()
+
+	upd := &client.UpdateJobRequest{}
+	err := applyJobPatch(upd, map[string]any{"unsupported": "value"})
+	if err == nil || !strings.Contains(err.Error(), "unsupported field") {
+		t.Fatalf("expected unsupported field error, got: %v", err)
 	}
 }
