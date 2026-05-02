@@ -630,7 +630,7 @@ func newWorkflowsVisualizeCommand(state *appState) *cobra.Command {
 			}
 
 			rendered := dag.RenderDAG(steps, statusMap)
-			fmt.Print(rendered)
+			fmt.Fprint(state.out(), rendered)
 			return nil
 		},
 	}

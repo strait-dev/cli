@@ -34,7 +34,7 @@ func TestJobsPause_SetsEnabledFalse(t *testing.T) {
 	cmd := newJobsPauseCommand(state)
 	cmd.SetArgs([]string{"job-1", "--yes"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -70,7 +70,7 @@ func TestJobsResume_SetsEnabledTrue(t *testing.T) {
 	cmd := newJobsResumeCommand(state)
 	cmd.SetArgs([]string{"job-1", "--yes"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -88,7 +88,7 @@ func TestJobsPause_RequiresArg(t *testing.T) {
 	cmd := newJobsPauseCommand(state)
 	cmd.SetArgs([]string{})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil {
 			t.Fatal("expected error for missing arg, got nil")
@@ -103,7 +103,7 @@ func TestJobsResume_RequiresArg(t *testing.T) {
 	cmd := newJobsResumeCommand(state)
 	cmd.SetArgs([]string{})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil {
 			t.Fatal("expected error for missing arg, got nil")
@@ -134,7 +134,7 @@ func TestJobsUpdate_FieldFlag(t *testing.T) {
 	cmd := newJobsUpdateCommand(state)
 	cmd.SetArgs([]string{"job-1", "--field", "name=renamed-job"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -169,7 +169,7 @@ func TestJobsUpdate_MultipleFields(t *testing.T) {
 	cmd := newJobsUpdateCommand(state)
 	cmd.SetArgs([]string{"job-1", "--field", "timeout_secs=120", "--field", "max_attempts=5"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -190,7 +190,7 @@ func TestJobsUpdate_UnsupportedField(t *testing.T) {
 	cmd := newJobsUpdateCommand(state)
 	cmd.SetArgs([]string{"job-1", "--field", "nonexistent=value"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil || !strings.Contains(err.Error(), "unsupported field") {
 			t.Fatalf("expected unsupported field error, got: %v", err)
@@ -205,7 +205,7 @@ func TestJobsUpdate_InvalidFieldFormat(t *testing.T) {
 	cmd := newJobsUpdateCommand(state)
 	cmd.SetArgs([]string{"job-1", "--field", "nameonly"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil || !strings.Contains(err.Error(), "key=value") {
 			t.Fatalf("expected key=value format error, got: %v", err)

@@ -33,7 +33,7 @@ func TestEnvironmentsGet_MasksVariablesByDefault(t *testing.T) {
 	cmd := newEnvironmentsGetCommand(state)
 	cmd.SetArgs([]string{"env-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("Execute: %v", err)
 		}
@@ -69,7 +69,7 @@ func TestEnvironmentsGet_RevealsVariablesWithFlag(t *testing.T) {
 	cmd := newEnvironmentsGetCommand(state)
 	cmd.SetArgs([]string{"env-1", "--reveal"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("Execute: %v", err)
 		}
@@ -97,7 +97,7 @@ func TestEnvironmentsVariables_MasksByDefault(t *testing.T) {
 	cmd := newEnvironmentsVariablesCommand(state)
 	cmd.SetArgs([]string{"env-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("Execute: %v", err)
 		}
@@ -130,7 +130,7 @@ func TestNotificationsGet_MasksConfigByDefault(t *testing.T) {
 	cmd := newNotificationsGetCommand(state)
 	cmd.SetArgs([]string{"chan-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("Execute: %v", err)
 		}
@@ -162,7 +162,7 @@ func TestNotificationsGet_RevealsConfigWithFlag(t *testing.T) {
 	cmd := newNotificationsGetCommand(state)
 	cmd.SetArgs([]string{"chan-1", "--reveal"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("Execute: %v", err)
 		}
@@ -192,7 +192,7 @@ func TestLogDrainsGet_MasksConfigByDefault(t *testing.T) {
 	cmd := newLogDrainsGetCommand(state)
 	cmd.SetArgs([]string{"drain-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("Execute: %v", err)
 		}

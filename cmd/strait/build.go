@@ -48,7 +48,7 @@ and writes it to the output directory.`,
 			}
 
 			if dryRun || asJSON {
-				fmt.Println(string(encoded))
+				fmt.Fprintln(state.out(), string(encoded))
 				return nil
 			}
 

@@ -30,7 +30,8 @@ func TestResourceGroupsDocumentIdOrSlug(t *testing.T) {
 
 	for _, name := range groups {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
+			// Subtests are not parallel: cobra's mergePersistentFlags mutates
+			// shared parent state, so concurrent root.Find races.
 			cmd, _, err := root.Find([]string{name})
 			if err != nil {
 				t.Fatalf("could not find %q command: %v", name, err)

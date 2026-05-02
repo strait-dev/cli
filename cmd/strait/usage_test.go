@@ -42,7 +42,7 @@ func TestUsageCommand_BareInvocationCallsCurrent(t *testing.T) {
 	cmd := newUsageCommand(state)
 	cmd.SetArgs([]string{}) // bare invocation
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("execute: %v", err)
 		}

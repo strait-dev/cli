@@ -42,7 +42,7 @@ type agentCapability struct {
 	EnvVars     []string `json:"env_vars,omitempty"`
 }
 
-func newAgentCapabilitiesCommand(_ *appState) *cobra.Command {
+func newAgentCapabilitiesCommand(state *appState) *cobra.Command {
 	return &cobra.Command{
 		Use:   "capabilities",
 		Short: "List all agent-relevant CLI capabilities as JSON",
@@ -114,7 +114,7 @@ func newAgentCapabilitiesCommand(_ *appState) *cobra.Command {
 					EnvVars:     []string{"STRAIT_API_KEY"},
 				},
 			}
-			enc := json.NewEncoder(os.Stdout)
+			enc := json.NewEncoder(state.out())
 			enc.SetIndent("", "  ")
 			return enc.Encode(caps)
 		},
@@ -152,14 +152,14 @@ func newAgentContextCommand(state *appState) *cobra.Command {
 				OS:             runtime.GOOS,
 				Arch:           runtime.GOARCH,
 			}
-			enc := json.NewEncoder(os.Stdout)
+			enc := json.NewEncoder(state.out())
 			enc.SetIndent("", "  ")
 			return enc.Encode(ctx)
 		},
 	}
 }
 
-func newAgentDescribeCommand(_ *appState) *cobra.Command {
+func newAgentDescribeCommand(state *appState) *cobra.Command {
 	return &cobra.Command{
 		Use:   "describe <command> [subcommand]",
 		Short: "Describe a CLI command's flags and usage as JSON",
@@ -230,7 +230,7 @@ func newAgentDescribeCommand(_ *appState) *cobra.Command {
 			appendFlags(target.LocalFlags())
 			appendFlags(target.InheritedFlags())
 
-			enc := json.NewEncoder(os.Stdout)
+			enc := json.NewEncoder(state.out())
 			enc.SetIndent("", "  ")
 			return enc.Encode(desc)
 		},
@@ -284,7 +284,7 @@ func newAgentSkillsCommand(state *appState) *cobra.Command {
 				}
 			}
 
-			enc := json.NewEncoder(os.Stdout)
+			enc := json.NewEncoder(state.out())
 			enc.SetIndent("", "  ")
 			return enc.Encode(skills)
 		},
@@ -300,7 +300,7 @@ type skillFileResult struct {
 	Status  string `json:"status"` // "created" | "skipped"
 }
 
-func newAgentSkillsGenerateCommand(_ *appState) *cobra.Command {
+func newAgentSkillsGenerateCommand(state *appState) *cobra.Command {
 	var outputDir string
 	var overwrite bool
 
@@ -353,7 +353,7 @@ default; use --overwrite to replace them.`,
 				})
 			}
 
-			enc := json.NewEncoder(os.Stdout)
+			enc := json.NewEncoder(state.out())
 			enc.SetIndent("", "  ")
 			return enc.Encode(results)
 		},

@@ -33,7 +33,7 @@ func TestContextCreate_Success(t *testing.T) {
 	cmd := newContextCreateCommand(state)
 	cmd.SetArgs([]string{"staging", "--server", "https://staging.example.com", "--project", "proj-staging"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -87,7 +87,7 @@ func TestContextList_Empty(t *testing.T) {
 
 	cmd := newContextListCommand(state)
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -109,7 +109,7 @@ func TestContextCurrent_NoActive(t *testing.T) {
 
 	cmd := newContextCurrentCommand(state)
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -135,7 +135,7 @@ func TestContextCurrent_WithActive(t *testing.T) {
 
 	cmd := newContextCurrentCommand(state)
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

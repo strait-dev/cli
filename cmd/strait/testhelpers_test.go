@@ -1,12 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 )
@@ -21,7 +21,9 @@ func newTestServer(t *testing.T, handler http.Handler) *httptest.Server {
 
 // newTestState creates an appState pointing at the given test server.
 // CI mode is enabled and output format is JSON so tests never block on
-// TTY prompts or styled output.
+// TTY prompts or styled output. The state's stdout is a fresh *bytes.Buffer
+// so captureStateOutput can read command output without swapping the global
+// os.Stdout under a process-wide mutex.
 func newTestState(t *testing.T, srv *httptest.Server) *appState {
 	t.Helper()
 	return &appState{
@@ -34,6 +36,7 @@ func newTestState(t *testing.T, srv *httptest.Server) *appState {
 			ciMode:       true,
 			noColor:      true,
 		},
+		stdout: &bytes.Buffer{},
 	}
 }
 
@@ -111,44 +114,29 @@ func readJSONBody(t *testing.T, r *http.Request, dest any) {
 	}
 }
 
-// captureCommandOutput captures everything written to os.Stdout during fn and
-// returns it as a string. Holds the shared stdoutCaptureMu for the entire
-// duration and restores os.Stdout before releasing the lock.
-func captureCommandOutput(t *testing.T, fn func()) string {
+// captureStateOutput runs fn and returns whatever was written to state's
+// in-memory stdout buffer. The buffer is reset before fn runs so callers can
+// invoke captureStateOutput repeatedly within a single test.
+//
+// Each appState owns its own buffer, so parallel tests do not contend on a
+// shared global the way the previous os.Stdout pipe-swap helper did. That
+// swap lived under a process-wide mutex which serialized every t.Parallel()
+// test that captured output and occasionally leaked goroutines between
+// siblings, producing intermittent CI flakes.
+//
+// If state.stdout is nil or not a *bytes.Buffer, this helper installs a
+// fresh buffer — callers do not need to wire one through every inline
+// appState construction in older tests.
+func captureStateOutput(t *testing.T, state *appState, fn func()) string {
 	t.Helper()
-	stdoutCaptureMu.Lock()
-	defer stdoutCaptureMu.Unlock()
-
-	orig := os.Stdout
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("pipe: %v", err)
+	buf, ok := state.stdout.(*bytes.Buffer)
+	if !ok {
+		buf = &bytes.Buffer{}
+		state.stdout = buf
 	}
-	os.Stdout = w
-
-	// Drain the pipe concurrently so writers don't block when the OS pipe
-	// buffer (typically 64 KiB) fills up.
-	type result struct {
-		data []byte
-		err  error
-	}
-	done := make(chan result, 1)
-	go func() {
-		data, err := io.ReadAll(r)
-		done <- result{data: data, err: err}
-	}()
-
+	buf.Reset()
 	fn()
-
-	_ = w.Close()
-	os.Stdout = orig // restore before reading to avoid races
-
-	res := <-done
-	_ = r.Close()
-	if res.err != nil {
-		t.Fatalf("read pipe: %v", res.err)
-	}
-	return string(res.data)
+	return buf.String()
 }
 
 // newRouterServer creates an httptest server that routes requests to handler

@@ -28,7 +28,7 @@ func TestAuditVerify_Passed_Text(t *testing.T) {
 	cmd := newAuditVerifyCommand(state)
 	cmd.SetArgs([]string{"--output", "text"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.ExecuteContext(context.Background()); err != nil {
 			t.Fatalf("execute: %v", err)
 		}
@@ -63,7 +63,7 @@ func TestAuditVerify_Failed_ReturnsError_JSON(t *testing.T) {
 
 	var rawOut string
 	err := error(nil)
-	rawOut = captureCommandOutput(t, func() {
+	rawOut = captureStateOutput(t, state, func() {
 		err = cmd.ExecuteContext(context.Background())
 	})
 	if err == nil {

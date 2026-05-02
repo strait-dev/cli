@@ -40,7 +40,7 @@ func TestTeamList_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newTeamListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -62,7 +62,7 @@ func TestTeamAdd_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newTeamAddCommand(state)
 	cmd.SetArgs([]string{"user-1", "--role-id", "role-operator"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -118,7 +118,7 @@ func TestTeamRoles_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newTeamRolesCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

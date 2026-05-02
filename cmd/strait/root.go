@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"runtime"
@@ -40,6 +41,21 @@ type appState struct {
 	configPath string
 	config     *cliconfig.File
 	resolved   cliconfig.Resolved
+	// stdout is where machine-readable output (printData, printQuietIDs,
+	// renderAuditVerify, printLLMSManifest, etc.) is written. When nil it
+	// defaults to os.Stdout. Tests inject a *bytes.Buffer to capture output
+	// without swapping the global os.Stdout under a process-wide mutex,
+	// which previously caused parallel-test races and flakes.
+	stdout io.Writer
+}
+
+// out returns the writer for machine-readable output, defaulting to os.Stdout
+// when no writer has been injected.
+func (s *appState) out() io.Writer {
+	if s == nil || s.stdout == nil {
+		return os.Stdout
+	}
+	return s.stdout
 }
 
 func newRootCommand() *cobra.Command {
@@ -56,7 +72,7 @@ func newRootCommand() *cobra.Command {
 		// RunE handles `strait --llms` (no subcommand).
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if llms {
-				return printLLMSManifest(cmd)
+				return printLLMSManifest(state.out(), cmd)
 			}
 			return cmd.Help()
 		},

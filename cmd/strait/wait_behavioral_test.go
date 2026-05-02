@@ -23,7 +23,7 @@ func TestWaitRun_CompletesImmediately(t *testing.T) {
 	cmd := newWaitRunCommand(state)
 	cmd.SetArgs([]string{"run-1", "--for", "status=completed", "--timeout", "5s"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -45,7 +45,7 @@ func TestWaitRun_Timeout(t *testing.T) {
 	cmd := newWaitRunCommand(state)
 	cmd.SetArgs([]string{"run-1", "--for", "status=completed", "--timeout", "100ms", "--interval", "20ms"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil || !strings.Contains(err.Error(), "timeout") {
 			t.Fatalf("expected timeout error, got: %v", err)
@@ -82,7 +82,7 @@ func TestWaitQueue_EmptyImmediately(t *testing.T) {
 	cmd := newWaitQueueCommand(state)
 	cmd.SetArgs([]string{"--empty", "--timeout", "5s"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

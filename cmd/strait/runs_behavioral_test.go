@@ -48,7 +48,7 @@ func TestRunsList_Success(t *testing.T) {
 	cmd := newRunsListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -75,7 +75,7 @@ func TestRunsList_StatusFilter(t *testing.T) {
 	cmd := newRunsListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test", "--status", "executing"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -100,7 +100,7 @@ func TestRunsGet_Success(t *testing.T) {
 	cmd := newRunsGetCommand(state)
 	cmd.SetArgs([]string{"run-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -128,7 +128,7 @@ func TestRunsCancel_SingleRun(t *testing.T) {
 	cmd := newRunsCancelCommand(state)
 	cmd.SetArgs([]string{"run-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -160,7 +160,7 @@ func TestRunsReplay_Success(t *testing.T) {
 	cmd := newRunsReplayCommand(state)
 	cmd.SetArgs([]string{"run-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -209,7 +209,7 @@ func TestRunsCancel_BulkRuns(t *testing.T) {
 	cmd := newRunsCancelCommand(state)
 	cmd.SetArgs([]string{"run-1", "run-2", "--yes"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -246,7 +246,7 @@ func TestRunsLast_Success(t *testing.T) {
 	cmd := newRunsLastCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -294,7 +294,7 @@ func TestRunsDiff_Success(t *testing.T) {
 	cmd := newRunsDiffCommand(state)
 	cmd.SetArgs([]string{"run-1", "run-2"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

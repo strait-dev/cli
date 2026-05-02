@@ -28,7 +28,7 @@ func TestExportJobs_Success(t *testing.T) {
 	cmd := newExportCommand(state)
 	cmd.SetArgs([]string{"jobs", "--project", "proj-test"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -72,7 +72,7 @@ func TestExportWorkflows_Success(t *testing.T) {
 	cmd := newExportCommand(state)
 	cmd.SetArgs([]string{"workflows", "--project", "proj-test"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -105,7 +105,7 @@ func TestExportAll_DryRun(t *testing.T) {
 	cmd := newExportCommand(state)
 	cmd.SetArgs([]string{"all", "--project", "proj-test", "--dry-run"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

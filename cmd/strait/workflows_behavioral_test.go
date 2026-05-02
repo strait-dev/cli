@@ -74,7 +74,7 @@ func TestWorkflowsList_Success(t *testing.T) {
 	cmd := newWorkflowsListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -99,7 +99,7 @@ func TestWorkflowsGet_Success(t *testing.T) {
 	cmd := newWorkflowsGetCommand(state)
 	cmd.SetArgs([]string{"wf-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -131,7 +131,7 @@ func TestWorkflowsCreate_Success(t *testing.T) {
 		"--description", "A test workflow",
 	})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -187,7 +187,7 @@ func TestWorkflowsUpdate_Success(t *testing.T) {
 	cmd := newWorkflowsUpdateCommand(state)
 	cmd.SetArgs([]string{"wf-1", "--name", "Updated Name"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -236,7 +236,7 @@ func TestWorkflowsDelete_WithYes(t *testing.T) {
 	cmd := newWorkflowsDeleteCommand(state)
 	cmd.SetArgs([]string{"wf-1", "--yes"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -274,7 +274,7 @@ func TestWorkflowsTrigger_Success(t *testing.T) {
 	cmd := newWorkflowsTriggerCommand(state)
 	cmd.SetArgs([]string{"wf-1", "--project", "proj-test"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -299,7 +299,7 @@ func TestWorkflowsVisualizeCommand(t *testing.T) {
 	cmd := newWorkflowsVisualizeCommand(state)
 	cmd.SetArgs([]string{"wf-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -323,7 +323,7 @@ func TestWorkflowsVisualizeCommand_FormatJSON(t *testing.T) {
 	cmd := newWorkflowsVisualizeCommand(state)
 	cmd.SetArgs([]string{"wf-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

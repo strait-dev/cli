@@ -41,7 +41,7 @@ func TestWorkflowRunsList_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newWorkflowRunsListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -62,7 +62,7 @@ func TestWorkflowRunsList_StatusFilter(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newWorkflowRunsListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test", "--status", "completed"})
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -79,7 +79,7 @@ func TestWorkflowRunsGet_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newWorkflowRunsGetCommand(state)
 	cmd.SetArgs([]string{"wfr-1"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -103,7 +103,7 @@ func TestWorkflowRunsCancel_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newWorkflowRunsCancelCommand(state)
 	cmd.SetArgs([]string{"wfr-1"})
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -123,7 +123,7 @@ func TestWorkflowRunsSteps_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newWorkflowRunsStepsCommand(state)
 	cmd.SetArgs([]string{"wfr-1"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -216,8 +215,9 @@ func newAuditVerifyCommand(state *appState) *cobra.Command {
 }
 
 func renderAuditVerify(state *appState, format string, result auditVerifyResult) error {
+	w := state.out()
 	if format == "json" {
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(result)
 	}
@@ -238,11 +238,11 @@ func renderAuditVerify(state *appState, format string, result auditVerifyResult)
 		}
 	}
 
-	fmt.Fprintf(os.Stdout, "Audit chain verification for project %s: %s\n", result.ProjectID, status)
-	fmt.Fprintf(os.Stdout, "  events checked: %d\n", result.EventsChecked)
-	fmt.Fprintf(os.Stdout, "  duration:       %dms\n", result.DurationMS)
+	fmt.Fprintf(w, "Audit chain verification for project %s: %s\n", result.ProjectID, status)
+	fmt.Fprintf(w, "  events checked: %d\n", result.EventsChecked)
+	fmt.Fprintf(w, "  duration:       %dms\n", result.DurationMS)
 	if result.FirstBreak != nil {
-		fmt.Fprintf(os.Stdout, "  first break:    event=%s reason=%s\n",
+		fmt.Fprintf(w, "  first break:    event=%s reason=%s\n",
 			dashIfEmpty(result.FirstBreak.EventID), result.FirstBreak.Reason)
 	}
 	return nil

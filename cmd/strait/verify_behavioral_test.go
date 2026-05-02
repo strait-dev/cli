@@ -27,7 +27,7 @@ func TestVerify_AllChecksPass(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newVerifyCommand(state)
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -56,7 +56,7 @@ func TestVerify_HealthFails(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newVerifyCommand(state)
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil || !strings.Contains(err.Error(), "verify failed") {
 			t.Fatalf("expected verify failed error, got: %v", err)

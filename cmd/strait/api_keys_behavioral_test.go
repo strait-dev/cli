@@ -30,7 +30,7 @@ func TestAPIKeysList_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newAPIKeysListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -57,7 +57,7 @@ func TestAPIKeysCreate_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newAPIKeysCreateCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test", "--name", "New Key", "--scopes", "jobs:read"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -119,7 +119,7 @@ func TestAPIKeysRotate_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newAPIKeysRotateCommand(state)
 	cmd.SetArgs([]string{"key-1", "--grace-period-minutes", "60"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
