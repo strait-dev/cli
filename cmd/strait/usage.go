@@ -14,15 +14,35 @@ func newUsageCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "usage",
 		Short: "Show billing-period usage and forecasts",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runUsageCurrent(cmd, state)
+		},
 	}
 	cmd.AddCommand(newUsageCurrentCommand(state))
 	cmd.AddCommand(newUsageHistoryCommand(state))
 	cmd.AddCommand(newUsageForecastCommand(state))
-
-	cmd.RunE = func(c *cobra.Command, _ []string) error {
-		return newUsageCurrentCommand(state).RunE(c, nil)
-	}
 	return cmd
+}
+
+// runUsageCurrent is the shared handler for both `strait usage` and
+// `strait usage current`. Extracting it as a free function avoids the
+// previous shim pattern of constructing a fresh cobra.Command just to
+// reach its RunE — that built an entire command tree per invocation
+// and obscured what the parent command actually did.
+func runUsageCurrent(cmd *cobra.Command, state *appState) error {
+	cli, err := newAPIClient(state)
+	if err != nil {
+		return err
+	}
+	period, err := cli.GetCurrentUsage(cmd.Context())
+	if err != nil {
+		return err
+	}
+	if isTTYRich(state) {
+		renderUsagePeriod(os.Stderr, "Current Usage", period)
+		return nil
+	}
+	return printData(state, period)
 }
 
 func newUsageCurrentCommand(state *appState) *cobra.Command {
@@ -30,19 +50,7 @@ func newUsageCurrentCommand(state *appState) *cobra.Command {
 		Use:   "current",
 		Short: "Show usage for the active billing period",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			cli, err := newAPIClient(state)
-			if err != nil {
-				return err
-			}
-			period, err := cli.GetCurrentUsage(cmd.Context())
-			if err != nil {
-				return err
-			}
-			if isTTYRich(state) {
-				renderUsagePeriod(os.Stderr, "Current Usage", period)
-				return nil
-			}
-			return printData(state, period)
+			return runUsageCurrent(cmd, state)
 		},
 	}
 }
