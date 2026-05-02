@@ -525,18 +525,22 @@ func resolveWorkflowIdentifier(ctx context.Context, cli *client.Client, state *a
 	if err := validate.SlugOrID(idOrSlug); err != nil {
 		return "", fmt.Errorf("invalid workflow identifier: %w", err)
 	}
-	if _, err := cli.GetWorkflow(ctx, idOrSlug); err == nil {
+	_, err := cli.GetWorkflow(ctx, idOrSlug)
+	if err == nil {
 		return idOrSlug, nil
 	}
+	if !client.IsNotFound(err) {
+		return "", fmt.Errorf("resolving workflow %q: %w", idOrSlug, err)
+	}
 
-	projectID, err := requireProjectID(state, "")
-	if err != nil {
+	projectID, perr := requireProjectID(state, "")
+	if perr != nil {
 		return "", fmt.Errorf("project is required to resolve slug %q", idOrSlug)
 	}
 
-	workflows, err := cli.ListWorkflows(ctx, projectID)
-	if err != nil {
-		return "", fmt.Errorf("resolving workflow %q: %w", idOrSlug, err)
+	workflows, lerr := cli.ListWorkflows(ctx, projectID)
+	if lerr != nil {
+		return "", fmt.Errorf("resolving workflow %q: %w", idOrSlug, lerr)
 	}
 
 	for _, workflow := range workflows {

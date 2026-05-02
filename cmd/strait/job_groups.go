@@ -390,16 +390,20 @@ func resolveJobGroupIdentifier(ctx context.Context, cli *client.Client, state *a
 	if err := validate.SlugOrID(idOrSlug); err != nil {
 		return "", fmt.Errorf("invalid job group identifier: %w", err)
 	}
-	if _, err := cli.GetJobGroup(ctx, idOrSlug); err == nil {
+	_, err := cli.GetJobGroup(ctx, idOrSlug)
+	if err == nil {
 		return idOrSlug, nil
 	}
-	projectID, err := requireProjectID(state, "")
-	if err != nil {
+	if !client.IsNotFound(err) {
+		return "", fmt.Errorf("resolving job group %q: %w", idOrSlug, err)
+	}
+	projectID, perr := requireProjectID(state, "")
+	if perr != nil {
 		return "", fmt.Errorf("project is required to resolve slug %q", idOrSlug)
 	}
-	groups, err := cli.ListJobGroups(ctx, projectID)
-	if err != nil {
-		return "", fmt.Errorf("resolving job group %q: %w", idOrSlug, err)
+	groups, lerr := cli.ListJobGroups(ctx, projectID)
+	if lerr != nil {
+		return "", fmt.Errorf("resolving job group %q: %w", idOrSlug, lerr)
 	}
 	for _, g := range groups {
 		if g.Slug == idOrSlug {

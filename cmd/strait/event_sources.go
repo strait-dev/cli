@@ -282,16 +282,20 @@ func resolveEventSourceIdentifier(ctx context.Context, cli *client.Client, state
 	if err := validate.SlugOrID(idOrSlug); err != nil {
 		return "", fmt.Errorf("invalid event source identifier: %w", err)
 	}
-	if _, err := cli.GetEventSource(ctx, idOrSlug); err == nil {
+	_, err := cli.GetEventSource(ctx, idOrSlug)
+	if err == nil {
 		return idOrSlug, nil
 	}
-	projectID, err := requireProjectID(state, "")
-	if err != nil {
+	if !client.IsNotFound(err) {
+		return "", fmt.Errorf("resolving event source %q: %w", idOrSlug, err)
+	}
+	projectID, perr := requireProjectID(state, "")
+	if perr != nil {
 		return "", fmt.Errorf("project is required to resolve slug %q", idOrSlug)
 	}
-	sources, err := cli.ListEventSources(ctx, projectID)
-	if err != nil {
-		return "", fmt.Errorf("resolving event source %q: %w", idOrSlug, err)
+	sources, lerr := cli.ListEventSources(ctx, projectID)
+	if lerr != nil {
+		return "", fmt.Errorf("resolving event source %q: %w", idOrSlug, lerr)
 	}
 	for _, s := range sources {
 		if s.Slug == idOrSlug {

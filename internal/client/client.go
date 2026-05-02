@@ -177,7 +177,7 @@ func (c *Client) doJSONWithHeaders(ctx context.Context, method, endpoint string,
 
 		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= http.StatusInternalServerError {
 			_ = resp.Body.Close()
-			lastErr = fmt.Errorf("request failed with status %d", resp.StatusCode)
+			lastErr = &APIError{StatusCode: resp.StatusCode, Message: http.StatusText(resp.StatusCode), Op: "request"}
 			if attempt < maxRetries-1 {
 				backoff := time.Duration(1<<uint(attempt)) * time.Second
 				backoff += jitter(backoff / 4) // add up to 25% jitter
@@ -194,13 +194,14 @@ func (c *Client) doJSONWithHeaders(ctx context.Context, method, endpoint string,
 
 		if resp.StatusCode >= http.StatusBadRequest {
 			errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+			msg := strings.TrimSpace(string(errBody))
 			var apiErr map[string]any
 			if err := json.Unmarshal(errBody, &apiErr); err == nil {
-				if msg, ok := apiErr["error"].(string); ok && msg != "" {
-					return fmt.Errorf("request failed (%d): %s", resp.StatusCode, msg)
+				if m, ok := apiErr["error"].(string); ok && m != "" {
+					msg = m
 				}
 			}
-			return fmt.Errorf("request failed (%d): %s", resp.StatusCode, strings.TrimSpace(string(errBody)))
+			return &APIError{StatusCode: resp.StatusCode, Message: msg, Op: "request"}
 		}
 
 		if out == nil {
@@ -234,7 +235,7 @@ func (c *Client) UploadFile(ctx context.Context, uploadURL string, r io.Reader, 
 
 	if resp.StatusCode >= http.StatusBadRequest {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return fmt.Errorf("upload failed (%d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return &APIError{StatusCode: resp.StatusCode, Message: strings.TrimSpace(string(body)), Op: "upload"}
 	}
 	return nil
 }

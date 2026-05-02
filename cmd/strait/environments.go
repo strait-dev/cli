@@ -326,16 +326,20 @@ func resolveEnvironmentIdentifier(ctx context.Context, cli *client.Client, state
 	if err := validate.SlugOrID(idOrSlug); err != nil {
 		return "", fmt.Errorf("invalid environment identifier: %w", err)
 	}
-	if _, err := cli.GetEnvironment(ctx, idOrSlug); err == nil {
+	_, err := cli.GetEnvironment(ctx, idOrSlug)
+	if err == nil {
 		return idOrSlug, nil
 	}
-	projectID, err := requireProjectID(state, "")
-	if err != nil {
+	if !client.IsNotFound(err) {
+		return "", fmt.Errorf("resolving environment %q: %w", idOrSlug, err)
+	}
+	projectID, perr := requireProjectID(state, "")
+	if perr != nil {
 		return "", fmt.Errorf("project is required to resolve slug %q", idOrSlug)
 	}
-	envs, err := cli.ListEnvironments(ctx, projectID)
-	if err != nil {
-		return "", fmt.Errorf("resolving environment %q: %w", idOrSlug, err)
+	envs, lerr := cli.ListEnvironments(ctx, projectID)
+	if lerr != nil {
+		return "", fmt.Errorf("resolving environment %q: %w", idOrSlug, lerr)
 	}
 	for _, e := range envs {
 		if e.Slug == idOrSlug {
