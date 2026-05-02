@@ -8,6 +8,7 @@ import (
 
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
+	"github.com/strait-dev/cli/internal/validate"
 
 	"github.com/spf13/cobra"
 )
@@ -88,6 +89,9 @@ func newNotificationsGetCommand(state *appState) *cobra.Command {
 		Short: "Get notification channel details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid notification channel id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -188,6 +192,9 @@ func newNotificationsUpdateCommand(state *appState) *cobra.Command {
 		Short: "Update a notification channel",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid notification channel id: %w", err)
+			}
 			req := client.UpdateNotificationChannelRequest{}
 			if cmd.Flags().Changed("name") {
 				req.Name = &name
@@ -235,6 +242,9 @@ func newNotificationsDeleteCommand(state *appState) *cobra.Command {
 		Short: "Delete a notification channel",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid notification channel id: %w", err)
+			}
 			if err := requireConfirmation(state, "Delete this notification channel?", yes); err != nil {
 				return err
 			}

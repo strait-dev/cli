@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/strait-dev/cli/internal/styles"
+	"github.com/strait-dev/cli/internal/validate"
 
 	"github.com/spf13/cobra"
 )
@@ -15,6 +16,9 @@ func newWorkflowRunsPauseCommand(state *appState) *cobra.Command {
 		Short: "Pause an in-flight workflow run",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid workflow run id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -38,6 +42,9 @@ func newWorkflowRunsResumeCommand(state *appState) *cobra.Command {
 		Short: "Resume a paused workflow run",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid workflow run id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -61,6 +68,9 @@ func newWorkflowRunsRetryCommand(state *appState) *cobra.Command {
 		Short: "Retry a failed workflow run",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid workflow run id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -84,6 +94,12 @@ func newWorkflowRunsApproveStepCommand(state *appState) *cobra.Command {
 		Short: "Approve a workflow step pending review",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid workflow run id: %w", err)
+			}
+			if err := validate.SlugOrID(args[1]); err != nil {
+				return fmt.Errorf("invalid step ref: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -106,6 +122,12 @@ func newWorkflowRunsRetryStepCommand(state *appState) *cobra.Command {
 		Short: "Retry an individual workflow step",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid workflow run id: %w", err)
+			}
+			if err := validate.SlugOrID(args[1]); err != nil {
+				return fmt.Errorf("invalid step ref: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -128,6 +150,12 @@ func newWorkflowRunsSkipStepCommand(state *appState) *cobra.Command {
 		Short: "Skip a workflow step",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid workflow run id: %w", err)
+			}
+			if err := validate.SlugOrID(args[1]); err != nil {
+				return fmt.Errorf("invalid step ref: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -151,6 +179,12 @@ func newWorkflowRunsForceCompleteStepCommand(state *appState) *cobra.Command {
 		Short: "Force-complete a workflow step regardless of state",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid workflow run id: %w", err)
+			}
+			if err := validate.SlugOrID(args[1]); err != nil {
+				return fmt.Errorf("invalid step ref: %w", err)
+			}
 			if err := requireConfirmation(state, fmt.Sprintf("Force-complete step %s on run %s?", args[1], args[0]), yes); err != nil {
 				return err
 			}

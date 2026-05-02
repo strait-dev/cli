@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/strait-dev/cli/internal/styles"
+	"github.com/strait-dev/cli/internal/validate"
 
 	"github.com/spf13/cobra"
 )
@@ -18,6 +19,9 @@ func newRunsRescheduleCommand(state *appState) *cobra.Command {
 		Short: "Reschedule a run for a future execution time",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid run id: %w", err)
+			}
 			if strings.TrimSpace(at) == "" {
 				return fmt.Errorf("--at is required (RFC3339)")
 			}
@@ -88,6 +92,9 @@ func newRunsDLQReplayCommand(state *appState) *cobra.Command {
 		Short: "Replay a run from the dead letter queue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid dlq id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -111,6 +118,9 @@ func newRunsOutputsCommand(state *appState) *cobra.Command {
 		Short: "List outputs produced by a run",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid run id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -130,6 +140,9 @@ func newRunsToolCallsCommand(state *appState) *cobra.Command {
 		Short: "List tool calls invoked during a run",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid run id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -149,6 +162,9 @@ func newRunsUsageCommand(state *appState) *cobra.Command {
 		Short: "Show resource usage for a run",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid run id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -181,6 +197,9 @@ func newRunsCheckpointsCommand(state *appState) *cobra.Command {
 		Short: "List checkpoints recorded during a run",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid run id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err

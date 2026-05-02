@@ -8,6 +8,7 @@ import (
 
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
+	"github.com/strait-dev/cli/internal/validate"
 
 	"github.com/spf13/cobra"
 )
@@ -315,6 +316,9 @@ func newEnvironmentsVariablesCommand(state *appState) *cobra.Command {
 }
 
 func resolveEnvironmentIdentifier(ctx context.Context, cli *client.Client, state *appState, idOrSlug string) (string, error) {
+	if err := validate.SlugOrID(idOrSlug); err != nil {
+		return "", fmt.Errorf("invalid environment identifier: %w", err)
+	}
 	if _, err := cli.GetEnvironment(ctx, idOrSlug); err == nil {
 		return idOrSlug, nil
 	}

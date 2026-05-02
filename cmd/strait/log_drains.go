@@ -8,6 +8,7 @@ import (
 
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
+	"github.com/strait-dev/cli/internal/validate"
 
 	"github.com/spf13/cobra"
 )
@@ -88,6 +89,9 @@ func newLogDrainsGetCommand(state *appState) *cobra.Command {
 		Short: "Get log drain details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid log drain id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -188,6 +192,9 @@ func newLogDrainsUpdateCommand(state *appState) *cobra.Command {
 		Short: "Update a log drain",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid log drain id: %w", err)
+			}
 			req := client.UpdateLogDrainRequest{}
 			if cmd.Flags().Changed("name") {
 				req.Name = &name
@@ -235,6 +242,9 @@ func newLogDrainsDeleteCommand(state *appState) *cobra.Command {
 		Short: "Delete a log drain",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid log drain id: %w", err)
+			}
 			if err := requireConfirmation(state, "Delete this log drain?", yes); err != nil {
 				return err
 			}

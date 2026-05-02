@@ -6,6 +6,7 @@ import (
 
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
+	"github.com/strait-dev/cli/internal/validate"
 
 	"github.com/spf13/cobra"
 )
@@ -109,6 +110,9 @@ func newTeamPoliciesDeleteCommand(state *appState) *cobra.Command {
 		Short: "Delete a team RBAC policy",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid policy id: %w", err)
+			}
 			if err := requireConfirmation(state, fmt.Sprintf("Delete policy %s?", args[0]), yes); err != nil {
 				return err
 			}

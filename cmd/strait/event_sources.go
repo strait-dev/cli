@@ -9,6 +9,7 @@ import (
 
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
+	"github.com/strait-dev/cli/internal/validate"
 
 	"github.com/spf13/cobra"
 )
@@ -278,6 +279,9 @@ func newEventSourcesDeleteCommand(state *appState) *cobra.Command {
 }
 
 func resolveEventSourceIdentifier(ctx context.Context, cli *client.Client, state *appState, idOrSlug string) (string, error) {
+	if err := validate.SlugOrID(idOrSlug); err != nil {
+		return "", fmt.Errorf("invalid event source identifier: %w", err)
+	}
 	if _, err := cli.GetEventSource(ctx, idOrSlug); err == nil {
 		return idOrSlug, nil
 	}

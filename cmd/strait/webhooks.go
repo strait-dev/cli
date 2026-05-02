@@ -7,6 +7,7 @@ import (
 
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
+	"github.com/strait-dev/cli/internal/validate"
 
 	"github.com/spf13/cobra"
 )
@@ -104,6 +105,9 @@ func newWebhooksGetCommand(state *appState) *cobra.Command {
 		Short: "Get webhook subscription details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid webhook id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -203,6 +207,9 @@ func newWebhooksUpdateCommand(state *appState) *cobra.Command {
 		Short: "Update a webhook subscription",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid webhook id: %w", err)
+			}
 			req := client.UpdateWebhookRequest{}
 			if cmd.Flags().Changed("url") {
 				req.URL = &hookURL
@@ -252,6 +259,9 @@ func newWebhooksDeleteCommand(state *appState) *cobra.Command {
 		Short: "Delete a webhook subscription",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid webhook id: %w", err)
+			}
 			if err := requireConfirmation(state, "Delete this webhook?", yes); err != nil {
 				return err
 			}
@@ -280,6 +290,9 @@ func newWebhooksDeliveriesCommand(state *appState) *cobra.Command {
 		Short: "List webhook delivery attempts",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid webhook id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -312,6 +325,9 @@ func newWebhooksRetryCommand(state *appState) *cobra.Command {
 		Short: "Retry a failed webhook delivery",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid delivery id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
@@ -336,6 +352,9 @@ func newWebhooksTestCommand(state *appState) *cobra.Command {
 		Short: "Send a synthetic test event to a webhook",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid webhook id: %w", err)
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
