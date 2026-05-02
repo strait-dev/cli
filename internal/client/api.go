@@ -699,3 +699,318 @@ func (c *Client) GetServerCapabilities(ctx context.Context) (*ServerCapabilities
 	}
 	return &out, nil
 }
+
+// GetEnvironment returns an environment by ID.
+func (c *Client) GetEnvironment(ctx context.Context, id string) (*types.Environment, error) {
+	var out types.Environment
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/environments", id), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateEnvironment creates a new environment.
+func (c *Client) CreateEnvironment(ctx context.Context, req CreateEnvironmentRequest) (*types.Environment, error) {
+	var out types.Environment
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/environments", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateEnvironment updates an environment by ID.
+func (c *Client) UpdateEnvironment(ctx context.Context, id string, req UpdateEnvironmentRequest) (*types.Environment, error) {
+	var out types.Environment
+	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/environments", id), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteEnvironment deletes an environment by ID.
+func (c *Client) DeleteEnvironment(ctx context.Context, id string) error {
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/environments", id), nil, nil, &map[string]string{})
+}
+
+// ListEnvironmentVariables returns the variables map for an environment.
+func (c *Client) ListEnvironmentVariables(ctx context.Context, id string) (map[string]string, error) {
+	var out map[string]string
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/environments", id, "variables"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListWebhooks returns webhook subscriptions for a project.
+func (c *Client) ListWebhooks(ctx context.Context, projectID string) ([]types.Webhook, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	var out []types.Webhook
+	if err := c.doListJSON(ctx, "/v1/webhooks", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetWebhook returns a webhook subscription by ID.
+func (c *Client) GetWebhook(ctx context.Context, id string) (*types.Webhook, error) {
+	var out types.Webhook
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/webhooks", id), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateWebhook creates a new webhook subscription.
+func (c *Client) CreateWebhook(ctx context.Context, req CreateWebhookRequest) (*types.Webhook, error) {
+	var out types.Webhook
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/webhooks", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateWebhook updates a webhook subscription.
+func (c *Client) UpdateWebhook(ctx context.Context, id string, req UpdateWebhookRequest) (*types.Webhook, error) {
+	var out types.Webhook
+	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/webhooks", id), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteWebhook deletes a webhook subscription by ID.
+func (c *Client) DeleteWebhook(ctx context.Context, id string) error {
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/webhooks", id), nil, nil, &map[string]string{})
+}
+
+// ListWebhookDeliveries returns delivery records for a webhook.
+func (c *Client) ListWebhookDeliveries(ctx context.Context, id string, limit int) ([]types.WebhookDelivery, error) {
+	query := url.Values{}
+	if limit > 0 {
+		query.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	var out []types.WebhookDelivery
+	if err := c.doListJSON(ctx, path.Join("/v1/webhooks", id, "deliveries"), query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RetryWebhookDelivery re-attempts a previous webhook delivery.
+func (c *Client) RetryWebhookDelivery(ctx context.Context, deliveryID string) (*types.WebhookDelivery, error) {
+	var out types.WebhookDelivery
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/webhook-deliveries", deliveryID, "retry"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// TestWebhook sends a synthetic test event to a webhook.
+func (c *Client) TestWebhook(ctx context.Context, id string) (*TestWebhookResponse, error) {
+	var out TestWebhookResponse
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/webhooks", id, "test"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListEventSources returns event sources for a project.
+func (c *Client) ListEventSources(ctx context.Context, projectID string) ([]types.EventSource, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	var out []types.EventSource
+	if err := c.doListJSON(ctx, "/v1/event-sources", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetEventSource returns an event source by ID.
+func (c *Client) GetEventSource(ctx context.Context, id string) (*types.EventSource, error) {
+	var out types.EventSource
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/event-sources", id), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateEventSource creates a new event source.
+func (c *Client) CreateEventSource(ctx context.Context, req CreateEventSourceRequest) (*types.EventSource, error) {
+	var out types.EventSource
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/event-sources", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateEventSource updates an event source by ID.
+func (c *Client) UpdateEventSource(ctx context.Context, id string, req UpdateEventSourceRequest) (*types.EventSource, error) {
+	var out types.EventSource
+	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/event-sources", id), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteEventSource deletes an event source by ID.
+func (c *Client) DeleteEventSource(ctx context.Context, id string) error {
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/event-sources", id), nil, nil, &map[string]string{})
+}
+
+// ListJobGroups returns job groups for a project.
+func (c *Client) ListJobGroups(ctx context.Context, projectID string) ([]types.JobGroup, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	var out []types.JobGroup
+	if err := c.doListJSON(ctx, "/v1/job-groups", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetJobGroup returns a job group by ID.
+func (c *Client) GetJobGroup(ctx context.Context, id string) (*types.JobGroup, error) {
+	var out types.JobGroup
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/job-groups", id), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateJobGroup creates a new job group.
+func (c *Client) CreateJobGroup(ctx context.Context, req CreateJobGroupRequest) (*types.JobGroup, error) {
+	var out types.JobGroup
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/job-groups", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateJobGroup updates a job group by ID.
+func (c *Client) UpdateJobGroup(ctx context.Context, id string, req UpdateJobGroupRequest) (*types.JobGroup, error) {
+	var out types.JobGroup
+	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/job-groups", id), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteJobGroup deletes a job group by ID.
+func (c *Client) DeleteJobGroup(ctx context.Context, id string) error {
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/job-groups", id), nil, nil, &map[string]string{})
+}
+
+// ListJobsInGroup returns jobs that belong to a job group.
+func (c *Client) ListJobsInGroup(ctx context.Context, id string) ([]types.Job, error) {
+	var out []types.Job
+	if err := c.doListJSON(ctx, path.Join("/v1/job-groups", id, "jobs"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PauseJobGroup pauses execution for all jobs in a group.
+func (c *Client) PauseJobGroup(ctx context.Context, id string) error {
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/job-groups", id, "pause"), nil, nil, &map[string]string{})
+}
+
+// ResumeJobGroup resumes execution for all jobs in a group.
+func (c *Client) ResumeJobGroup(ctx context.Context, id string) error {
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/job-groups", id, "resume"), nil, nil, &map[string]string{})
+}
+
+// GetJobGroupStats returns aggregate stats for a job group.
+func (c *Client) GetJobGroupStats(ctx context.Context, id string) (*types.JobGroupStats, error) {
+	var out types.JobGroupStats
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/job-groups", id, "stats"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListNotificationChannels returns notification channels for a project.
+func (c *Client) ListNotificationChannels(ctx context.Context, projectID string) ([]types.NotificationChannel, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	var out []types.NotificationChannel
+	if err := c.doListJSON(ctx, "/v1/notification-channels", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetNotificationChannel returns a notification channel by ID.
+func (c *Client) GetNotificationChannel(ctx context.Context, id string) (*types.NotificationChannel, error) {
+	var out types.NotificationChannel
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/notification-channels", id), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateNotificationChannel creates a new notification channel.
+func (c *Client) CreateNotificationChannel(ctx context.Context, req CreateNotificationChannelRequest) (*types.NotificationChannel, error) {
+	var out types.NotificationChannel
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/notification-channels", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateNotificationChannel updates a notification channel by ID.
+func (c *Client) UpdateNotificationChannel(ctx context.Context, id string, req UpdateNotificationChannelRequest) (*types.NotificationChannel, error) {
+	var out types.NotificationChannel
+	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/notification-channels", id), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteNotificationChannel deletes a notification channel by ID.
+func (c *Client) DeleteNotificationChannel(ctx context.Context, id string) error {
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/notification-channels", id), nil, nil, &map[string]string{})
+}
+
+// ListLogDrains returns log drains for a project.
+func (c *Client) ListLogDrains(ctx context.Context, projectID string) ([]types.LogDrain, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	var out []types.LogDrain
+	if err := c.doListJSON(ctx, "/v1/log-drains", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetLogDrain returns a log drain by ID.
+func (c *Client) GetLogDrain(ctx context.Context, id string) (*types.LogDrain, error) {
+	var out types.LogDrain
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/log-drains", id), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateLogDrain creates a new log drain.
+func (c *Client) CreateLogDrain(ctx context.Context, req CreateLogDrainRequest) (*types.LogDrain, error) {
+	var out types.LogDrain
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/log-drains", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateLogDrain updates a log drain by ID.
+func (c *Client) UpdateLogDrain(ctx context.Context, id string, req UpdateLogDrainRequest) (*types.LogDrain, error) {
+	var out types.LogDrain
+	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/log-drains", id), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteLogDrain deletes a log drain by ID.
+func (c *Client) DeleteLogDrain(ctx context.Context, id string) error {
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/log-drains", id), nil, nil, &map[string]string{})
+}

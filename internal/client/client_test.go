@@ -1463,6 +1463,298 @@ func TestPurgeEventTriggers_DryRun(t *testing.T) {
 	}
 }
 
+func TestEnvironmentCRUD(t *testing.T) {
+	t.Parallel()
+
+	env := types.Environment{ID: "env-1", ProjectID: "proj-1", Name: "Production", Slug: "prod", IsStandard: true}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/environments/env-1":
+			respondJSON(t, w, http.StatusOK, env)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/environments":
+			respondJSON(t, w, http.StatusCreated, env)
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/environments/env-1":
+			respondJSON(t, w, http.StatusOK, env)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/environments/env-1":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/environments/env-1/variables":
+			respondJSON(t, w, http.StatusOK, map[string]string{"FOO": "bar"})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if got, err := c.GetEnvironment(context.Background(), "env-1"); err != nil || got.Slug != "prod" {
+		t.Fatalf("GetEnvironment: %v / got=%+v", err, got)
+	}
+	if got, err := c.CreateEnvironment(context.Background(), CreateEnvironmentRequest{ProjectID: "proj-1", Name: "Production", Slug: "prod"}); err != nil || got.ID != "env-1" {
+		t.Fatalf("CreateEnvironment: %v / got=%+v", err, got)
+	}
+	name := "Prod"
+	if got, err := c.UpdateEnvironment(context.Background(), "env-1", UpdateEnvironmentRequest{Name: &name}); err != nil || got.ID != "env-1" {
+		t.Fatalf("UpdateEnvironment: %v / got=%+v", err, got)
+	}
+	if err := c.DeleteEnvironment(context.Background(), "env-1"); err != nil {
+		t.Fatalf("DeleteEnvironment: %v", err)
+	}
+	vars, err := c.ListEnvironmentVariables(context.Background(), "env-1")
+	if err != nil || vars["FOO"] != "bar" {
+		t.Fatalf("ListEnvironmentVariables: %v / got=%+v", err, vars)
+	}
+}
+
+func TestWebhookLifecycle(t *testing.T) {
+	t.Parallel()
+
+	hook := types.Webhook{ID: "wh-1", ProjectID: "proj-1", URL: "https://example.com/hook", Events: []string{"run.completed"}, Active: true}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks":
+			respondPaginated(t, w, http.StatusOK, []types.Webhook{hook})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/wh-1":
+			respondJSON(t, w, http.StatusOK, hook)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks":
+			respondJSON(t, w, http.StatusCreated, hook)
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/webhooks/wh-1":
+			respondJSON(t, w, http.StatusOK, hook)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/webhooks/wh-1":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/wh-1/deliveries":
+			respondPaginated(t, w, http.StatusOK, []types.WebhookDelivery{{ID: "wd-1", WebhookID: "wh-1", Status: "ok"}})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/wh-1/test":
+			respondJSON(t, w, http.StatusOK, TestWebhookResponse{DeliveryID: "wd-9", Status: "queued"})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhook-deliveries/wd-1/retry":
+			respondJSON(t, w, http.StatusOK, types.WebhookDelivery{ID: "wd-1", WebhookID: "wh-1", Status: "queued"})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if got, err := c.ListWebhooks(context.Background(), "proj-1"); err != nil || len(got) != 1 {
+		t.Fatalf("ListWebhooks: %v / got=%+v", err, got)
+	}
+	if _, err := c.GetWebhook(context.Background(), "wh-1"); err != nil {
+		t.Fatalf("GetWebhook: %v", err)
+	}
+	if _, err := c.CreateWebhook(context.Background(), CreateWebhookRequest{ProjectID: "proj-1", URL: "https://example.com/hook", Events: []string{"run.completed"}}); err != nil {
+		t.Fatalf("CreateWebhook: %v", err)
+	}
+	url := "https://new.example.com"
+	if _, err := c.UpdateWebhook(context.Background(), "wh-1", UpdateWebhookRequest{URL: &url}); err != nil {
+		t.Fatalf("UpdateWebhook: %v", err)
+	}
+	if err := c.DeleteWebhook(context.Background(), "wh-1"); err != nil {
+		t.Fatalf("DeleteWebhook: %v", err)
+	}
+	if got, err := c.ListWebhookDeliveries(context.Background(), "wh-1", 10); err != nil || len(got) != 1 {
+		t.Fatalf("ListWebhookDeliveries: %v / got=%+v", err, got)
+	}
+	if got, err := c.TestWebhook(context.Background(), "wh-1"); err != nil || got.DeliveryID != "wd-9" {
+		t.Fatalf("TestWebhook: %v / got=%+v", err, got)
+	}
+	if got, err := c.RetryWebhookDelivery(context.Background(), "wd-1"); err != nil || got.ID != "wd-1" {
+		t.Fatalf("RetryWebhookDelivery: %v / got=%+v", err, got)
+	}
+}
+
+func TestEventSourceCRUD(t *testing.T) {
+	t.Parallel()
+
+	src := types.EventSource{ID: "es-1", ProjectID: "proj-1", Name: "Kafka", Slug: "kafka", Type: "kafka", Enabled: true}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/event-sources":
+			respondPaginated(t, w, http.StatusOK, []types.EventSource{src})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/event-sources/es-1":
+			respondJSON(t, w, http.StatusOK, src)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/event-sources":
+			respondJSON(t, w, http.StatusCreated, src)
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/event-sources/es-1":
+			respondJSON(t, w, http.StatusOK, src)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/event-sources/es-1":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if _, err := c.ListEventSources(context.Background(), "proj-1"); err != nil {
+		t.Fatalf("ListEventSources: %v", err)
+	}
+	if _, err := c.GetEventSource(context.Background(), "es-1"); err != nil {
+		t.Fatalf("GetEventSource: %v", err)
+	}
+	if _, err := c.CreateEventSource(context.Background(), CreateEventSourceRequest{ProjectID: "proj-1", Name: "Kafka", Slug: "kafka", Type: "kafka"}); err != nil {
+		t.Fatalf("CreateEventSource: %v", err)
+	}
+	name := "Kafka2"
+	if _, err := c.UpdateEventSource(context.Background(), "es-1", UpdateEventSourceRequest{Name: &name}); err != nil {
+		t.Fatalf("UpdateEventSource: %v", err)
+	}
+	if err := c.DeleteEventSource(context.Background(), "es-1"); err != nil {
+		t.Fatalf("DeleteEventSource: %v", err)
+	}
+}
+
+func TestJobGroupLifecycle(t *testing.T) {
+	t.Parallel()
+
+	group := types.JobGroup{ID: "jg-1", ProjectID: "proj-1", Name: "ETL", Slug: "etl", JobCount: 3}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/job-groups":
+			respondPaginated(t, w, http.StatusOK, []types.JobGroup{group})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/job-groups/jg-1":
+			respondJSON(t, w, http.StatusOK, group)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups":
+			respondJSON(t, w, http.StatusCreated, group)
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/job-groups/jg-1":
+			respondJSON(t, w, http.StatusOK, group)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/job-groups/jg-1":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/job-groups/jg-1/jobs":
+			respondPaginated(t, w, http.StatusOK, []types.Job{{ID: "job-1"}})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups/jg-1/pause":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups/jg-1/resume":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/job-groups/jg-1/stats":
+			respondJSON(t, w, http.StatusOK, types.JobGroupStats{GroupID: "jg-1", JobCount: 3, RunsTotal: 100})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if _, err := c.ListJobGroups(context.Background(), "proj-1"); err != nil {
+		t.Fatalf("ListJobGroups: %v", err)
+	}
+	if _, err := c.GetJobGroup(context.Background(), "jg-1"); err != nil {
+		t.Fatalf("GetJobGroup: %v", err)
+	}
+	if _, err := c.CreateJobGroup(context.Background(), CreateJobGroupRequest{ProjectID: "proj-1", Name: "ETL", Slug: "etl"}); err != nil {
+		t.Fatalf("CreateJobGroup: %v", err)
+	}
+	name := "etl-v2"
+	if _, err := c.UpdateJobGroup(context.Background(), "jg-1", UpdateJobGroupRequest{Name: &name}); err != nil {
+		t.Fatalf("UpdateJobGroup: %v", err)
+	}
+	if err := c.DeleteJobGroup(context.Background(), "jg-1"); err != nil {
+		t.Fatalf("DeleteJobGroup: %v", err)
+	}
+	if _, err := c.ListJobsInGroup(context.Background(), "jg-1"); err != nil {
+		t.Fatalf("ListJobsInGroup: %v", err)
+	}
+	if err := c.PauseJobGroup(context.Background(), "jg-1"); err != nil {
+		t.Fatalf("PauseJobGroup: %v", err)
+	}
+	if err := c.ResumeJobGroup(context.Background(), "jg-1"); err != nil {
+		t.Fatalf("ResumeJobGroup: %v", err)
+	}
+	if got, err := c.GetJobGroupStats(context.Background(), "jg-1"); err != nil || got.RunsTotal != 100 {
+		t.Fatalf("GetJobGroupStats: %v / got=%+v", err, got)
+	}
+}
+
+func TestNotificationChannelCRUD(t *testing.T) {
+	t.Parallel()
+
+	channel := types.NotificationChannel{ID: "nc-1", ProjectID: "proj-1", Name: "oncall", Type: "slack", Enabled: true}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/notification-channels":
+			respondPaginated(t, w, http.StatusOK, []types.NotificationChannel{channel})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/notification-channels/nc-1":
+			respondJSON(t, w, http.StatusOK, channel)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/notification-channels":
+			respondJSON(t, w, http.StatusCreated, channel)
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/notification-channels/nc-1":
+			respondJSON(t, w, http.StatusOK, channel)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/notification-channels/nc-1":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if _, err := c.ListNotificationChannels(context.Background(), "proj-1"); err != nil {
+		t.Fatalf("ListNotificationChannels: %v", err)
+	}
+	if _, err := c.GetNotificationChannel(context.Background(), "nc-1"); err != nil {
+		t.Fatalf("GetNotificationChannel: %v", err)
+	}
+	if _, err := c.CreateNotificationChannel(context.Background(), CreateNotificationChannelRequest{
+		ProjectID: "proj-1", Name: "oncall", Type: "slack", Config: json.RawMessage(`{"webhook_url":"https://hooks.example"}`),
+	}); err != nil {
+		t.Fatalf("CreateNotificationChannel: %v", err)
+	}
+	name := "oncall-v2"
+	if _, err := c.UpdateNotificationChannel(context.Background(), "nc-1", UpdateNotificationChannelRequest{Name: &name}); err != nil {
+		t.Fatalf("UpdateNotificationChannel: %v", err)
+	}
+	if err := c.DeleteNotificationChannel(context.Background(), "nc-1"); err != nil {
+		t.Fatalf("DeleteNotificationChannel: %v", err)
+	}
+}
+
+func TestLogDrainCRUD(t *testing.T) {
+	t.Parallel()
+
+	drain := types.LogDrain{ID: "ld-1", ProjectID: "proj-1", Name: "datadog-prod", Type: "datadog", Enabled: true}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/log-drains":
+			respondPaginated(t, w, http.StatusOK, []types.LogDrain{drain})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/log-drains/ld-1":
+			respondJSON(t, w, http.StatusOK, drain)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/log-drains":
+			respondJSON(t, w, http.StatusCreated, drain)
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/log-drains/ld-1":
+			respondJSON(t, w, http.StatusOK, drain)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/log-drains/ld-1":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if _, err := c.ListLogDrains(context.Background(), "proj-1"); err != nil {
+		t.Fatalf("ListLogDrains: %v", err)
+	}
+	if _, err := c.GetLogDrain(context.Background(), "ld-1"); err != nil {
+		t.Fatalf("GetLogDrain: %v", err)
+	}
+	if _, err := c.CreateLogDrain(context.Background(), CreateLogDrainRequest{
+		ProjectID: "proj-1", Name: "datadog-prod", Type: "datadog", Config: json.RawMessage(`{"api_key":"x"}`),
+	}); err != nil {
+		t.Fatalf("CreateLogDrain: %v", err)
+	}
+	name := "datadog-prod-v2"
+	if _, err := c.UpdateLogDrain(context.Background(), "ld-1", UpdateLogDrainRequest{Name: &name}); err != nil {
+		t.Fatalf("UpdateLogDrain: %v", err)
+	}
+	if err := c.DeleteLogDrain(context.Background(), "ld-1"); err != nil {
+		t.Fatalf("DeleteLogDrain: %v", err)
+	}
+}
+
 // Test helpers.
 
 func mustClient(t *testing.T, baseURL string) *Client {

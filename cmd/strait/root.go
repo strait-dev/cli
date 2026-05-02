@@ -234,6 +234,12 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newConfigCommand(state))
 	cmd.AddCommand(newSchemaCommand(state))
 	cmd.AddCommand(newAgentCommand(state))
+	cmd.AddCommand(newEnvironmentsCommand(state))
+	cmd.AddCommand(newWebhooksCommand(state))
+	cmd.AddCommand(newEventSourcesCommand(state))
+	cmd.AddCommand(newJobGroupsCommand(state))
+	cmd.AddCommand(newNotificationsCommand(state))
+	cmd.AddCommand(newLogDrainsCommand(state))
 
 	rawArgs := os.Args[1:]
 	configPath := extractConfigPath(rawArgs)
@@ -334,6 +340,19 @@ func normalizeLegacyArgs(args []string) []string {
 		"config":        {},
 		"schema":        {},
 		"agent":         {},
+		"environments":  {},
+		"environment":   {},
+		"envs":          {},
+		"env":           {},
+		"webhooks":      {},
+		"event-sources": {},
+		"event-source":  {},
+		"job-groups":    {},
+		"job-group":     {},
+		"notifications": {},
+		"notification":  {},
+		"log-drains":    {},
+		"log-drain":     {},
 	}
 
 	first := args[0]

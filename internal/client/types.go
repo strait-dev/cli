@@ -414,3 +414,110 @@ type RunStreamMessage struct {
 	To        string          `json:"to,omitempty"`
 	Error     string          `json:"error,omitempty"`
 }
+
+// CreateEnvironmentRequest is the request body for creating an environment.
+type CreateEnvironmentRequest struct {
+	ProjectID  string            `json:"project_id"`
+	Name       string            `json:"name"`
+	Slug       string            `json:"slug"`
+	ParentID   string            `json:"parent_id,omitempty"`
+	IsStandard bool              `json:"is_standard,omitempty"`
+	Variables  map[string]string `json:"variables,omitempty"`
+}
+
+// UpdateEnvironmentRequest is the request body for updating an environment.
+type UpdateEnvironmentRequest struct {
+	Name      *string            `json:"name,omitempty"`
+	Slug      *string            `json:"slug,omitempty"`
+	ParentID  *string            `json:"parent_id,omitempty"`
+	Variables *map[string]string `json:"variables,omitempty"`
+}
+
+// CreateWebhookRequest is the request body for creating a webhook subscription.
+type CreateWebhookRequest struct {
+	ProjectID  string   `json:"project_id"`
+	URL        string   `json:"url"`
+	Events     []string `json:"events"`
+	Secret     string   `json:"secret,omitempty"`
+	Active     *bool    `json:"active,omitempty"`
+	HeadersRaw string   `json:"-"`
+}
+
+// UpdateWebhookRequest is the request body for updating a webhook.
+type UpdateWebhookRequest struct {
+	URL    *string   `json:"url,omitempty"`
+	Events *[]string `json:"events,omitempty"`
+	Secret *string   `json:"secret,omitempty"`
+	Active *bool     `json:"active,omitempty"`
+}
+
+// TestWebhookResponse is the response from a webhook test ping.
+type TestWebhookResponse struct {
+	DeliveryID string `json:"delivery_id"`
+	Status     string `json:"status"`
+}
+
+// CreateEventSourceRequest is the request body for creating an event source.
+type CreateEventSourceRequest struct {
+	ProjectID string          `json:"project_id"`
+	Name      string          `json:"name"`
+	Slug      string          `json:"slug"`
+	Type      string          `json:"type"`
+	Config    json.RawMessage `json:"config,omitempty"`
+	Enabled   *bool           `json:"enabled,omitempty"`
+}
+
+// UpdateEventSourceRequest is the request body for updating an event source.
+type UpdateEventSourceRequest struct {
+	Name    *string          `json:"name,omitempty"`
+	Slug    *string          `json:"slug,omitempty"`
+	Config  *json.RawMessage `json:"config,omitempty"`
+	Enabled *bool            `json:"enabled,omitempty"`
+}
+
+// CreateJobGroupRequest is the request body for creating a job group.
+type CreateJobGroupRequest struct {
+	ProjectID   string `json:"project_id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	Description string `json:"description,omitempty"`
+}
+
+// UpdateJobGroupRequest is the request body for updating a job group.
+type UpdateJobGroupRequest struct {
+	Name        *string `json:"name,omitempty"`
+	Slug        *string `json:"slug,omitempty"`
+	Description *string `json:"description,omitempty"`
+}
+
+// CreateNotificationChannelRequest is the request body for creating a notification channel.
+type CreateNotificationChannelRequest struct {
+	ProjectID string          `json:"project_id"`
+	Name      string          `json:"name"`
+	Type      string          `json:"type"`
+	Config    json.RawMessage `json:"config"`
+	Enabled   *bool           `json:"enabled,omitempty"`
+}
+
+// UpdateNotificationChannelRequest is the request body for updating a notification channel.
+type UpdateNotificationChannelRequest struct {
+	Name    *string          `json:"name,omitempty"`
+	Config  *json.RawMessage `json:"config,omitempty"`
+	Enabled *bool            `json:"enabled,omitempty"`
+}
+
+// CreateLogDrainRequest is the request body for creating a log drain.
+type CreateLogDrainRequest struct {
+	ProjectID string          `json:"project_id"`
+	Name      string          `json:"name"`
+	Type      string          `json:"type"`
+	Config    json.RawMessage `json:"config"`
+	Enabled   *bool           `json:"enabled,omitempty"`
+}
+
+// UpdateLogDrainRequest is the request body for updating a log drain.
+type UpdateLogDrainRequest struct {
+	Name    *string          `json:"name,omitempty"`
+	Config  *json.RawMessage `json:"config,omitempty"`
+	Enabled *bool            `json:"enabled,omitempty"`
+}

@@ -660,3 +660,88 @@ type StepOverride struct {
 	StepRef string `json:"step_ref"`
 	Enabled bool   `json:"enabled"`
 }
+
+// Webhook represents an outbound webhook subscription.
+type Webhook struct {
+	ID         string     `json:"id"`
+	ProjectID  string     `json:"project_id"`
+	URL        string     `json:"url"`
+	Events     []string   `json:"events"`
+	Secret     string     `json:"secret,omitempty"`
+	Active     bool       `json:"active"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
+	LastSentAt *time.Time `json:"last_sent_at,omitempty"`
+}
+
+// WebhookDelivery represents a single webhook delivery attempt.
+type WebhookDelivery struct {
+	ID           string     `json:"id"`
+	WebhookID    string     `json:"webhook_id"`
+	EventType    string     `json:"event_type"`
+	Status       string     `json:"status"`
+	StatusCode   int        `json:"status_code,omitempty"`
+	AttemptCount int        `json:"attempt_count"`
+	Error        string     `json:"error,omitempty"`
+	RequestedAt  time.Time  `json:"requested_at"`
+	DeliveredAt  *time.Time `json:"delivered_at,omitempty"`
+}
+
+// EventSource represents an external event source feeding the project.
+type EventSource struct {
+	ID        string          `json:"id"`
+	ProjectID string          `json:"project_id"`
+	Name      string          `json:"name"`
+	Slug      string          `json:"slug"`
+	Type      string          `json:"type"`
+	Config    json.RawMessage `json:"config,omitempty"`
+	Enabled   bool            `json:"enabled"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+// JobGroup represents a logical grouping of jobs.
+type JobGroup struct {
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"project_id"`
+	Name        string    `json:"name"`
+	Slug        string    `json:"slug"`
+	Description string    `json:"description,omitempty"`
+	Paused      bool      `json:"paused"`
+	JobCount    int       `json:"job_count,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// JobGroupStats holds aggregate execution metrics for a job group.
+type JobGroupStats struct {
+	GroupID    string `json:"group_id"`
+	JobCount   int    `json:"job_count"`
+	RunsTotal  int64  `json:"runs_total"`
+	RunsFailed int64  `json:"runs_failed"`
+	RunsActive int64  `json:"runs_active"`
+}
+
+// NotificationChannel represents a notification delivery channel.
+type NotificationChannel struct {
+	ID        string          `json:"id"`
+	ProjectID string          `json:"project_id"`
+	Name      string          `json:"name"`
+	Type      string          `json:"type"`
+	Config    json.RawMessage `json:"config,omitempty"`
+	Enabled   bool            `json:"enabled"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+// LogDrain represents a destination for streaming logs.
+type LogDrain struct {
+	ID        string          `json:"id"`
+	ProjectID string          `json:"project_id"`
+	Name      string          `json:"name"`
+	Type      string          `json:"type"`
+	Config    json.RawMessage `json:"config,omitempty"`
+	Enabled   bool            `json:"enabled"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
