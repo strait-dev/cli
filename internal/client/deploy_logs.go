@@ -19,6 +19,12 @@ import (
 // handle receives the raw log text (not JSON). When the server signals
 // completion the function returns nil.
 func (c *Client) StreamDeploymentLogs(ctx context.Context, jobID, deploymentID string, handle func(chunk string) error) error {
+	if err := validatePathSegment(jobID); err != nil {
+		return fmt.Errorf("invalid job id: %w", err)
+	}
+	if err := validatePathSegment(deploymentID); err != nil {
+		return fmt.Errorf("invalid deployment id: %w", err)
+	}
 	fullURL, err := url.Parse(c.baseURL)
 	if err != nil {
 		return err
