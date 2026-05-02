@@ -240,6 +240,8 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newJobGroupsCommand(state))
 	cmd.AddCommand(newNotificationsCommand(state))
 	cmd.AddCommand(newLogDrainsCommand(state))
+	cmd.AddCommand(newUsageCommand(state))
+	cmd.AddCommand(newAnalyticsCommand(state))
 
 	rawArgs := os.Args[1:]
 	configPath := extractConfigPath(rawArgs)
@@ -353,6 +355,8 @@ func normalizeLegacyArgs(args []string) []string {
 		"notification":  {},
 		"log-drains":    {},
 		"log-drain":     {},
+		"usage":         {},
+		"analytics":     {},
 	}
 
 	first := args[0]

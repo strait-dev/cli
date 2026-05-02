@@ -20,7 +20,113 @@ func newTeamCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newTeamAddCommand(state))
 	cmd.AddCommand(newTeamRemoveCommand(state))
 	cmd.AddCommand(newTeamRolesCommand(state))
+	cmd.AddCommand(newTeamPoliciesCommand(state))
 
+	return cmd
+}
+
+func newTeamPoliciesCommand(state *appState) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "policies",
+		Short: "Manage RBAC policies on the team",
+	}
+	cmd.AddCommand(newTeamPoliciesListCommand(state))
+	cmd.AddCommand(newTeamPoliciesCreateCommand(state))
+	cmd.AddCommand(newTeamPoliciesDeleteCommand(state))
+	return cmd
+}
+
+func newTeamPoliciesListCommand(state *appState) *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "List team RBAC policies",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cli, err := newAPIClient(state)
+			if err != nil {
+				return err
+			}
+			policies, err := cli.ListTeamPolicies(cmd.Context())
+			if err != nil {
+				return err
+			}
+			if isTTYRich(state) {
+				fmt.Fprintln(os.Stderr, styles.SectionHeader("Policies", len(policies)))
+				for _, p := range policies {
+					fmt.Fprintf(os.Stderr, "  %s  %s  perms=%v\n",
+						styles.Bold.Render(p.Name), styles.MutedStyle.Render(p.ID), p.Permissions)
+				}
+				return nil
+			}
+			return printData(state, policies)
+		},
+	}
+}
+
+func newTeamPoliciesCreateCommand(state *appState) *cobra.Command {
+	var name, resourcePattern, tagPattern string
+	var perms []string
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create a new team RBAC policy",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if name == "" {
+				return fmt.Errorf("--name is required")
+			}
+			if len(perms) == 0 {
+				return fmt.Errorf("--permission is required at least once")
+			}
+			cli, err := newAPIClient(state)
+			if err != nil {
+				return err
+			}
+			policy, err := cli.CreateTeamPolicy(cmd.Context(), client.CreateTeamPolicyRequest{
+				Name:            name,
+				ResourcePattern: resourcePattern,
+				TagPattern:      tagPattern,
+				Permissions:     perms,
+			})
+			if err != nil {
+				return err
+			}
+			if isTTYRich(state) {
+				fmt.Fprintln(os.Stderr, styles.Success("Created policy "+styles.Bold.Render(policy.Name)))
+				return nil
+			}
+			return printData(state, policy)
+		},
+	}
+	cmd.Flags().StringVar(&name, "name", "", "policy name (required)")
+	cmd.Flags().StringVar(&resourcePattern, "resource-pattern", "", "resource pattern (e.g. job:*, workflow:billing-*)")
+	cmd.Flags().StringVar(&tagPattern, "tag-pattern", "", "tag pattern (e.g. env=prod)")
+	cmd.Flags().StringSliceVar(&perms, "permission", nil, "permission to grant (repeatable)")
+	return cmd
+}
+
+func newTeamPoliciesDeleteCommand(state *appState) *cobra.Command {
+	var yes bool
+	cmd := &cobra.Command{
+		Use:   "delete <policy-id>",
+		Short: "Delete a team RBAC policy",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := requireConfirmation(state, fmt.Sprintf("Delete policy %s?", args[0]), yes); err != nil {
+				return err
+			}
+			cli, err := newAPIClient(state)
+			if err != nil {
+				return err
+			}
+			if err := cli.DeleteTeamPolicy(cmd.Context(), args[0]); err != nil {
+				return err
+			}
+			if isTTYRich(state) {
+				fmt.Fprintln(os.Stderr, styles.Success("Deleted policy "+styles.Bold.Render(args[0])))
+				return nil
+			}
+			return printData(state, map[string]string{"id": args[0], "deleted": "true"})
+		},
+	}
+	cmd.Flags().BoolVar(&yes, "yes", false, "skip confirmation")
 	return cmd
 }
 

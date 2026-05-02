@@ -569,3 +569,11 @@ type SetWorkflowPolicyRequest struct {
 type RescheduleRunRequest struct {
 	ScheduledAt time.Time `json:"scheduled_at"`
 }
+
+// CreateTeamPolicyRequest is the request body for creating a team policy.
+type CreateTeamPolicyRequest struct {
+	Name            string   `json:"name"`
+	ResourcePattern string   `json:"resource_pattern,omitempty"`
+	TagPattern      string   `json:"tag_pattern,omitempty"`
+	Permissions     []string `json:"permissions"`
+}

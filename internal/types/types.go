@@ -837,3 +837,70 @@ type DLQRun struct {
 	FailedAt   time.Time `json:"failed_at"`
 	AttemptCnt int       `json:"attempt_count"`
 }
+
+// UsagePeriod represents resource usage and billing for a billing period.
+type UsagePeriod struct {
+	PeriodStart      time.Time `json:"period_start"`
+	PeriodEnd        time.Time `json:"period_end"`
+	Runs             int64     `json:"runs"`
+	WorkflowRuns     int64     `json:"workflow_runs"`
+	ComputeMinutes   float64   `json:"compute_minutes"`
+	StorageMBHours   float64   `json:"storage_mb_hours,omitempty"`
+	EgressMB         float64   `json:"egress_mb,omitempty"`
+	TokensInput      int64     `json:"tokens_input,omitempty"`
+	TokensOutput     int64     `json:"tokens_output,omitempty"`
+	CostUSD          float64   `json:"cost_usd"`
+	IncludedQuotaPct float64   `json:"included_quota_pct,omitempty"`
+}
+
+// CostsAnalytics summarises spend for the analytics period.
+type CostsAnalytics struct {
+	PeriodHours int                    `json:"period_hours"`
+	TotalUSD    float64                `json:"total_usd"`
+	ByJob       []CostByJob            `json:"by_job,omitempty"`
+	ByCategory  map[string]float64     `json:"by_category,omitempty"`
+	Series      []CostsTimeseriesPoint `json:"series,omitempty"`
+}
+
+// CostByJob is a per-job cost breakdown.
+type CostByJob struct {
+	JobID   string  `json:"job_id"`
+	JobSlug string  `json:"job_slug"`
+	Runs    int64   `json:"runs"`
+	USD     float64 `json:"usd"`
+}
+
+// CostsTimeseriesPoint is one bucket of the cost timeseries.
+type CostsTimeseriesPoint struct {
+	BucketStart time.Time `json:"bucket_start"`
+	USD         float64   `json:"usd"`
+}
+
+// ReliabilityAnalytics summarises reliability over the analytics period.
+type ReliabilityAnalytics struct {
+	PeriodHours       int     `json:"period_hours"`
+	SuccessRate       float64 `json:"success_rate"`
+	AvgDurationSecs   float64 `json:"avg_duration_secs"`
+	P95DurationSecs   float64 `json:"p95_duration_secs"`
+	RetriedRunPercent float64 `json:"retried_run_percent,omitempty"`
+}
+
+// TopFailingJob represents a job with elevated failure rate.
+type TopFailingJob struct {
+	JobID       string  `json:"job_id"`
+	JobSlug     string  `json:"job_slug"`
+	TotalRuns   int64   `json:"total_runs"`
+	FailedRuns  int64   `json:"failed_runs"`
+	FailureRate float64 `json:"failure_rate"`
+}
+
+// TeamPolicy represents an RBAC policy granting permissions to a team.
+type TeamPolicy struct {
+	ID              string    `json:"id"`
+	Name            string    `json:"name"`
+	ResourcePattern string    `json:"resource_pattern,omitempty"`
+	TagPattern      string    `json:"tag_pattern,omitempty"`
+	Permissions     []string  `json:"permissions"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}

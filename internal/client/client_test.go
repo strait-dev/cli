@@ -2969,3 +2969,120 @@ func TestRunTelemetryEndpoints(t *testing.T) {
 		t.Fatalf("ListRunCheckpoints: %v len=%d", err, len(cps))
 	}
 }
+
+func TestUsageEndpoints(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/billing/usage":
+			assertMethod(t, r, http.MethodGet)
+			respondJSON(t, w, http.StatusOK, types.UsagePeriod{Runs: 42, CostUSD: 12.34})
+		case "/v1/billing/usage/history":
+			assertMethod(t, r, http.MethodGet)
+			respondPaginated(t, w, http.StatusOK, []types.UsagePeriod{{Runs: 10}, {Runs: 20}})
+		case "/v1/billing/usage/forecast":
+			assertMethod(t, r, http.MethodGet)
+			respondJSON(t, w, http.StatusOK, types.UsagePeriod{Runs: 99, CostUSD: 50})
+		default:
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	cur, err := c.GetCurrentUsage(context.Background())
+	if err != nil || cur.Runs != 42 {
+		t.Fatalf("GetCurrentUsage: %v %+v", err, cur)
+	}
+	hist, err := c.GetUsageHistory(context.Background())
+	if err != nil || len(hist) != 2 {
+		t.Fatalf("GetUsageHistory: %v len=%d", err, len(hist))
+	}
+	fc, err := c.GetUsageForecast(context.Background())
+	if err != nil || fc.Runs != 99 {
+		t.Fatalf("GetUsageForecast: %v %+v", err, fc)
+	}
+}
+
+func TestAnalyticsEndpoints(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/analytics/costs":
+			assertMethod(t, r, http.MethodGet)
+			if got := r.URL.Query().Get("project_id"); got != "proj-1" {
+				t.Fatalf("project_id: %q", got)
+			}
+			if got := r.URL.Query().Get("period_hours"); got != "168" {
+				t.Fatalf("period_hours: %q", got)
+			}
+			respondJSON(t, w, http.StatusOK, types.CostsAnalytics{TotalUSD: 99.95, PeriodHours: 168})
+		case "/v1/analytics/reliability":
+			assertMethod(t, r, http.MethodGet)
+			respondJSON(t, w, http.StatusOK, types.ReliabilityAnalytics{SuccessRate: 0.97, PeriodHours: 168})
+		case "/v1/analytics/top-failing":
+			assertMethod(t, r, http.MethodGet)
+			if got := r.URL.Query().Get("limit"); got != "5" {
+				t.Fatalf("limit: %q", got)
+			}
+			respondPaginated(t, w, http.StatusOK, []types.TopFailingJob{{JobSlug: "x", FailureRate: 0.5}})
+		default:
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	costs, err := c.GetCostsAnalytics(context.Background(), "proj-1", 168)
+	if err != nil || costs.TotalUSD != 99.95 {
+		t.Fatalf("GetCostsAnalytics: %v %+v", err, costs)
+	}
+	rel, err := c.GetReliabilityAnalytics(context.Background(), "proj-1", 168)
+	if err != nil || rel.SuccessRate < 0.96 {
+		t.Fatalf("GetReliabilityAnalytics: %v %+v", err, rel)
+	}
+	top, err := c.ListTopFailingJobs(context.Background(), "proj-1", 168, 5)
+	if err != nil || len(top) != 1 {
+		t.Fatalf("ListTopFailingJobs: %v len=%d", err, len(top))
+	}
+}
+
+func TestTeamPolicyEndpoints(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/team/policies" && r.Method == http.MethodGet:
+			respondPaginated(t, w, http.StatusOK, []types.TeamPolicy{{ID: "pol-1", Name: "default"}})
+		case r.URL.Path == "/v1/team/policies" && r.Method == http.MethodPost:
+			var req CreateTeamPolicyRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if req.Name != "default" || len(req.Permissions) != 1 {
+				t.Fatalf("body: %+v", req)
+			}
+			respondJSON(t, w, http.StatusOK, types.TeamPolicy{ID: "pol-2", Name: req.Name, Permissions: req.Permissions})
+		case r.URL.Path == "/v1/team/policies/pol-2" && r.Method == http.MethodDelete:
+			respondJSON(t, w, http.StatusOK, map[string]string{"ok": "true"})
+		default:
+			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	policies, err := c.ListTeamPolicies(context.Background())
+	if err != nil || len(policies) != 1 {
+		t.Fatalf("ListTeamPolicies: %v len=%d", err, len(policies))
+	}
+	pol, err := c.CreateTeamPolicy(context.Background(), CreateTeamPolicyRequest{Name: "default", Permissions: []string{"jobs:read"}})
+	if err != nil || pol.ID != "pol-2" {
+		t.Fatalf("CreateTeamPolicy: %v %+v", err, pol)
+	}
+	if err := c.DeleteTeamPolicy(context.Background(), "pol-2"); err != nil {
+		t.Fatalf("DeleteTeamPolicy: %v", err)
+	}
+}

@@ -1263,3 +1263,92 @@ func (c *Client) ListRunCheckpoints(ctx context.Context, runID string) ([]types.
 	}
 	return out, nil
 }
+
+// GetCurrentUsage returns the active billing period usage.
+func (c *Client) GetCurrentUsage(ctx context.Context) (*types.UsagePeriod, error) {
+	var out types.UsagePeriod
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/billing/usage", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetUsageHistory returns historical billing periods.
+func (c *Client) GetUsageHistory(ctx context.Context) ([]types.UsagePeriod, error) {
+	var out []types.UsagePeriod
+	if err := c.doListJSON(ctx, "/v1/billing/usage/history", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetUsageForecast returns projected end-of-period usage.
+func (c *Client) GetUsageForecast(ctx context.Context) (*types.UsagePeriod, error) {
+	var out types.UsagePeriod
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/billing/usage/forecast", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetCostsAnalytics returns cost analytics for a project.
+func (c *Client) GetCostsAnalytics(ctx context.Context, projectID string, periodHours int) (*types.CostsAnalytics, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	query.Set("period_hours", fmt.Sprintf("%d", periodHours))
+	var out types.CostsAnalytics
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/analytics/costs", query, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetReliabilityAnalytics returns reliability metrics for a project.
+func (c *Client) GetReliabilityAnalytics(ctx context.Context, projectID string, periodHours int) (*types.ReliabilityAnalytics, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	query.Set("period_hours", fmt.Sprintf("%d", periodHours))
+	var out types.ReliabilityAnalytics
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/analytics/reliability", query, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListTopFailingJobs returns the jobs with the highest failure rate.
+func (c *Client) ListTopFailingJobs(ctx context.Context, projectID string, periodHours, limit int) ([]types.TopFailingJob, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	query.Set("period_hours", fmt.Sprintf("%d", periodHours))
+	if limit > 0 {
+		query.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	var out []types.TopFailingJob
+	if err := c.doListJSON(ctx, "/v1/analytics/top-failing", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListTeamPolicies returns the RBAC policies attached to the team.
+func (c *Client) ListTeamPolicies(ctx context.Context) ([]types.TeamPolicy, error) {
+	var out []types.TeamPolicy
+	if err := c.doListJSON(ctx, "/v1/team/policies", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateTeamPolicy creates a new RBAC policy on the team.
+func (c *Client) CreateTeamPolicy(ctx context.Context, req CreateTeamPolicyRequest) (*types.TeamPolicy, error) {
+	var out types.TeamPolicy
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/team/policies", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteTeamPolicy removes an RBAC policy from the team.
+func (c *Client) DeleteTeamPolicy(ctx context.Context, id string) error {
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/team/policies", id), nil, nil, &map[string]string{})
+}

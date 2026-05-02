@@ -21,6 +21,7 @@ func newCodeDeploymentsCommand(state *appState) *cobra.Command {
 	}
 
 	cmd.AddCommand(newCodeDeploymentsListCommand(state))
+	cmd.AddCommand(newCodeDeploymentsCreateFromSourceCommand(state))
 
 	getCmd, getJobSlug := newCodeDeploymentGetCommand(state)
 	getCmd.ValidArgsFunction = completeDeploymentIDs(state, func() string { return *getJobSlug })
