@@ -521,3 +521,51 @@ type UpdateLogDrainRequest struct {
 	Config  *json.RawMessage `json:"config,omitempty"`
 	Enabled *bool            `json:"enabled,omitempty"`
 }
+
+// CloneJobRequest is the request body for cloning a job.
+type CloneJobRequest struct {
+	Name string `json:"name,omitempty"`
+	Slug string `json:"slug,omitempty"`
+}
+
+// AddJobDependencyRequest is the request body for adding a job dependency.
+type AddJobDependencyRequest struct {
+	DependsOn string `json:"depends_on"`
+	Type      string `json:"type,omitempty"`
+}
+
+// BatchUpdateJobsRequest is the request body for batch-updating jobs.
+type BatchUpdateJobsRequest struct {
+	Updates []BatchJobUpdate `json:"updates"`
+}
+
+// BatchJobUpdate is a single update entry in a batch.
+type BatchJobUpdate struct {
+	ID    string           `json:"id"`
+	Patch UpdateJobRequest `json:"patch"`
+}
+
+// BatchUpdateJobsResponse summarises a batch update.
+type BatchUpdateJobsResponse struct {
+	Updated []string `json:"updated"`
+	Failed  []struct {
+		ID     string `json:"id"`
+		Reason string `json:"reason"`
+	} `json:"failed,omitempty"`
+}
+
+// CloneWorkflowRequest is the request body for cloning a workflow.
+type CloneWorkflowRequest struct {
+	Name string `json:"name,omitempty"`
+	Slug string `json:"slug,omitempty"`
+}
+
+// SetWorkflowPolicyRequest is the request body for setting a workflow policy.
+type SetWorkflowPolicyRequest struct {
+	Policy json.RawMessage `json:"policy"`
+}
+
+// RescheduleRunRequest is the request body for rescheduling a run.
+type RescheduleRunRequest struct {
+	ScheduledAt time.Time `json:"scheduled_at"`
+}

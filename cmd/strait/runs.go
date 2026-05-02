@@ -30,6 +30,13 @@ func newRunsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newRunsReplayCommand(state))
 	cmd.AddCommand(newRunsLastCommand(state))
 	cmd.AddCommand(newRunsDiffCommand(state))
+	cmd.AddCommand(newRunsRescheduleCommand(state))
+	cmd.AddCommand(newRunsDLQCommand(state))
+	cmd.AddCommand(newRunsDLQReplayCommand(state))
+	cmd.AddCommand(newRunsOutputsCommand(state))
+	cmd.AddCommand(newRunsToolCallsCommand(state))
+	cmd.AddCommand(newRunsUsageCommand(state))
+	cmd.AddCommand(newRunsCheckpointsCommand(state))
 
 	return cmd
 }

@@ -2576,3 +2576,396 @@ func TestVerifyAuditChain_SincePassedAsQuery(t *testing.T) {
 		t.Fatalf("VerifyAuditChain: %v", err)
 	}
 }
+
+func TestCloneJob(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/jobs/job-1/clone")
+		respondJSON(t, w, http.StatusOK, types.Job{ID: "job-2", Slug: "job-2"})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	got, err := c.CloneJob(context.Background(), "job-1", CloneJobRequest{Name: "Clone", Slug: "job-2"})
+	if err != nil {
+		t.Fatalf("CloneJob: %v", err)
+	}
+	if got.Slug != "job-2" {
+		t.Fatalf("unexpected slug: %q", got.Slug)
+	}
+}
+
+func TestGetJobHealth(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodGet)
+		assertPath(t, r, "/v1/jobs/job-1/health")
+		respondJSON(t, w, http.StatusOK, types.JobHealth{
+			JobID: "job-1", Status: "healthy", SuccessRate: 0.99, P95DurationMS: 1200,
+		})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	got, err := c.GetJobHealth(context.Background(), "job-1")
+	if err != nil {
+		t.Fatalf("GetJobHealth: %v", err)
+	}
+	if got.Status != "healthy" || got.SuccessRate != 0.99 {
+		t.Fatalf("unexpected health: %+v", got)
+	}
+}
+
+func TestListJobDependencies(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodGet)
+		assertPath(t, r, "/v1/jobs/job-1/dependencies")
+		respondPaginated(t, w, http.StatusOK, []types.JobDependency{{ID: "dep-1", JobID: "job-1", DependsOn: "job-0", Type: "success"}})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	deps, err := c.ListJobDependencies(context.Background(), "job-1")
+	if err != nil {
+		t.Fatalf("ListJobDependencies: %v", err)
+	}
+	if len(deps) != 1 || deps[0].DependsOn != "job-0" {
+		t.Fatalf("unexpected deps: %+v", deps)
+	}
+}
+
+func TestAddJobDependency(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/jobs/job-1/dependencies")
+		var body AddJobDependencyRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if body.DependsOn != "job-0" || body.Type != "success" {
+			t.Fatalf("unexpected body: %+v", body)
+		}
+		respondJSON(t, w, http.StatusOK, types.JobDependency{ID: "dep-9", JobID: "job-1", DependsOn: body.DependsOn, Type: body.Type})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	dep, err := c.AddJobDependency(context.Background(), "job-1", AddJobDependencyRequest{DependsOn: "job-0", Type: "success"})
+	if err != nil {
+		t.Fatalf("AddJobDependency: %v", err)
+	}
+	if dep.ID != "dep-9" {
+		t.Fatalf("unexpected dep: %+v", dep)
+	}
+}
+
+func TestBatchUpdateJobs(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/jobs/batch")
+		respondJSON(t, w, http.StatusOK, map[string]any{
+			"updated": []string{"job-1", "job-2"},
+			"failed": []map[string]string{
+				{"id": "job-3", "reason": "not found"},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	resp, err := c.BatchUpdateJobs(context.Background(), BatchUpdateJobsRequest{Updates: []BatchJobUpdate{{ID: "job-1"}}})
+	if err != nil {
+		t.Fatalf("BatchUpdateJobs: %v", err)
+	}
+	if len(resp.Updated) != 2 || len(resp.Failed) != 1 {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+}
+
+func TestCloneWorkflow(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/workflows/wf-1/clone")
+		respondJSON(t, w, http.StatusOK, map[string]any{"id": "wf-2", "slug": "wf-2"})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	wf, err := c.CloneWorkflow(context.Background(), "wf-1", CloneWorkflowRequest{Name: "Clone", Slug: "wf-2"})
+	if err != nil {
+		t.Fatalf("CloneWorkflow: %v", err)
+	}
+	if wf.Slug != "wf-2" {
+		t.Fatalf("unexpected slug: %q", wf.Slug)
+	}
+}
+
+func TestDryRunWorkflow(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/workflows/wf-1/dry-run")
+		respondJSON(t, w, http.StatusOK, map[string]any{"ok": true})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	out, err := c.DryRunWorkflow(context.Background(), "wf-1", json.RawMessage(`{"x":1}`))
+	if err != nil {
+		t.Fatalf("DryRunWorkflow: %v", err)
+	}
+	if len(out) == 0 {
+		t.Fatalf("expected payload, got empty")
+	}
+}
+
+func TestListWorkflowVersions(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodGet)
+		assertPath(t, r, "/v1/workflows/wf-1/versions")
+		respondPaginated(t, w, http.StatusOK, []types.WorkflowVersion{{WorkflowID: "wf-1", Version: 1}})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	versions, err := c.ListWorkflowVersions(context.Background(), "wf-1")
+	if err != nil {
+		t.Fatalf("ListWorkflowVersions: %v", err)
+	}
+	if len(versions) != 1 || versions[0].Version != 1 {
+		t.Fatalf("unexpected versions: %+v", versions)
+	}
+}
+
+func TestDiffWorkflowVersions(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodGet)
+		assertPath(t, r, "/v1/workflows/wf-1/diff")
+		if r.URL.Query().Get("from") != "1" || r.URL.Query().Get("to") != "2" {
+			t.Fatalf("unexpected query: %q", r.URL.RawQuery)
+		}
+		respondJSON(t, w, http.StatusOK, types.WorkflowDiff{WorkflowID: "wf-1", From: 1, To: 2})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	diff, err := c.DiffWorkflowVersions(context.Background(), "wf-1", 1, 2)
+	if err != nil {
+		t.Fatalf("DiffWorkflowVersions: %v", err)
+	}
+	if diff.From != 1 || diff.To != 2 {
+		t.Fatalf("unexpected diff: %+v", diff)
+	}
+}
+
+func TestWorkflowPolicy(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertPath(t, r, "/v1/workflows/wf-1/policy")
+		switch r.Method {
+		case http.MethodGet:
+			respondJSON(t, w, http.StatusOK, types.WorkflowPolicy{WorkflowID: "wf-1", Policy: json.RawMessage(`{"max":1}`)})
+		case http.MethodPut:
+			respondJSON(t, w, http.StatusOK, types.WorkflowPolicy{WorkflowID: "wf-1", Policy: json.RawMessage(`{"max":2}`)})
+		default:
+			t.Fatalf("unexpected method %q", r.Method)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	got, err := c.GetWorkflowPolicy(context.Background(), "wf-1")
+	if err != nil {
+		t.Fatalf("GetWorkflowPolicy: %v", err)
+	}
+	if got.WorkflowID != "wf-1" {
+		t.Fatalf("unexpected: %+v", got)
+	}
+	updated, err := c.SetWorkflowPolicy(context.Background(), "wf-1", json.RawMessage(`{"max":2}`))
+	if err != nil {
+		t.Fatalf("SetWorkflowPolicy: %v", err)
+	}
+	if updated.WorkflowID != "wf-1" {
+		t.Fatalf("unexpected updated: %+v", updated)
+	}
+}
+
+func TestPauseResumeRetryWorkflowRun(t *testing.T) {
+	t.Parallel()
+
+	expected := map[string]string{
+		"/v1/workflow-runs/wfr-1/pause":  "paused",
+		"/v1/workflow-runs/wfr-1/resume": "running",
+		"/v1/workflow-runs/wfr-1/retry":  "queued",
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		status, ok := expected[r.URL.Path]
+		if !ok {
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+		respondJSON(t, w, http.StatusOK, map[string]any{"id": "wfr-1", "status": status})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if _, err := c.PauseWorkflowRun(context.Background(), "wfr-1"); err != nil {
+		t.Fatalf("PauseWorkflowRun: %v", err)
+	}
+	if _, err := c.ResumeWorkflowRun(context.Background(), "wfr-1"); err != nil {
+		t.Fatalf("ResumeWorkflowRun: %v", err)
+	}
+	if _, err := c.RetryWorkflowRun(context.Background(), "wfr-1"); err != nil {
+		t.Fatalf("RetryWorkflowRun: %v", err)
+	}
+}
+
+func TestWorkflowStepActions(t *testing.T) {
+	t.Parallel()
+
+	expected := map[string]struct{}{
+		"/v1/workflow-runs/wfr-1/steps/build/approve":        {},
+		"/v1/workflow-runs/wfr-1/steps/build/retry":          {},
+		"/v1/workflow-runs/wfr-1/steps/build/skip":           {},
+		"/v1/workflow-runs/wfr-1/steps/build/force-complete": {},
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		if _, ok := expected[r.URL.Path]; !ok {
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+		respondJSON(t, w, http.StatusOK, map[string]string{})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if err := c.ApproveWorkflowStep(context.Background(), "wfr-1", "build"); err != nil {
+		t.Fatalf("ApproveWorkflowStep: %v", err)
+	}
+	if err := c.RetryWorkflowStep(context.Background(), "wfr-1", "build"); err != nil {
+		t.Fatalf("RetryWorkflowStep: %v", err)
+	}
+	if err := c.SkipWorkflowStep(context.Background(), "wfr-1", "build"); err != nil {
+		t.Fatalf("SkipWorkflowStep: %v", err)
+	}
+	if err := c.ForceCompleteWorkflowStep(context.Background(), "wfr-1", "build"); err != nil {
+		t.Fatalf("ForceCompleteWorkflowStep: %v", err)
+	}
+}
+
+func TestRescheduleRun(t *testing.T) {
+	t.Parallel()
+
+	at := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/runs/run-1/reschedule")
+		var body RescheduleRunRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if !body.ScheduledAt.Equal(at) {
+			t.Fatalf("expected %v, got %v", at, body.ScheduledAt)
+		}
+		respondJSON(t, w, http.StatusOK, types.JobRun{ID: "run-1", Status: "delayed"})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	run, err := c.RescheduleRun(context.Background(), "run-1", at)
+	if err != nil {
+		t.Fatalf("RescheduleRun: %v", err)
+	}
+	if run.ID != "run-1" {
+		t.Fatalf("unexpected: %+v", run)
+	}
+}
+
+func TestDLQListAndReplay(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/dlq":
+			if r.URL.Query().Get("project_id") != "proj-1" {
+				t.Fatalf("expected project_id query, got %q", r.URL.RawQuery)
+			}
+			respondPaginated(t, w, http.StatusOK, []types.DLQRun{{ID: "dlq-1", JobID: "job-1", Reason: "max attempts"}})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/dlq/dlq-1/replay":
+			respondJSON(t, w, http.StatusOK, types.JobRun{ID: "run-2", Status: "queued"})
+		default:
+			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	items, err := c.ListDLQ(context.Background(), "proj-1")
+	if err != nil {
+		t.Fatalf("ListDLQ: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("unexpected items: %+v", items)
+	}
+	run, err := c.ReplayDLQ(context.Background(), "dlq-1")
+	if err != nil {
+		t.Fatalf("ReplayDLQ: %v", err)
+	}
+	if run.ID != "run-2" {
+		t.Fatalf("unexpected replay: %+v", run)
+	}
+}
+
+func TestRunTelemetryEndpoints(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/runs/run-1/outputs":
+			respondPaginated(t, w, http.StatusOK, []types.RunOutput{{ID: "out-1", RunID: "run-1", Key: "result"}})
+		case "/v1/runs/run-1/tool-calls":
+			respondPaginated(t, w, http.StatusOK, []types.RunToolCall{{ID: "tc-1", RunID: "run-1", Tool: "fetch"}})
+		case "/v1/runs/run-1/usage":
+			respondJSON(t, w, http.StatusOK, types.RunUsage{RunID: "run-1", DurationMS: 4200, CostUSD: 0.12})
+		case "/v1/runs/run-1/checkpoints":
+			respondPaginated(t, w, http.StatusOK, []types.RunCheckpoint{{ID: "cp-1", RunID: "run-1", Name: "phase-1"}})
+		default:
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if outputs, err := c.ListRunOutputs(context.Background(), "run-1"); err != nil || len(outputs) != 1 {
+		t.Fatalf("ListRunOutputs: %v len=%d", err, len(outputs))
+	}
+	if calls, err := c.ListRunToolCalls(context.Background(), "run-1"); err != nil || len(calls) != 1 {
+		t.Fatalf("ListRunToolCalls: %v len=%d", err, len(calls))
+	}
+	usage, err := c.GetRunUsage(context.Background(), "run-1")
+	if err != nil || usage.DurationMS != 4200 {
+		t.Fatalf("GetRunUsage: %v %+v", err, usage)
+	}
+	if cps, err := c.ListRunCheckpoints(context.Background(), "run-1"); err != nil || len(cps) != 1 {
+		t.Fatalf("ListRunCheckpoints: %v len=%d", err, len(cps))
+	}
+}

@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -1013,4 +1014,252 @@ func (c *Client) UpdateLogDrain(ctx context.Context, id string, req UpdateLogDra
 // DeleteLogDrain deletes a log drain by ID.
 func (c *Client) DeleteLogDrain(ctx context.Context, id string) error {
 	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/log-drains", id), nil, nil, &map[string]string{})
+}
+
+// CloneJob clones a job and returns the new copy.
+func (c *Client) CloneJob(ctx context.Context, id string, req CloneJobRequest) (*types.Job, error) {
+	var out types.Job
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", id, "clone"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetJobHealth returns the health summary for a job.
+func (c *Client) GetJobHealth(ctx context.Context, id string) (*types.JobHealth, error) {
+	var out types.JobHealth
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/jobs", id, "health"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListJobDependencies returns the dependency edges for a job.
+func (c *Client) ListJobDependencies(ctx context.Context, id string) ([]types.JobDependency, error) {
+	var out []types.JobDependency
+	if err := c.doListJSON(ctx, path.Join("/v1/jobs", id, "dependencies"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AddJobDependency creates a new dependency edge for a job.
+func (c *Client) AddJobDependency(ctx context.Context, id string, req AddJobDependencyRequest) (*types.JobDependency, error) {
+	var out types.JobDependency
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", id, "dependencies"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// BatchUpdateJobs applies multiple job updates in one call.
+func (c *Client) BatchUpdateJobs(ctx context.Context, req BatchUpdateJobsRequest) (*BatchUpdateJobsResponse, error) {
+	var out BatchUpdateJobsResponse
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/jobs/batch", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CloneWorkflow clones a workflow and returns the new copy.
+func (c *Client) CloneWorkflow(ctx context.Context, id string, req CloneWorkflowRequest) (*WorkflowResponse, error) {
+	var out WorkflowResponse
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflows", id, "clone"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DryRunWorkflow performs a workflow dry-run without persisting state.
+func (c *Client) DryRunWorkflow(ctx context.Context, id string, payload json.RawMessage) (json.RawMessage, error) {
+	body := map[string]json.RawMessage{}
+	if len(payload) > 0 {
+		body["payload"] = payload
+	}
+	var out json.RawMessage
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflows", id, "dry-run"), nil, body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PlanWorkflow returns the planned execution graph without running.
+func (c *Client) PlanWorkflow(ctx context.Context, id string, payload json.RawMessage) (json.RawMessage, error) {
+	body := map[string]json.RawMessage{}
+	if len(payload) > 0 {
+		body["payload"] = payload
+	}
+	var out json.RawMessage
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflows", id, "plan"), nil, body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SimulateWorkflow simulates running a workflow.
+func (c *Client) SimulateWorkflow(ctx context.Context, id string, payload json.RawMessage) (json.RawMessage, error) {
+	body := map[string]json.RawMessage{}
+	if len(payload) > 0 {
+		body["payload"] = payload
+	}
+	var out json.RawMessage
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflows", id, "simulate"), nil, body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListWorkflowVersions returns the version history for a workflow.
+func (c *Client) ListWorkflowVersions(ctx context.Context, id string) ([]types.WorkflowVersion, error) {
+	var out []types.WorkflowVersion
+	if err := c.doListJSON(ctx, path.Join("/v1/workflows", id, "versions"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DiffWorkflowVersions returns the diff between two workflow versions.
+func (c *Client) DiffWorkflowVersions(ctx context.Context, id string, fromV, toV int) (*types.WorkflowDiff, error) {
+	query := url.Values{}
+	query.Set("from", fmt.Sprintf("%d", fromV))
+	query.Set("to", fmt.Sprintf("%d", toV))
+	var out types.WorkflowDiff
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/workflows", id, "diff"), query, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetWorkflowPolicy returns the current run-time policy for a workflow.
+func (c *Client) GetWorkflowPolicy(ctx context.Context, id string) (*types.WorkflowPolicy, error) {
+	var out types.WorkflowPolicy
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/workflows", id, "policy"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SetWorkflowPolicy replaces the run-time policy for a workflow.
+func (c *Client) SetWorkflowPolicy(ctx context.Context, id string, policy json.RawMessage) (*types.WorkflowPolicy, error) {
+	req := SetWorkflowPolicyRequest{Policy: policy}
+	var out types.WorkflowPolicy
+	if err := c.doJSON(ctx, http.MethodPut, path.Join("/v1/workflows", id, "policy"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// PauseWorkflowRun pauses an in-flight workflow run.
+func (c *Client) PauseWorkflowRun(ctx context.Context, id string) (*types.WorkflowRun, error) {
+	var out types.WorkflowRun
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", id, "pause"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ResumeWorkflowRun resumes a paused workflow run.
+func (c *Client) ResumeWorkflowRun(ctx context.Context, id string) (*types.WorkflowRun, error) {
+	var out types.WorkflowRun
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", id, "resume"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// RetryWorkflowRun retries a failed workflow run.
+func (c *Client) RetryWorkflowRun(ctx context.Context, id string) (*types.WorkflowRun, error) {
+	var out types.WorkflowRun
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", id, "retry"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ApproveWorkflowStep approves a workflow step pending review.
+func (c *Client) ApproveWorkflowStep(ctx context.Context, runID, stepRef string) error {
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", runID, "steps", stepRef, "approve"), nil, nil, &map[string]string{})
+}
+
+// RetryWorkflowStep retries an individual workflow step.
+func (c *Client) RetryWorkflowStep(ctx context.Context, runID, stepRef string) error {
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", runID, "steps", stepRef, "retry"), nil, nil, &map[string]string{})
+}
+
+// SkipWorkflowStep skips a workflow step.
+func (c *Client) SkipWorkflowStep(ctx context.Context, runID, stepRef string) error {
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", runID, "steps", stepRef, "skip"), nil, nil, &map[string]string{})
+}
+
+// ForceCompleteWorkflowStep marks a workflow step as completed regardless of state.
+func (c *Client) ForceCompleteWorkflowStep(ctx context.Context, runID, stepRef string) error {
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", runID, "steps", stepRef, "force-complete"), nil, nil, &map[string]string{})
+}
+
+// RescheduleRun reschedules a run for a future execution time.
+func (c *Client) RescheduleRun(ctx context.Context, runID string, at time.Time) (*types.JobRun, error) {
+	req := RescheduleRunRequest{ScheduledAt: at}
+	var out types.JobRun
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/runs", runID, "reschedule"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListDLQ returns runs that have been moved to the dead letter queue.
+func (c *Client) ListDLQ(ctx context.Context, projectID string) ([]types.DLQRun, error) {
+	query := url.Values{}
+	if projectID != "" {
+		query.Set("project_id", projectID)
+	}
+	var out []types.DLQRun
+	if err := c.doListJSON(ctx, "/v1/runs/dlq", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ReplayDLQ replays a run from the dead letter queue.
+func (c *Client) ReplayDLQ(ctx context.Context, dlqID string) (*types.JobRun, error) {
+	var out types.JobRun
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/runs/dlq", dlqID, "replay"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListRunOutputs returns the structured outputs produced by a run.
+func (c *Client) ListRunOutputs(ctx context.Context, runID string) ([]types.RunOutput, error) {
+	var out []types.RunOutput
+	if err := c.doListJSON(ctx, path.Join("/v1/runs", runID, "outputs"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListRunToolCalls returns the tool calls invoked during a run.
+func (c *Client) ListRunToolCalls(ctx context.Context, runID string) ([]types.RunToolCall, error) {
+	var out []types.RunToolCall
+	if err := c.doListJSON(ctx, path.Join("/v1/runs", runID, "tool-calls"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetRunUsage returns resource usage for a run.
+func (c *Client) GetRunUsage(ctx context.Context, runID string) (*types.RunUsage, error) {
+	var out types.RunUsage
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/runs", runID, "usage"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListRunCheckpoints returns checkpoints recorded during a run.
+func (c *Client) ListRunCheckpoints(ctx context.Context, runID string) ([]types.RunCheckpoint, error) {
+	var out []types.RunCheckpoint
+	if err := c.doListJSON(ctx, path.Join("/v1/runs", runID, "checkpoints"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }

@@ -745,3 +745,95 @@ type LogDrain struct {
 	CreatedAt time.Time       `json:"created_at"`
 	UpdatedAt time.Time       `json:"updated_at"`
 }
+
+// JobHealth captures health status for a job.
+type JobHealth struct {
+	JobID         string    `json:"job_id"`
+	Status        string    `json:"status"`
+	LastRunStatus string    `json:"last_run_status,omitempty"`
+	LastRunAt     time.Time `json:"last_run_at,omitzero"`
+	SuccessRate   float64   `json:"success_rate,omitempty"`
+	P95DurationMS int64     `json:"p95_duration_ms,omitempty"`
+}
+
+// JobDependency represents a dependency edge between two jobs.
+type JobDependency struct {
+	ID        string    `json:"id"`
+	JobID     string    `json:"job_id"`
+	DependsOn string    `json:"depends_on"`
+	Type      string    `json:"type,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// WorkflowVersion represents a versioned workflow definition.
+type WorkflowVersion struct {
+	WorkflowID string    `json:"workflow_id"`
+	Version    int       `json:"version"`
+	CreatedAt  time.Time `json:"created_at"`
+	CreatedBy  string    `json:"created_by,omitempty"`
+}
+
+// WorkflowDiff represents the difference between two workflow versions.
+type WorkflowDiff struct {
+	WorkflowID string          `json:"workflow_id"`
+	From       int             `json:"from"`
+	To         int             `json:"to"`
+	Changes    json.RawMessage `json:"changes,omitempty"`
+}
+
+// WorkflowPolicy represents the run-time policy for a workflow.
+type WorkflowPolicy struct {
+	WorkflowID string          `json:"workflow_id"`
+	Policy     json.RawMessage `json:"policy"`
+	UpdatedAt  time.Time       `json:"updated_at"`
+}
+
+// RunOutput represents output produced by a run.
+type RunOutput struct {
+	ID        string          `json:"id"`
+	RunID     string          `json:"run_id"`
+	Key       string          `json:"key"`
+	Value     json.RawMessage `json:"value,omitempty"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
+// RunToolCall represents a tool invocation within a run.
+type RunToolCall struct {
+	ID         string          `json:"id"`
+	RunID      string          `json:"run_id"`
+	Tool       string          `json:"tool"`
+	Args       json.RawMessage `json:"args,omitempty"`
+	Result     json.RawMessage `json:"result,omitempty"`
+	DurationMS int64           `json:"duration_ms,omitempty"`
+	CreatedAt  time.Time       `json:"created_at"`
+}
+
+// RunUsage captures resource usage for a run.
+type RunUsage struct {
+	RunID         string  `json:"run_id"`
+	TokensInput   int64   `json:"tokens_input,omitempty"`
+	TokensOutput  int64   `json:"tokens_output,omitempty"`
+	CostUSD       float64 `json:"cost_usd,omitempty"`
+	DurationMS    int64   `json:"duration_ms,omitempty"`
+	CPUSeconds    float64 `json:"cpu_seconds,omitempty"`
+	MemoryMBHours float64 `json:"memory_mb_hours,omitempty"`
+}
+
+// RunCheckpoint represents a checkpoint in a run.
+type RunCheckpoint struct {
+	ID        string          `json:"id"`
+	RunID     string          `json:"run_id"`
+	Name      string          `json:"name,omitempty"`
+	State     json.RawMessage `json:"state,omitempty"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
+// DLQRun represents a run that has been moved to the dead letter queue.
+type DLQRun struct {
+	ID         string    `json:"id"`
+	RunID      string    `json:"run_id"`
+	JobID      string    `json:"job_id,omitempty"`
+	Reason     string    `json:"reason"`
+	FailedAt   time.Time `json:"failed_at"`
+	AttemptCnt int       `json:"attempt_count"`
+}

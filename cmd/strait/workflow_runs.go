@@ -21,6 +21,13 @@ func newWorkflowRunsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newWorkflowRunsCancelCommand(state))
 	cmd.AddCommand(newWorkflowRunsStepsCommand(state))
 	cmd.AddCommand(newWorkflowRunsWatchCommand(state))
+	cmd.AddCommand(newWorkflowRunsPauseCommand(state))
+	cmd.AddCommand(newWorkflowRunsResumeCommand(state))
+	cmd.AddCommand(newWorkflowRunsRetryCommand(state))
+	cmd.AddCommand(newWorkflowRunsApproveStepCommand(state))
+	cmd.AddCommand(newWorkflowRunsRetryStepCommand(state))
+	cmd.AddCommand(newWorkflowRunsSkipStepCommand(state))
+	cmd.AddCommand(newWorkflowRunsForceCompleteStepCommand(state))
 
 	return cmd
 }

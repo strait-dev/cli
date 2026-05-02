@@ -126,17 +126,29 @@ func captureCommandOutput(t *testing.T, fn func()) string {
 	}
 	os.Stdout = w
 
+	// Drain the pipe concurrently so writers don't block when the OS pipe
+	// buffer (typically 64 KiB) fills up.
+	type result struct {
+		data []byte
+		err  error
+	}
+	done := make(chan result, 1)
+	go func() {
+		data, err := io.ReadAll(r)
+		done <- result{data: data, err: err}
+	}()
+
 	fn()
 
 	_ = w.Close()
 	os.Stdout = orig // restore before reading to avoid races
 
-	data, err := io.ReadAll(r)
-	if err != nil {
-		t.Fatalf("read pipe: %v", err)
-	}
+	res := <-done
 	_ = r.Close()
-	return string(data)
+	if res.err != nil {
+		t.Fatalf("read pipe: %v", res.err)
+	}
+	return string(res.data)
 }
 
 // newRouterServer creates an httptest server that routes requests to handler
