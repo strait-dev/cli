@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -92,7 +91,7 @@ func newAPICommand(state *appState) *cobra.Command {
 			}
 
 			if len(rawResp) == 0 {
-				fmt.Printf("status: %d\n", resp.StatusCode)
+				fmt.Fprintf(state.out(), "status: %d\n", resp.StatusCode)
 				return nil
 			}
 
@@ -102,7 +101,7 @@ func newAPICommand(state *appState) *cobra.Command {
 					return err
 				}
 			} else {
-				if _, err := os.Stdout.Write(rawResp); err != nil {
+				if _, err := state.out().Write(rawResp); err != nil {
 					return err
 				}
 			}

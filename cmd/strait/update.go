@@ -107,7 +107,7 @@ func updateCachePath() string {
 	return filepath.Join(home, ".cache", "strait", "update-check.json")
 }
 
-func newUpgradeCommand() *cobra.Command {
+func newUpgradeCommand(state *appState) *cobra.Command {
 	var apply bool
 
 	cmd := &cobra.Command{
@@ -125,17 +125,18 @@ With --apply, downloads and replaces the current binary in place.`,
 
 			setCachedUpdate(latest)
 
+			w := state.out()
 			current := strings.TrimPrefix(version, "v")
 			if current == latest {
-				fmt.Printf("Already up to date (v%s)\n", current)
+				fmt.Fprintf(w, "Already up to date (v%s)\n", current)
 				return nil
 			}
 
-			fmt.Printf("Current: v%s\nLatest:  v%s\n", current, latest)
+			fmt.Fprintf(w, "Current: v%s\nLatest:  v%s\n", current, latest)
 
 			if !apply {
-				fmt.Println("\nTo upgrade, run: strait upgrade --apply")
-				fmt.Printf("Or download from: https://github.com/strait-dev/cli/releases/tag/v%s\n", latest)
+				fmt.Fprintln(w, "\nTo upgrade, run: strait upgrade --apply")
+				fmt.Fprintf(w, "Or download from: https://github.com/strait-dev/cli/releases/tag/v%s\n", latest)
 				return nil
 			}
 

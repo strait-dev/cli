@@ -43,7 +43,7 @@ func newDevCommand(state *appState) *cobra.Command {
 
 				fmt.Fprintln(os.Stderr, "starting docker dependencies: postgres, redis")
 				compose := exec.Command("docker", "compose", "up", "-d", "postgres", "redis")
-				compose.Stdout = os.Stdout
+				compose.Stdout = os.Stdout // printdata-ok: subprocess inherits the terminal
 				compose.Stderr = os.Stderr
 				if err := compose.Run(); err != nil {
 					return fmt.Errorf("start docker dependencies: %w", err)
@@ -373,7 +373,7 @@ Requires cloudflared to be installed (offers to download if missing).`,
 			cfCmd := exec.CommandContext(cmd.Context(), cfPath, args...) //nolint:gosec // cfPath is from LookPath or user-controlled --cloudflared flag
 
 			// Capture stderr where cloudflared prints the tunnel URL.
-			cfCmd.Stdout = os.Stdout
+			cfCmd.Stdout = os.Stdout // printdata-ok: subprocess inherits the terminal
 			cfCmd.Stderr = os.Stderr
 
 			if err := cfCmd.Start(); err != nil {

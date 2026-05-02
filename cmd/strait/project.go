@@ -91,7 +91,7 @@ func newProjectExportCommand(state *appState) *cobra.Command {
 			}
 
 			if outputFile == "" {
-				_, err = os.Stdout.Write(data)
+				_, err = state.out().Write(data)
 				return err
 			}
 

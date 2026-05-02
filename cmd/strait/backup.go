@@ -80,7 +80,7 @@ Requires pg_dump to be installed and available in PATH.`,
 			}
 
 			pgDump := exec.Command("pg_dump", args...) //nolint:gosec // args built from validated flags, not user-controlled input
-			pgDump.Stdout = os.Stdout
+			pgDump.Stdout = os.Stdout                  // printdata-ok: subprocess inherits the terminal
 			pgDump.Stderr = os.Stderr
 
 			if verbose || state.opts.verbose {

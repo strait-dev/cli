@@ -42,7 +42,7 @@ Exits 0 when executing count reaches 0, exits 1 on timeout.`,
 				}
 
 				if state.opts.verbose {
-					fmt.Printf("[%s] queued=%d executing=%d delayed=%d\n",
+					fmt.Fprintf(state.out(), "[%s] queued=%d executing=%d delayed=%d\n",
 						time.Now().UTC().Format(time.RFC3339), stats.Queued, stats.Executing, stats.Delayed)
 				}
 

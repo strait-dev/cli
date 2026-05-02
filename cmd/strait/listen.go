@@ -62,7 +62,7 @@ Deduplicates by run ID so each run appears only once (or when status changes).`,
 						seen[run.ID] = currentStatus
 						ts := run.CreatedAt.UTC().Format(time.RFC3339)
 						statusStr := styles.StatusBadge(currentStatus)
-						fmt.Fprintf(os.Stdout, "%s  %s  %s  attempt=%d  triggered_by=%s\n",
+						fmt.Fprintf(state.out(), "%s  %s  %s  attempt=%d  triggered_by=%s\n",
 							ts, run.ID, statusStr, run.Attempt, run.TriggeredBy)
 					}
 				}
