@@ -390,6 +390,9 @@ func resolveJobGroupIdentifier(ctx context.Context, cli *client.Client, state *a
 	if err := validate.SlugOrID(idOrSlug); err != nil {
 		return "", fmt.Errorf("invalid job group identifier: %w", err)
 	}
+	if validate.IsUUID(idOrSlug) {
+		return idOrSlug, nil
+	}
 	_, err := cli.GetJobGroup(ctx, idOrSlug)
 	if err == nil {
 		return idOrSlug, nil

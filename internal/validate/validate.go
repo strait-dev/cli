@@ -73,3 +73,10 @@ func ProjectID(id string) error {
 	}
 	return nil
 }
+
+// IsUUID reports whether s matches the 8-4-4-4-12 hex UUID format
+// (case-insensitive). Useful in resolvers to skip a speculative GET when the
+// argument is clearly a slug rather than an ID.
+func IsUUID(s string) bool {
+	return reUUID.MatchString(strings.TrimSpace(s))
+}

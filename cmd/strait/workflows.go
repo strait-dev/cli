@@ -525,6 +525,9 @@ func resolveWorkflowIdentifier(ctx context.Context, cli *client.Client, state *a
 	if err := validate.SlugOrID(idOrSlug); err != nil {
 		return "", fmt.Errorf("invalid workflow identifier: %w", err)
 	}
+	if validate.IsUUID(idOrSlug) {
+		return idOrSlug, nil
+	}
 	_, err := cli.GetWorkflow(ctx, idOrSlug)
 	if err == nil {
 		return idOrSlug, nil

@@ -9,6 +9,103 @@ import (
 	"github.com/strait-dev/cli/internal/types"
 )
 
+const testUUID = "11111111-2222-3333-4444-555555555555"
+
+// TestResolveJobIdentifier_UUIDShortCircuit asserts that when the argument is
+// a well-formed UUID the resolver returns it without making any API calls,
+// avoiding a wasted speculative GET.
+func TestResolveJobIdentifier_UUIDShortCircuit(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int32
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs/" + testUUID: func(w http.ResponseWriter, _ *http.Request) {
+			calls.Add(1)
+			respondJSON(t, w, http.StatusOK, testJob)
+		},
+		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
+			calls.Add(1)
+			respondPaginated(t, w, http.StatusOK, []types.Job{testJob})
+		},
+	})
+
+	state := newTestState(t, srv)
+	cli, _ := newAPIClient(state)
+
+	id, err := resolveJobIdentifier(t.Context(), cli, state, testUUID)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if id != testUUID {
+		t.Fatalf("got %s, want %s", id, testUUID)
+	}
+	if calls.Load() != 0 {
+		t.Fatalf("expected 0 API calls for UUID input, got %d", calls.Load())
+	}
+}
+
+// TestResolveEnvironmentIdentifier_UUIDShortCircuit — same coverage for environments.
+func TestResolveEnvironmentIdentifier_UUIDShortCircuit(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int32
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/environments/" + testUUID: func(w http.ResponseWriter, _ *http.Request) {
+			calls.Add(1)
+			respondJSON(t, w, http.StatusOK, types.Environment{ID: testUUID})
+		},
+		"GET /v1/environments": func(w http.ResponseWriter, _ *http.Request) {
+			calls.Add(1)
+			respondPaginated(t, w, http.StatusOK, []types.Environment{{ID: testUUID, Slug: "prod"}})
+		},
+	})
+
+	state := newTestState(t, srv)
+	cli, _ := newAPIClient(state)
+
+	id, err := resolveEnvironmentIdentifier(t.Context(), cli, state, testUUID)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if id != testUUID {
+		t.Fatalf("got %s, want %s", id, testUUID)
+	}
+	if calls.Load() != 0 {
+		t.Fatalf("expected 0 API calls for UUID input, got %d", calls.Load())
+	}
+}
+
+// TestResolveWorkflowIdentifier_UUIDShortCircuit — same coverage for workflows.
+func TestResolveWorkflowIdentifier_UUIDShortCircuit(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int32
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/workflows/" + testUUID: func(w http.ResponseWriter, _ *http.Request) {
+			calls.Add(1)
+			respondJSON(t, w, http.StatusOK, types.Workflow{ID: testUUID})
+		},
+		"GET /v1/workflows": func(w http.ResponseWriter, _ *http.Request) {
+			calls.Add(1)
+			respondPaginated(t, w, http.StatusOK, []types.Workflow{{ID: testUUID, Slug: "deploy"}})
+		},
+	})
+
+	state := newTestState(t, srv)
+	cli, _ := newAPIClient(state)
+
+	id, err := resolveWorkflowIdentifier(t.Context(), cli, state, testUUID)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if id != testUUID {
+		t.Fatalf("got %s, want %s", id, testUUID)
+	}
+	if calls.Load() != 0 {
+		t.Fatalf("expected 0 API calls for UUID input, got %d", calls.Load())
+	}
+}
+
 // TestResolveJobIdentifier_DoesNotFallbackOn500 asserts that when GET /v1/jobs/X
 // returns a 5xx, the resolver returns the error verbatim and does NOT fall
 // back to the list+slug-match path. Falling back on a transient failure can

@@ -101,6 +101,9 @@ func resolveJobIdentifier(ctx context.Context, cli *client.Client, state *appSta
 	if err := validate.SlugOrID(idOrSlug); err != nil {
 		return "", fmt.Errorf("invalid job identifier: %w", err)
 	}
+	if validate.IsUUID(idOrSlug) {
+		return idOrSlug, nil
+	}
 	_, err := cli.GetJob(ctx, idOrSlug)
 	if err == nil {
 		return idOrSlug, nil

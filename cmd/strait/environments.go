@@ -326,6 +326,9 @@ func resolveEnvironmentIdentifier(ctx context.Context, cli *client.Client, state
 	if err := validate.SlugOrID(idOrSlug); err != nil {
 		return "", fmt.Errorf("invalid environment identifier: %w", err)
 	}
+	if validate.IsUUID(idOrSlug) {
+		return idOrSlug, nil
+	}
 	_, err := cli.GetEnvironment(ctx, idOrSlug)
 	if err == nil {
 		return idOrSlug, nil
