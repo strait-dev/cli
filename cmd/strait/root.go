@@ -52,8 +52,8 @@ type appState struct {
 // out returns the writer for machine-readable output, defaulting to os.Stdout
 // when no writer has been injected.
 func (s *appState) out() io.Writer {
-	if s == nil || s.stdout == nil {
-		return os.Stdout
+	if s.stdout == nil {
+		return os.Stdout // printdata-ok: this method *is* the official accessor for stdout
 	}
 	return s.stdout
 }

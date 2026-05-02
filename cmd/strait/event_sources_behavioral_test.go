@@ -9,15 +9,18 @@ import (
 	"github.com/strait-dev/cli/internal/types"
 )
 
-var testEventSource = types.EventSource{
-	ID:        "src-1",
-	ProjectID: "proj-test",
-	Name:      "Kafka Source",
-	Slug:      "kafka-source",
-	Type:      "kafka",
-	Enabled:   true,
-	CreatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
-	UpdatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
+// testEventSourceFixture returns a fresh EventSource per call.
+func testEventSourceFixture() types.EventSource {
+	return types.EventSource{
+		ID:        "src-1",
+		ProjectID: "proj-test",
+		Name:      "Kafka Source",
+		Slug:      "kafka-source",
+		Type:      "kafka",
+		Enabled:   true,
+		CreatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
+		UpdatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
+	}
 }
 
 func TestEventSourcesList_Success(t *testing.T) {
@@ -26,7 +29,7 @@ func TestEventSourcesList_Success(t *testing.T) {
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"GET /v1/event-sources": func(w http.ResponseWriter, r *http.Request) {
 			assertQuery(t, r, "project_id", "proj-test")
-			respondPaginated(t, w, http.StatusOK, []types.EventSource{testEventSource})
+			respondPaginated(t, w, http.StatusOK, []types.EventSource{testEventSourceFixture()})
 		},
 	})
 
@@ -50,7 +53,7 @@ func TestEventSourcesGet_Success(t *testing.T) {
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"GET /v1/event-sources/src-1": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, testEventSource)
+			respondJSON(t, w, http.StatusOK, testEventSourceFixture())
 		},
 	})
 
@@ -84,8 +87,18 @@ func TestEventSourcesCreate_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"POST /v1/event-sources": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusCreated, testEventSource)
+		"POST /v1/event-sources": func(w http.ResponseWriter, r *http.Request) {
+			assertAuth(t, r, "test-key")
+			var got struct {
+				Name string `json:"name"`
+				Slug string `json:"slug"`
+				Type string `json:"type"`
+			}
+			readJSONBody(t, r, &got)
+			if got.Name != "Kafka Source" || got.Slug != "kafka-source" || got.Type != "kafka" {
+				t.Errorf("body: got %+v", got)
+			}
+			respondJSON(t, w, http.StatusCreated, testEventSourceFixture())
 		},
 	})
 
@@ -150,7 +163,7 @@ func TestEventSourcesDelete_WithYes(t *testing.T) {
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"GET /v1/event-sources/src-1": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, testEventSource)
+			respondJSON(t, w, http.StatusOK, testEventSourceFixture())
 		},
 		"DELETE /v1/event-sources/src-1": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, map[string]string{})

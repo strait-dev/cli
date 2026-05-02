@@ -168,7 +168,7 @@ func selfUpdate(version string) error {
 	}
 
 	downloadURL := fmt.Sprintf("https://github.com/strait-dev/cli/releases/download/v%s/%s", version, archiveName)
-	fmt.Printf("Downloading %s...\n", downloadURL)
+	fmt.Fprintf(os.Stderr, "Downloading %s...\n", downloadURL)
 
 	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Get(downloadURL) //nolint:noctx // short-lived CLI command
@@ -216,7 +216,7 @@ func selfUpdate(version string) error {
 		return fmt.Errorf("replace binary: %w (try running with elevated permissions)", err)
 	}
 
-	fmt.Printf("Upgraded to v%s\n", version)
+	fmt.Fprintf(os.Stderr, "Upgraded to v%s\n", version)
 	return nil
 }
 

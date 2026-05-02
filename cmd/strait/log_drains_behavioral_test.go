@@ -10,15 +10,19 @@ import (
 	"github.com/strait-dev/cli/internal/types"
 )
 
-var testDrain = types.LogDrain{
-	ID:        "drain-1",
-	ProjectID: "proj-test",
-	Name:      "prod-dd",
-	Type:      "datadog",
-	Config:    json.RawMessage(`{"api_key":"secret"}`),
-	Enabled:   true,
-	CreatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
-	UpdatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
+// testDrainFixture returns a fresh LogDrain per call so parallel tests do not
+// share the same backing array for Config (json.RawMessage is a []byte slice).
+func testDrainFixture() types.LogDrain {
+	return types.LogDrain{
+		ID:        "drain-1",
+		ProjectID: "proj-test",
+		Name:      "prod-dd",
+		Type:      "datadog",
+		Config:    json.RawMessage(`{"api_key":"secret"}`),
+		Enabled:   true,
+		CreatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
+		UpdatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
+	}
 }
 
 func TestLogDrainsList_Success(t *testing.T) {
@@ -26,8 +30,9 @@ func TestLogDrainsList_Success(t *testing.T) {
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"GET /v1/log-drains": func(w http.ResponseWriter, r *http.Request) {
+			assertAuth(t, r, "test-key")
 			assertQuery(t, r, "project_id", "proj-test")
-			respondPaginated(t, w, http.StatusOK, []types.LogDrain{testDrain})
+			respondPaginated(t, w, http.StatusOK, []types.LogDrain{testDrainFixture()})
 		},
 	})
 
@@ -44,6 +49,11 @@ func TestLogDrainsList_Success(t *testing.T) {
 	if !strings.Contains(out, "prod-dd") {
 		t.Fatalf("expected drain name in output: %s", out)
 	}
+	// list intentionally omits Config rather than masking — assert the
+	// secret is absent regardless.
+	if strings.Contains(out, "secret") {
+		t.Fatalf("expected list output to omit config secrets, got: %s", out)
+	}
 }
 
 func TestLogDrainsGet_MasksConfig(t *testing.T) {
@@ -51,7 +61,7 @@ func TestLogDrainsGet_MasksConfig(t *testing.T) {
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"GET /v1/log-drains/drain-1": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, testDrain)
+			respondJSON(t, w, http.StatusOK, testDrainFixture())
 		},
 	})
 
@@ -67,6 +77,33 @@ func TestLogDrainsGet_MasksConfig(t *testing.T) {
 
 	if strings.Contains(out, "secret") {
 		t.Fatalf("expected api_key to be masked, got: %s", out)
+	}
+	if !strings.Contains(out, "********") {
+		t.Fatalf("expected mask placeholder, got: %s", out)
+	}
+}
+
+func TestLogDrainsGet_RevealUnmasks(t *testing.T) {
+	t.Parallel()
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/log-drains/drain-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, testDrainFixture())
+		},
+	})
+
+	state := newTestState(t, srv)
+	cmd := newLogDrainsGetCommand(state)
+	cmd.SetArgs([]string{"drain-1", "--reveal"})
+
+	out := captureStateOutput(t, state, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "secret") {
+		t.Fatalf("expected revealed config in output: %s", out)
 	}
 }
 
@@ -108,8 +145,20 @@ func TestLogDrainsCreate_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"POST /v1/log-drains": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusCreated, testDrain)
+		"POST /v1/log-drains": func(w http.ResponseWriter, r *http.Request) {
+			assertAuth(t, r, "test-key")
+			var got struct {
+				Name string `json:"name"`
+				Type string `json:"type"`
+			}
+			readJSONBody(t, r, &got)
+			if got.Name != "prod-dd" {
+				t.Errorf("name: got %q, want %q", got.Name, "prod-dd")
+			}
+			if got.Type != "datadog" {
+				t.Errorf("type: got %q, want %q", got.Type, "datadog")
+			}
+			respondJSON(t, w, http.StatusCreated, testDrainFixture())
 		},
 	})
 

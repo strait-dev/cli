@@ -381,7 +381,7 @@ func runInteractiveJobEdit(ctx context.Context, cli *client.Client, state *appSt
 
 	cmd := exec.Command(editor, tmpPath) //nolint:gosec // editor is from $EDITOR env var or default vi, tmpPath is a temp file
 	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
+	cmd.Stdout = os.Stdout // printdata-ok: subprocess stdout passthrough for $EDITOR
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return err

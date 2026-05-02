@@ -80,7 +80,7 @@ func loadConfigForWrite(state *appState) (*cliconfig.File, string, error) {
 }
 
 func stdoutIsTTY() bool {
-	fi, err := os.Stdout.Stat()
+	fi, err := os.Stdout.Stat() // printdata-ok: TTY detection on the actual fd, not a writer
 	if err != nil {
 		return false
 	}

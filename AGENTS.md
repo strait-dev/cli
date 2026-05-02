@@ -89,7 +89,8 @@ Support files:
 
 6. **Output discipline**
    - TTY: rich styled output to stderr via `styles` package.
-   - Non-TTY/piped: machine-readable JSON to stdout.
+   - Non-TTY/piped: machine-readable JSON to stdout via `printData(state, ...)` or `state.out()`. Never use `os.Stdout`, `fmt.Print`/`Println`/`Printf`, or the `print`/`println` builtins for primary output — `TestRunEHandlersDoNotBypassPrintData` will fail the build.
+   - If a bypass is genuinely necessary (e.g. subprocess stdout passthrough, top-level fatal handler that runs without `appState`), suppress the audit on that line with `// printdata-ok: <reason>`. The reason must explain why routing through `state.out()` is impossible, not why it would be inconvenient.
    - All commands must support `--format json` and `--quiet` modes.
 
 ---

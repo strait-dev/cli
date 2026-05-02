@@ -13,8 +13,8 @@ func TestAuditVerify_Passed_Text(t *testing.T) {
 	t.Parallel()
 
 	srv := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assertMethod(t, r, http.MethodGet)
-		assertPath(t, r, "/v1/audit-events/verify")
+		assertMethod(t, r, w, http.MethodGet)
+		assertPath(t, r, w, "/v1/audit-events/verify")
 		assertAuth(t, r, "test-key")
 		assertQuery(t, r, "project_id", "proj-test")
 		respondJSON(t, w, http.StatusOK, map[string]any{
@@ -46,8 +46,8 @@ func TestAuditVerify_Failed_ReturnsError_JSON(t *testing.T) {
 	t.Parallel()
 
 	srv := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assertMethod(t, r, http.MethodGet)
-		assertPath(t, r, "/v1/audit-events/verify")
+		assertMethod(t, r, w, http.MethodGet)
+		assertPath(t, r, w, "/v1/audit-events/verify")
 		respondJSON(t, w, http.StatusOK, map[string]any{
 			"project_id":     "proj-test",
 			"valid":          false,

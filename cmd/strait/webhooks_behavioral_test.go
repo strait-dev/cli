@@ -9,14 +9,19 @@ import (
 	"github.com/strait-dev/cli/internal/types"
 )
 
-var testWebhook = types.Webhook{
-	ID:        "webhook-1",
-	ProjectID: "proj-test",
-	URL:       "https://example.com/hook",
-	Events:    []string{"job.run.completed"},
-	Active:    true,
-	CreatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
-	UpdatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
+// testWebhookFixture returns a fresh Webhook value per call. Tests share the
+// shape but never the same backing array — one bad mutation does not bleed
+// across parallel tests.
+func testWebhookFixture() types.Webhook {
+	return types.Webhook{
+		ID:        "webhook-1",
+		ProjectID: "proj-test",
+		URL:       "https://example.com/hook",
+		Events:    []string{"job.run.completed"},
+		Active:    true,
+		CreatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
+		UpdatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
+	}
 }
 
 func TestWebhooksList_Success(t *testing.T) {
@@ -26,7 +31,7 @@ func TestWebhooksList_Success(t *testing.T) {
 		"GET /v1/webhooks": func(w http.ResponseWriter, r *http.Request) {
 			assertAuth(t, r, "test-key")
 			assertQuery(t, r, "project_id", "proj-test")
-			respondPaginated(t, w, http.StatusOK, []types.Webhook{testWebhook})
+			respondPaginated(t, w, http.StatusOK, []types.Webhook{testWebhookFixture()})
 		},
 	})
 
@@ -68,7 +73,7 @@ func TestWebhooksGet_ByID(t *testing.T) {
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"GET /v1/webhooks/webhook-1": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, testWebhook)
+			respondJSON(t, w, http.StatusOK, testWebhookFixture())
 		},
 	})
 
@@ -92,8 +97,20 @@ func TestWebhooksCreate_Success(t *testing.T) {
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"POST /v1/webhooks": func(w http.ResponseWriter, r *http.Request) {
-			assertMethod(t, r, "POST")
-			respondJSON(t, w, http.StatusCreated, testWebhook)
+			assertMethod(t, r, w, "POST")
+			assertAuth(t, r, "test-key")
+			var got struct {
+				URL    string   `json:"url"`
+				Events []string `json:"events"`
+			}
+			readJSONBody(t, r, &got)
+			if got.URL != "https://example.com/hook" {
+				t.Errorf("url: got %q, want %q", got.URL, "https://example.com/hook")
+			}
+			if len(got.Events) != 1 || got.Events[0] != "job.run.completed" {
+				t.Errorf("events: got %v, want [job.run.completed]", got.Events)
+			}
+			respondJSON(t, w, http.StatusCreated, testWebhookFixture())
 		},
 	})
 
@@ -162,7 +179,7 @@ func TestWebhooksUpdate_PatchURL(t *testing.T) {
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"PATCH /v1/webhooks/webhook-1": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, testWebhook)
+			respondJSON(t, w, http.StatusOK, testWebhookFixture())
 		},
 	})
 
