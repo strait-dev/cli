@@ -18,6 +18,7 @@ func newEnvironmentsCommand(state *appState) *cobra.Command {
 		Use:     "environments",
 		Aliases: []string{"environment", "envs", "env"},
 		Short:   "Manage project environments",
+		Long:    idOrSlugLong("environment", "Manage project environments."),
 	}
 
 	getCmd := newEnvironmentsGetCommand(state)

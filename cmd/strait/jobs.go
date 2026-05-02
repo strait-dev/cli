@@ -21,6 +21,7 @@ func newJobsCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "jobs",
 		Short: "Manage jobs",
+		Long:  idOrSlugLong("job", "Manage jobs."),
 	}
 
 	getCmd := newJobsGetCommand(state)

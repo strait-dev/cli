@@ -19,6 +19,7 @@ func newWorkflowsCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "workflows",
 		Short: "Manage workflows",
+		Long:  idOrSlugLong("workflow", "Manage workflows."),
 	}
 
 	getCmd := newWorkflowsGetCommand(state)

@@ -19,6 +19,7 @@ func newEventSourcesCommand(state *appState) *cobra.Command {
 		Use:     "event-sources",
 		Aliases: []string{"event-source"},
 		Short:   "Manage external event sources",
+		Long:    idOrSlugLong("event source", "Manage external event sources."),
 	}
 
 	getCmd := newEventSourcesGetCommand(state)

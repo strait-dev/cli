@@ -12,6 +12,18 @@ import (
 	cliconfig "github.com/strait-dev/cli/internal/config"
 )
 
+// idOrSlugLong returns a standardized Long: docstring for resource command
+// groups whose sub-commands accept either a UUID or a slug as the identifier
+// argument. Slugs require an active project context; UUIDs do not.
+func idOrSlugLong(resource, shortDesc string) string {
+	return fmt.Sprintf(`%s
+
+Sub-commands that take an identifier argument accept either:
+  - The %s UUID (resolved directly), or
+  - The %s slug (resolved within the active project — set via
+    --project, STRAIT_PROJECT_ID, or 'strait use <project>')`, shortDesc, resource, resource)
+}
+
 // debugTransport wraps an http.RoundTripper and logs method, URL, status, and
 // latency to stderr for each request. It is activated by --debug.
 type debugTransport struct {

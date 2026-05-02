@@ -18,6 +18,7 @@ func newJobGroupsCommand(state *appState) *cobra.Command {
 		Use:     "job-groups",
 		Aliases: []string{"job-group"},
 		Short:   "Manage logical groupings of jobs",
+		Long:    idOrSlugLong("job group", "Manage logical groupings of jobs."),
 	}
 
 	getCmd := newJobGroupsGetCommand(state)
