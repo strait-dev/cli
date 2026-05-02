@@ -75,9 +75,9 @@ func newEnvironmentsListCommand(state *appState) *cobra.Command {
 				fmt.Fprintln(os.Stderr, styles.SectionHeader("Environments", len(envs)))
 				for _, e := range envs {
 					fmt.Fprintf(os.Stderr, "  %-20s  vars=%d  %s\n",
-						styles.Bold.Render(e.Slug),
+						styles.Bold.Render(styles.SafeText(e.Slug)),
 						len(e.Variables),
-						styles.MutedStyle.Render(e.ID),
+						styles.MutedStyle.Render(styles.SafeText(e.ID)),
 					)
 				}
 				return nil
@@ -176,7 +176,7 @@ func newEnvironmentsCreateCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Created environment "+styles.Bold.Render(env.Slug)))
+				fmt.Fprintln(os.Stderr, styles.Success("Created environment "+styles.Bold.Render(styles.SafeText(env.Slug))))
 				return nil
 			}
 			return printData(state, env)
@@ -238,7 +238,7 @@ func newEnvironmentsUpdateCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Updated environment "+styles.Bold.Render(env.Slug)))
+				fmt.Fprintln(os.Stderr, styles.Success("Updated environment "+styles.Bold.Render(styles.SafeText(env.Slug))))
 				return nil
 			}
 			return printData(state, env)
@@ -276,7 +276,7 @@ func newEnvironmentsDeleteCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Deleted environment "+styles.Bold.Render(id)))
+				fmt.Fprintln(os.Stderr, styles.Success("Deleted environment "+styles.Bold.Render(styles.SafeText(id))))
 				return nil
 			}
 			return printData(state, map[string]any{"deleted": true, "id": id})
@@ -311,7 +311,7 @@ func newEnvironmentsVariablesCommand(state *appState) *cobra.Command {
 			if isTTYRich(state) {
 				fmt.Fprintln(os.Stderr, styles.SectionHeader("Variables", len(masked)))
 				for k, v := range masked {
-					fmt.Fprintf(os.Stderr, "  %s=%s\n", styles.Bold.Render(k), v)
+					fmt.Fprintf(os.Stderr, "  %s=%s\n", styles.Bold.Render(styles.SafeText(k)), styles.SafeText(v))
 				}
 				return nil
 			}

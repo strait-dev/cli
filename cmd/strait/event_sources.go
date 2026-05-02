@@ -71,9 +71,9 @@ func newEventSourcesListCommand(state *appState) *cobra.Command {
 				for _, s := range sources {
 					fmt.Fprintf(os.Stderr, "  %s  %-20s  type=%s  %s\n",
 						styles.Enabled(s.Enabled),
-						styles.Bold.Render(s.Slug),
-						s.Type,
-						styles.MutedStyle.Render(s.ID),
+						styles.Bold.Render(styles.SafeText(s.Slug)),
+						styles.SafeText(s.Type),
+						styles.MutedStyle.Render(styles.SafeText(s.ID)),
 					)
 				}
 				return nil
@@ -170,7 +170,7 @@ func newEventSourcesCreateCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Created event source "+styles.Bold.Render(source.Slug)))
+				fmt.Fprintln(os.Stderr, styles.Success("Created event source "+styles.Bold.Render(styles.SafeText(source.Slug))))
 				return nil
 			}
 			return printData(state, source)
@@ -231,7 +231,7 @@ func newEventSourcesUpdateCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Updated event source "+styles.Bold.Render(source.Slug)))
+				fmt.Fprintln(os.Stderr, styles.Success("Updated event source "+styles.Bold.Render(styles.SafeText(source.Slug))))
 				return nil
 			}
 			return printData(state, source)
@@ -268,7 +268,7 @@ func newEventSourcesDeleteCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Deleted event source "+styles.Bold.Render(id)))
+				fmt.Fprintln(os.Stderr, styles.Success("Deleted event source "+styles.Bold.Render(styles.SafeText(id))))
 				return nil
 			}
 			return printData(state, map[string]any{"deleted": true, "id": id})

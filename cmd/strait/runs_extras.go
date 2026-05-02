@@ -71,9 +71,9 @@ func newRunsDLQCommand(state *appState) *cobra.Command {
 				fmt.Fprintln(os.Stderr, styles.SectionHeader("DLQ", len(items)))
 				for _, d := range items {
 					fmt.Fprintf(os.Stderr, "  %s  job=%s  reason=%s  %s\n",
-						styles.Bold.Render(d.ID),
-						styles.MutedStyle.Render(d.JobID),
-						d.Reason,
+						styles.Bold.Render(styles.SafeText(d.ID)),
+						styles.MutedStyle.Render(styles.SafeText(d.JobID)),
+						styles.SafeText(d.Reason),
 						styles.RelativeTime(d.FailedAt),
 					)
 				}
@@ -104,7 +104,7 @@ func newRunsDLQReplayCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Replayed DLQ entry "+styles.Bold.Render(args[0])+" as run "+styles.Bold.Render(run.ID)))
+				fmt.Fprintln(os.Stderr, styles.Success("Replayed DLQ entry "+styles.Bold.Render(styles.SafeText(args[0]))+" as run "+styles.Bold.Render(styles.SafeText(run.ID))))
 				return nil
 			}
 			return printData(state, run)

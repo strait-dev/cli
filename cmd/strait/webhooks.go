@@ -84,9 +84,9 @@ func newWebhooksListCommand(state *appState) *cobra.Command {
 				for _, h := range hooks {
 					fmt.Fprintf(os.Stderr, "  %s  %s  events=%s  %s\n",
 						styles.Enabled(h.Active),
-						h.URL,
-						styles.MutedStyle.Render(strings.Join(h.Events, ",")),
-						styles.MutedStyle.Render(h.ID),
+						styles.SafeText(h.URL),
+						styles.MutedStyle.Render(styles.SafeText(strings.Join(h.Events, ","))),
+						styles.MutedStyle.Render(styles.SafeText(h.ID)),
 					)
 				}
 				return nil
@@ -176,7 +176,7 @@ func newWebhooksCreateCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Created webhook "+styles.Bold.Render(hook.ID)))
+				fmt.Fprintln(os.Stderr, styles.Success("Created webhook "+styles.Bold.Render(styles.SafeText(hook.ID))))
 				if hook.Secret != "" {
 					fmt.Fprintln(os.Stderr, styles.MutedStyle.Render("(save the secret now -- it will not be shown again unless --reveal)"))
 					fmt.Fprintln(os.Stderr, "secret: "+hook.Secret)
@@ -235,7 +235,7 @@ func newWebhooksUpdateCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Updated webhook "+styles.Bold.Render(hook.ID)))
+				fmt.Fprintln(os.Stderr, styles.Success("Updated webhook "+styles.Bold.Render(styles.SafeText(hook.ID))))
 				return nil
 			}
 			masked := *hook
@@ -337,7 +337,7 @@ func newWebhooksRetryCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Retry queued: "+styles.Bold.Render(delivery.ID)))
+				fmt.Fprintln(os.Stderr, styles.Success("Retry queued: "+styles.Bold.Render(styles.SafeText(delivery.ID))))
 				return nil
 			}
 			return printData(state, delivery)
@@ -364,7 +364,7 @@ func newWebhooksTestCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Test dispatched: "+styles.Bold.Render(resp.DeliveryID)))
+				fmt.Fprintln(os.Stderr, styles.Success("Test dispatched: "+styles.Bold.Render(styles.SafeText(resp.DeliveryID))))
 				return nil
 			}
 			return printData(state, resp)

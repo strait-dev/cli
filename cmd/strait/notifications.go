@@ -69,9 +69,9 @@ func newNotificationsListCommand(state *appState) *cobra.Command {
 				for _, c := range channels {
 					fmt.Fprintf(os.Stderr, "  %s  %-20s  type=%s  %s\n",
 						styles.Enabled(c.Enabled),
-						styles.Bold.Render(c.Name),
-						c.Type,
-						styles.MutedStyle.Render(c.ID),
+						styles.Bold.Render(styles.SafeText(c.Name)),
+						styles.SafeText(c.Type),
+						styles.MutedStyle.Render(styles.SafeText(c.ID)),
 					)
 				}
 				return nil
@@ -170,7 +170,7 @@ Pass channel-specific settings via --config-json (e.g. webhook URL for slack, em
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Created channel "+styles.Bold.Render(channel.Name)))
+				fmt.Fprintln(os.Stderr, styles.Success("Created channel "+styles.Bold.Render(styles.SafeText(channel.Name))))
 				return nil
 			}
 			masked := *channel
@@ -227,7 +227,7 @@ func newNotificationsUpdateCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Updated channel "+styles.Bold.Render(channel.Name)))
+				fmt.Fprintln(os.Stderr, styles.Success("Updated channel "+styles.Bold.Render(styles.SafeText(channel.Name))))
 				return nil
 			}
 			masked := *channel

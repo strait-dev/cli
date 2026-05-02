@@ -69,9 +69,9 @@ func newLogDrainsListCommand(state *appState) *cobra.Command {
 				for _, d := range drains {
 					fmt.Fprintf(os.Stderr, "  %s  %-20s  type=%s  %s\n",
 						styles.Enabled(d.Enabled),
-						styles.Bold.Render(d.Name),
-						d.Type,
-						styles.MutedStyle.Render(d.ID),
+						styles.Bold.Render(styles.SafeText(d.Name)),
+						styles.SafeText(d.Type),
+						styles.MutedStyle.Render(styles.SafeText(d.ID)),
 					)
 				}
 				return nil
@@ -170,7 +170,7 @@ Pass drain-specific settings via --config-json.`,
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Created log drain "+styles.Bold.Render(drain.Name)))
+				fmt.Fprintln(os.Stderr, styles.Success("Created log drain "+styles.Bold.Render(styles.SafeText(drain.Name))))
 				return nil
 			}
 			masked := *drain
@@ -227,7 +227,7 @@ func newLogDrainsUpdateCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Updated log drain "+styles.Bold.Render(drain.Name)))
+				fmt.Fprintln(os.Stderr, styles.Success("Updated log drain "+styles.Bold.Render(styles.SafeText(drain.Name))))
 				return nil
 			}
 			masked := *drain

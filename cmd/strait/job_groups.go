@@ -85,7 +85,7 @@ func newJobGroupsListCommand(state *appState) *cobra.Command {
 						runState = "paused"
 					}
 					fmt.Fprintf(os.Stderr, "  %-20s  jobs=%d  %s  %s\n",
-						styles.Bold.Render(g.Slug), g.JobCount, runState, styles.MutedStyle.Render(g.ID))
+						styles.Bold.Render(styles.SafeText(g.Slug)), g.JobCount, runState, styles.MutedStyle.Render(styles.SafeText(g.ID)))
 				}
 				return nil
 			}
@@ -167,7 +167,7 @@ func newJobGroupsCreateCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Created job group "+styles.Bold.Render(group.Slug)))
+				fmt.Fprintln(os.Stderr, styles.Success("Created job group "+styles.Bold.Render(styles.SafeText(group.Slug))))
 				return nil
 			}
 			return printData(state, group)
@@ -218,7 +218,7 @@ func newJobGroupsUpdateCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Updated job group "+styles.Bold.Render(group.Slug)))
+				fmt.Fprintln(os.Stderr, styles.Success("Updated job group "+styles.Bold.Render(styles.SafeText(group.Slug))))
 				return nil
 			}
 			return printData(state, group)
