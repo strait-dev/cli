@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/strait-dev/cli/internal/styles"
@@ -53,8 +54,7 @@ Deduplicates by run ID so each run appears only once (or when status changes).`,
 					continue
 				}
 
-				for i := len(runs) - 1; i >= 0; i-- {
-					run := runs[i]
+				for _, run := range slices.Backward(runs) {
 					lastStatus, known := seen[run.ID]
 					currentStatus := string(run.Status)
 

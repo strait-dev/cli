@@ -110,11 +110,11 @@ func newAuditCommand(state *appState) *cobra.Command {
 // It is intentionally decoupled from the server response so the CLI can expose
 // a self-contained contract (status enum, first_break object, duration).
 type auditVerifyResult struct {
-	ProjectID     string                `json:"project_id"`
-	Status        string                `json:"status"`
-	EventsChecked int                   `json:"events_checked"`
-	FirstBreak    *auditVerifyBreak     `json:"first_break"`
-	DurationMS    int64                 `json:"duration_ms"`
+	ProjectID     string            `json:"project_id"`
+	Status        string            `json:"status"`
+	EventsChecked int               `json:"events_checked"`
+	FirstBreak    *auditVerifyBreak `json:"first_break"`
+	DurationMS    int64             `json:"duration_ms"`
 }
 
 type auditVerifyBreak struct {
@@ -223,7 +223,7 @@ func renderAuditVerify(state *appState, format string, result auditVerifyResult)
 	}
 
 	rich := isTTYRich(state)
-	status := result.Status
+	var status string
 	if rich {
 		if result.Status == "passed" {
 			status = styles.Green.Render("PASS")

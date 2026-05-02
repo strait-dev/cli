@@ -87,6 +87,26 @@ type HealthStatus struct {
 	Status string `json:"status"`
 }
 
+// BulkCancelRunsRequest is the request body for bulk-canceling runs.
+type BulkCancelRunsRequest struct {
+	IDs []string `json:"ids"`
+}
+
+// BulkCancelResult is the per-run result inside a bulk cancel response.
+type BulkCancelResult struct {
+	ID       string `json:"id"`
+	Canceled bool   `json:"canceled"`
+	Status   string `json:"status,omitempty"`
+	Error    string `json:"error,omitempty"`
+}
+
+// BulkCancelRunsResponse is the response from bulk-canceling runs.
+type BulkCancelRunsResponse struct {
+	Results  []BulkCancelResult `json:"results"`
+	Total    int                `json:"total"`
+	Canceled int                `json:"canceled"`
+}
+
 // WorkflowStepRequest is a step definition in workflow create/update requests.
 type WorkflowStepRequest struct {
 	JobID     string          `json:"job_id"`

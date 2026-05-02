@@ -151,6 +151,25 @@ func (c *Client) CancelRun(ctx context.Context, runID string) (*types.JobRun, er
 	return &out, nil
 }
 
+// BulkCancelRuns cancels many runs in a single request.
+func (c *Client) BulkCancelRuns(ctx context.Context, ids []string) (*BulkCancelRunsResponse, error) {
+	req := BulkCancelRunsRequest{IDs: ids}
+	var out BulkCancelRunsResponse
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/runs/bulk-cancel", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ReplayRun replays a run by ID, preserving lineage to the original run.
+func (c *Client) ReplayRun(ctx context.Context, runID string) (*types.JobRun, error) {
+	var out types.JobRun
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/runs", runID, "replay"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // ListRunEvents returns events for a run.
 func (c *Client) ListRunEvents(ctx context.Context, runID, level, eventType string) ([]types.RunEvent, error) {
 	query := url.Values{}

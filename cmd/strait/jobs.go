@@ -65,7 +65,7 @@ func newJobsDeleteCommand(state *appState) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "delete <job-id-or-slug>",
-		Short: "Disable a job by ID or slug",
+		Short: "Delete a job by ID or slug",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := requireConfirmation(state, "Delete this job?", yes); err != nil {

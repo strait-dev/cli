@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
 	"github.com/strait-dev/cli/internal/types"
 
@@ -191,18 +190,37 @@ func newRunsCancelCommand(state *appState) *cobra.Command {
 			}
 
 			results := make([]map[string]any, 0, len(targetIDs))
-			for _, id := range targetIDs {
+			if len(targetIDs) == 1 {
+				id := targetIDs[0]
 				run, cancelErr := cli.CancelRun(cmd.Context(), id)
 				if cancelErr != nil {
 					results = append(results, map[string]any{"id": id, "canceled": false, "error": cancelErr.Error()})
 					if isTTYRich(state) {
 						fmt.Fprintln(os.Stderr, styles.Err("Failed to cancel "+id+": "+cancelErr.Error()))
 					}
-					continue
+				} else {
+					results = append(results, map[string]any{"id": id, "canceled": true, "status": run.Status})
+					if isTTYRich(state) {
+						fmt.Fprintln(os.Stderr, styles.Success("Canceled run "+styles.Bold.Render(id)))
+					}
 				}
-				results = append(results, map[string]any{"id": id, "canceled": true, "status": run.Status})
-				if isTTYRich(state) {
-					fmt.Fprintln(os.Stderr, styles.Success("Canceled run "+styles.Bold.Render(id)))
+			} else {
+				resp, bulkErr := cli.BulkCancelRuns(cmd.Context(), targetIDs)
+				if bulkErr != nil {
+					return fmt.Errorf("bulk cancel runs: %w", bulkErr)
+				}
+				for _, r := range resp.Results {
+					if r.Canceled {
+						results = append(results, map[string]any{"id": r.ID, "canceled": true, "status": r.Status})
+						if isTTYRich(state) {
+							fmt.Fprintln(os.Stderr, styles.Success("Canceled run "+styles.Bold.Render(r.ID)))
+						}
+					} else {
+						results = append(results, map[string]any{"id": r.ID, "canceled": false, "error": r.Error})
+						if isTTYRich(state) {
+							fmt.Fprintln(os.Stderr, styles.Err("Failed to cancel "+r.ID+": "+r.Error))
+						}
+					}
 				}
 			}
 
@@ -450,7 +468,7 @@ func newRunsReplayCommand(state *appState) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "replay <run-id>",
-		Short: "Replay a run using its original payload",
+		Short: "Replay a run, preserving lineage to the original",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cli, err := newAPIClient(state)
@@ -458,19 +476,14 @@ func newRunsReplayCommand(state *appState) *cobra.Command {
 				return err
 			}
 
-			original, err := cli.GetRun(cmd.Context(), args[0])
-			if err != nil {
-				return err
-			}
-
-			triggered, err := cli.TriggerJob(cmd.Context(), original.JobID, client.TriggerJobRequest{Payload: original.Payload}, "")
+			replayed, err := cli.ReplayRun(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
 
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Info("Replayed as run "+styles.Bold.Render(triggered.ID)))
-			} else if err := printData(state, triggered); err != nil {
+				fmt.Fprintln(os.Stderr, styles.Info("Replayed as run "+styles.Bold.Render(replayed.ID)))
+			} else if err := printData(state, replayed); err != nil {
 				return err
 			}
 
@@ -478,7 +491,7 @@ func newRunsReplayCommand(state *appState) *cobra.Command {
 				return nil
 			}
 
-			return watchRunUntilDone(cmd.Context(), state, triggered.ID, 2*time.Second, 5*time.Minute)
+			return watchRunUntilDone(cmd.Context(), state, replayed.ID, 2*time.Second, 5*time.Minute)
 		},
 	}
 

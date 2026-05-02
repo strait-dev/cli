@@ -569,6 +569,33 @@ func newWorkflowsVisualizeCommand(state *appState) *cobra.Command {
 				}
 			}
 
+			format := state.opts.outputFormat
+			if format != "" && format != "table" && format != "wide" {
+				nodes := make([]map[string]any, 0, len(wf.Steps))
+				for _, s := range wf.Steps {
+					node := map[string]any{
+						"step_ref":   s.StepRef,
+						"depends_on": s.DependsOn,
+					}
+					if statusMap != nil {
+						node["status"] = statusMap[s.StepRef]
+					}
+					nodes = append(nodes, node)
+				}
+				edges := make([]map[string]any, 0)
+				for _, s := range wf.Steps {
+					for _, dep := range s.DependsOn {
+						edges = append(edges, map[string]any{"from": dep, "to": s.StepRef})
+					}
+				}
+				return printData(state, map[string]any{
+					"workflow_id":     workflowID,
+					"workflow_run_id": workflowRunID,
+					"nodes":           nodes,
+					"edges":           edges,
+				})
+			}
+
 			rendered := dag.RenderDAG(steps, statusMap)
 			fmt.Print(rendered)
 			return nil

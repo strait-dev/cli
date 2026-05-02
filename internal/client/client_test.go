@@ -697,6 +697,80 @@ func TestCancelRun(t *testing.T) {
 	}
 }
 
+func TestBulkCancelRuns(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/runs/bulk-cancel")
+		assertAuth(t, r, "test-key")
+		assertContentType(t, r)
+
+		var req BulkCancelRunsRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		if len(req.IDs) != 3 {
+			t.Fatalf("expected 3 ids, got %d", len(req.IDs))
+		}
+
+		respondJSON(t, w, http.StatusOK, BulkCancelRunsResponse{
+			Results: []BulkCancelResult{
+				{ID: "run-1", Canceled: true, Status: "canceled"},
+				{ID: "run-2", Canceled: true, Status: "canceled"},
+				{ID: "run-3", Canceled: false, Error: "already terminal"},
+			},
+			Total:    3,
+			Canceled: 2,
+		})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	got, err := c.BulkCancelRuns(context.Background(), []string{"run-1", "run-2", "run-3"})
+	if err != nil {
+		t.Fatalf("BulkCancelRuns: %v", err)
+	}
+	if got.Total != 3 || got.Canceled != 2 {
+		t.Fatalf("unexpected counters: %+v", got)
+	}
+	if len(got.Results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(got.Results))
+	}
+	if got.Results[2].Canceled || got.Results[2].Error == "" {
+		t.Fatalf("expected third run to be reported as failed, got %+v", got.Results[2])
+	}
+}
+
+func TestReplayRun(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/runs/run-1/replay")
+		assertAuth(t, r, "test-key")
+		respondJSON(t, w, http.StatusOK, types.JobRun{
+			ID:          "run-2",
+			JobID:       "job-1",
+			ParentRunID: "run-1",
+			Status:      types.StatusQueued,
+		})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	got, err := c.ReplayRun(context.Background(), "run-1")
+	if err != nil {
+		t.Fatalf("ReplayRun: %v", err)
+	}
+	if got.ID != "run-2" {
+		t.Fatalf("expected replayed run id run-2, got %s", got.ID)
+	}
+	if got.ParentRunID != "run-1" {
+		t.Fatalf("expected ParentRunID=run-1, got %q", got.ParentRunID)
+	}
+}
+
 func TestListRunEvents(t *testing.T) {
 	t.Parallel()
 

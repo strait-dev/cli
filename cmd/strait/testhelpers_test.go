@@ -65,8 +65,6 @@ func respondError(t *testing.T, w http.ResponseWriter, status int, msg string) {
 }
 
 // assertMethod fails the test if the request method does not match want.
-//
-//nolint:unused // available for use in future command tests
 func assertMethod(t *testing.T, r *http.Request, want string) {
 	t.Helper()
 	if r.Method != want {
@@ -75,8 +73,6 @@ func assertMethod(t *testing.T, r *http.Request, want string) {
 }
 
 // assertPath fails the test if the request path does not match want.
-//
-//nolint:unused // available for use in future command tests
 func assertPath(t *testing.T, r *http.Request, want string) {
 	t.Helper()
 	if r.URL.Path != want {
