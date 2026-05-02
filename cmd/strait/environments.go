@@ -349,10 +349,29 @@ func parseKeyValuePairs(pairs []string) (map[string]string, error) {
 	out := make(map[string]string, len(pairs))
 	for _, p := range pairs {
 		k, v, ok := strings.Cut(p, "=")
-		if !ok || strings.TrimSpace(k) == "" {
-			return nil, fmt.Errorf("invalid key=value: %q", p)
+		if !ok {
+			return nil, fmt.Errorf("invalid key=value (missing %q): %q", "=", p)
+		}
+		k = strings.TrimSpace(k)
+		if k == "" {
+			return nil, fmt.Errorf("invalid key=value (empty key): %q", p)
+		}
+		if err := validateVarKey(k); err != nil {
+			return nil, fmt.Errorf("invalid key %q: %w", k, err)
+		}
+		if _, dup := out[k]; dup {
+			return nil, fmt.Errorf("duplicate key %q", k)
 		}
 		out[k] = v
 	}
 	return out, nil
+}
+
+func validateVarKey(k string) error {
+	for _, r := range k {
+		if r < 0x20 || r == 0x7f {
+			return fmt.Errorf("key must not contain control characters")
+		}
+	}
+	return nil
 }
