@@ -5,11 +5,16 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+// parseTestURL is a thin helper so TestJoinPath_RoundTripThroughURL doesn't
+// need to import net/url at the test-case body level.
+func parseTestURL(s string) (*url.URL, error) { return url.Parse(s) }
 
 func TestValidatePathSegment(t *testing.T) {
 	t.Parallel()
@@ -456,6 +461,62 @@ func TestPathTraversalErrorWrapping(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "invalid job id") {
 		t.Fatalf("expected error mentioning 'invalid job id', got %q", err.Error())
+	}
+}
+
+// TestJoinPath_NoPreEncoding asserts that joinPath returns decoded path
+// segments (NOT percent-encoded). Pre-encoding here would cause Go's URL
+// package to double-encode the "%" sign when the result is set on
+// (*url.URL).Path, producing wire-level paths like "/v1/jobs/foo%2520bar"
+// instead of the intended "/v1/jobs/foo%20bar".
+func TestJoinPath_NoPreEncoding(t *testing.T) {
+	t.Parallel()
+
+	// All these slug bytes are LEGAL per validatePathSegment (no slashes, no
+	// control chars, no "%" prefix). joinPath must NOT pre-encode them — Go's
+	// URL package handles encoding when the result is used as a URL path.
+	got, err := joinPath("/v1/jobs", "my-job-v2")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "/v1/jobs/my-job-v2" {
+		t.Fatalf("got %q, want %q", got, "/v1/jobs/my-job-v2")
+	}
+
+	// Segments are joined verbatim, with no percent-encoding inserted.
+	got, err = joinPath("/v1/runs", "run-abc", "events")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "/v1/runs/run-abc/events" {
+		t.Fatalf("got %q, want %q", got, "/v1/runs/run-abc/events")
+	}
+	if strings.Contains(got, "%") {
+		t.Fatalf("joinPath must not introduce percent-encoding: %q", got)
+	}
+}
+
+// TestJoinPath_RoundTripThroughURL ensures that when joinPath's output is set
+// on (*url.URL).Path, the resulting URL string survives a round trip through
+// url.Parse without altering the path — i.e., we are not silently
+// double-encoding or losing segment integrity.
+func TestJoinPath_RoundTripThroughURL(t *testing.T) {
+	t.Parallel()
+
+	endpoint, err := joinPath("/v1/jobs", "abc-def", "trigger")
+	if err != nil {
+		t.Fatalf("joinPath: %v", err)
+	}
+	full := "https://api.example.com" + endpoint
+	parsed, err := parseTestURL(full)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if parsed.Path != endpoint {
+		t.Fatalf("round-trip path mismatch: got %q, want %q", parsed.Path, endpoint)
+	}
+	if parsed.String() != full {
+		t.Fatalf("round-trip string mismatch: got %q, want %q", parsed.String(), full)
 	}
 }
 

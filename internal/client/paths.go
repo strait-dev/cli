@@ -2,7 +2,6 @@ package client
 
 import (
 	"fmt"
-	"path"
 	"strings"
 )
 
@@ -10,6 +9,12 @@ import (
 // path-traversal and smuggling vectors. The first argument is a static prefix
 // that the caller controls (e.g. "/v1/jobs"); subsequent segments are treated
 // as untrusted and validated.
+//
+// The returned string is intended to be set on (*url.URL).Path, which Go's
+// net/url package re-encodes on URL.String(): special characters like space,
+// "?", and "#" are percent-encoded automatically. We deliberately do NOT
+// percent-encode here ourselves — doing so would cause double-encoding (the "%"
+// in our output would itself be re-encoded as "%25").
 func joinPath(prefix string, segments ...string) (string, error) {
 	for _, s := range segments {
 		if err := validatePathSegment(s); err != nil {
@@ -17,9 +22,9 @@ func joinPath(prefix string, segments ...string) (string, error) {
 		}
 	}
 	parts := make([]string, 0, len(segments)+1)
-	parts = append(parts, prefix)
+	parts = append(parts, strings.TrimRight(prefix, "/"))
 	parts = append(parts, segments...)
-	return path.Join(parts...), nil
+	return strings.Join(parts, "/"), nil
 }
 
 // validatePathSegment rejects any string that would change the resolved URL
