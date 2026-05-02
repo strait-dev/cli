@@ -8,9 +8,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/strait-dev/cli/internal/client"
 	cliconfig "github.com/strait-dev/cli/internal/config"
 )
+
+// mustMarkFlagRequired panics if MarkFlagRequired returns an error — which
+// only happens when the flag name doesn't exist on the command. That is a
+// programmer error caught at command construction (i.e. process startup),
+// not a user-facing condition. Panicking guarantees we don't ship a binary
+// where a "required" flag is silently optional because of a typo.
+func mustMarkFlagRequired(cmd *cobra.Command, name string) {
+	if err := cmd.MarkFlagRequired(name); err != nil {
+		panic(fmt.Sprintf("strait: MarkFlagRequired(%q) on %q: %v", name, cmd.Use, err))
+	}
+}
 
 // idOrSlugLong returns a standardized Long: docstring for resource command
 // groups whose sub-commands accept either a UUID or a slug as the identifier

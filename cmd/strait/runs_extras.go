@@ -45,7 +45,7 @@ func newRunsRescheduleCommand(state *appState) *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&at, "at", "", "RFC3339 timestamp to reschedule the run for (required)")
-	_ = cmd.MarkFlagRequired("at")
+	mustMarkFlagRequired(cmd, "at")
 	return cmd
 }
 

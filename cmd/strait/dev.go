@@ -428,7 +428,7 @@ Requires cloudflared to be installed (offers to download if missing).`,
 	cmd.Flags().StringVar(&job, "job", "", "filter to specific job slug")
 	cmd.Flags().BoolVar(&noUpdate, "no-update", false, "create tunnel without updating job endpoints")
 
-	_ = cmd.MarkFlagRequired("port")
+	mustMarkFlagRequired(cmd, "port")
 
 	return cmd
 }

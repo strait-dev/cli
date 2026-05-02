@@ -218,8 +218,8 @@ func newWorkflowsDiffCommand(state *appState) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&fromV, "from", "", "from version (required)")
 	cmd.Flags().StringVar(&toV, "to", "", "to version (required)")
-	_ = cmd.MarkFlagRequired("from")
-	_ = cmd.MarkFlagRequired("to")
+	mustMarkFlagRequired(cmd, "from")
+	mustMarkFlagRequired(cmd, "to")
 	return cmd
 }
 
