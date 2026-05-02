@@ -17,7 +17,7 @@ If instructions conflict, use this priority order:
 - **Language**: Go 1.26
 - **Module**: `github.com/strait-dev/cli`
 - **Purpose**: Standalone command-line interface for the Strait job orchestration platform.
-  - 50+ commands covering job management, workflow orchestration, deployment, local development, and real-time monitoring
+  - 70+ top-level commands covering jobs and workflows, deployment, environments and webhooks, billing and analytics, RBAC, local development, and real-time monitoring
   - REST API client — all commands call the Strait server API over HTTP (zero database, queue, or worker dependencies)
   - OAuth device code flow + keychain credential storage
   - Config file management (`~/.config/strait/config.yaml`, `.strait.yaml`)
@@ -39,10 +39,10 @@ Core technical model:
 ## 2) Repository map (how to navigate)
 
 ```
-cmd/strait/              CLI commands and app entrypoint (50+ command files)
+cmd/strait/              CLI commands and app entrypoint (70+ command files)
 internal/
   types/                 CLI-own types matching REST API JSON contract
-  client/                HTTP API client (50+ methods, SSE streaming, device auth)
+  client/                HTTP API client (100+ methods, SSE streaming, device auth)
   auth/                  Keyring credential storage + OAuth device flow
   config/                Config file management and context resolution
   styles/                Terminal color and formatting (lipgloss)
