@@ -84,6 +84,7 @@ func newLogDrainsListCommand(state *appState) *cobra.Command {
 }
 
 func newLogDrainsGetCommand(state *appState) *cobra.Command {
+	var reveal bool
 	cmd := &cobra.Command{
 		Use:   "get <drain-id>",
 		Short: "Get log drain details",
@@ -110,9 +111,12 @@ func newLogDrainsGetCommand(state *appState) *cobra.Command {
 				fmt.Fprint(os.Stderr, styles.DetailBox("Log Drain", lines))
 				return nil
 			}
-			return printData(state, drain)
+			masked := *drain
+			masked.Config = maskRawJSON(drain.Config, reveal)
+			return printData(state, &masked)
 		},
 	}
+	cmd.Flags().BoolVar(&reveal, "reveal", false, "show drain config (API keys, URLs) in plaintext")
 	return cmd
 }
 
@@ -169,7 +173,9 @@ Pass drain-specific settings via --config-json.`,
 				fmt.Fprintln(os.Stderr, styles.Success("Created log drain "+styles.Bold.Render(drain.Name)))
 				return nil
 			}
-			return printData(state, drain)
+			masked := *drain
+			masked.Config = maskRawJSON(drain.Config, false)
+			return printData(state, &masked)
 		},
 	}
 
@@ -224,7 +230,9 @@ func newLogDrainsUpdateCommand(state *appState) *cobra.Command {
 				fmt.Fprintln(os.Stderr, styles.Success("Updated log drain "+styles.Bold.Render(drain.Name)))
 				return nil
 			}
-			return printData(state, drain)
+			masked := *drain
+			masked.Config = maskRawJSON(drain.Config, false)
+			return printData(state, &masked)
 		},
 	}
 

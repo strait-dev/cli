@@ -92,6 +92,7 @@ func newEnvironmentsListCommand(state *appState) *cobra.Command {
 }
 
 func newEnvironmentsGetCommand(state *appState) *cobra.Command {
+	var reveal bool
 	cmd := &cobra.Command{
 		Use:   "get <environment-id-or-slug>",
 		Short: "Get environment by ID or slug",
@@ -120,9 +121,12 @@ func newEnvironmentsGetCommand(state *appState) *cobra.Command {
 				fmt.Fprint(os.Stderr, styles.DetailBox("Environment Details", lines))
 				return nil
 			}
-			return printData(state, env)
+			masked := *env
+			masked.Variables = maskMapValues(env.Variables, reveal)
+			return printData(state, &masked)
 		},
 	}
+	cmd.Flags().BoolVar(&reveal, "reveal", false, "show variable values in plaintext (default: masked as ********)")
 	return cmd
 }
 
@@ -285,6 +289,7 @@ func newEnvironmentsDeleteCommand(state *appState) *cobra.Command {
 }
 
 func newEnvironmentsVariablesCommand(state *appState) *cobra.Command {
+	var reveal bool
 	cmd := &cobra.Command{
 		Use:   "variables <environment-id-or-slug>",
 		Short: "List environment variables",
@@ -302,16 +307,18 @@ func newEnvironmentsVariablesCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			masked := maskMapValues(vars, reveal)
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.SectionHeader("Variables", len(vars)))
-				for k, v := range vars {
+				fmt.Fprintln(os.Stderr, styles.SectionHeader("Variables", len(masked)))
+				for k, v := range masked {
 					fmt.Fprintf(os.Stderr, "  %s=%s\n", styles.Bold.Render(k), v)
 				}
 				return nil
 			}
-			return printData(state, vars)
+			return printData(state, masked)
 		},
 	}
+	cmd.Flags().BoolVar(&reveal, "reveal", false, "show variable values in plaintext (default: masked as ********)")
 	return cmd
 }
 

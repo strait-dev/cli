@@ -84,6 +84,7 @@ func newNotificationsListCommand(state *appState) *cobra.Command {
 }
 
 func newNotificationsGetCommand(state *appState) *cobra.Command {
+	var reveal bool
 	cmd := &cobra.Command{
 		Use:   "get <channel-id>",
 		Short: "Get notification channel details",
@@ -110,9 +111,12 @@ func newNotificationsGetCommand(state *appState) *cobra.Command {
 				fmt.Fprint(os.Stderr, styles.DetailBox("Notification Channel", lines))
 				return nil
 			}
-			return printData(state, channel)
+			masked := *channel
+			masked.Config = maskRawJSON(channel.Config, reveal)
+			return printData(state, &masked)
 		},
 	}
+	cmd.Flags().BoolVar(&reveal, "reveal", false, "show channel config (webhook URLs, API keys) in plaintext")
 	return cmd
 }
 
@@ -169,7 +173,9 @@ Pass channel-specific settings via --config-json (e.g. webhook URL for slack, em
 				fmt.Fprintln(os.Stderr, styles.Success("Created channel "+styles.Bold.Render(channel.Name)))
 				return nil
 			}
-			return printData(state, channel)
+			masked := *channel
+			masked.Config = maskRawJSON(channel.Config, false)
+			return printData(state, &masked)
 		},
 	}
 
@@ -224,7 +230,9 @@ func newNotificationsUpdateCommand(state *appState) *cobra.Command {
 				fmt.Fprintln(os.Stderr, styles.Success("Updated channel "+styles.Bold.Render(channel.Name)))
 				return nil
 			}
-			return printData(state, channel)
+			masked := *channel
+			masked.Config = maskRawJSON(channel.Config, false)
+			return printData(state, &masked)
 		},
 	}
 
