@@ -48,7 +48,7 @@ func TestRunsList_Success(t *testing.T) {
 	cmd := newRunsListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -75,7 +75,7 @@ func TestRunsList_StatusFilter(t *testing.T) {
 	cmd := newRunsListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test", "--status", "executing"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -100,7 +100,7 @@ func TestRunsGet_Success(t *testing.T) {
 	cmd := newRunsGetCommand(state)
 	cmd.SetArgs([]string{"run-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -128,7 +128,7 @@ func TestRunsCancel_SingleRun(t *testing.T) {
 	cmd := newRunsCancelCommand(state)
 	cmd.SetArgs([]string{"run-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -142,18 +142,16 @@ func TestRunsCancel_SingleRun(t *testing.T) {
 func TestRunsReplay_Success(t *testing.T) {
 	t.Parallel()
 
-	var triggerBody map[string]any
+	var replayCalls int
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/runs/run-1": func(w http.ResponseWriter, r *http.Request) {
+		"POST /v1/runs/run-1/replay": func(w http.ResponseWriter, r *http.Request) {
 			assertAuth(t, r, "test-key")
-			respondJSON(t, w, http.StatusOK, testRun)
-		},
-		"POST /v1/jobs/job-1/trigger": func(w http.ResponseWriter, r *http.Request) {
-			assertAuth(t, r, "test-key")
-			readJSONBody(t, r, &triggerBody)
-			respondJSON(t, w, http.StatusOK, map[string]any{
-				"id":     "run-replay-1",
-				"status": "queued",
+			replayCalls++
+			respondJSON(t, w, http.StatusOK, types.JobRun{
+				ID:          "run-replay-1",
+				JobID:       "job-1",
+				ParentRunID: "run-1",
+				Status:      types.StatusQueued,
 			})
 		},
 	})
@@ -162,27 +160,73 @@ func TestRunsReplay_Success(t *testing.T) {
 	cmd := newRunsReplayCommand(state)
 	cmd.SetArgs([]string{"run-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
 
+	if replayCalls != 1 {
+		t.Fatalf("expected exactly one replay call, got %d", replayCalls)
+	}
 	if !strings.Contains(out, "run-replay-1") {
 		t.Fatalf("expected run-replay-1 in output, got: %s", out)
 	}
+	if !strings.Contains(out, "run-1") {
+		t.Fatalf("expected parent run-1 lineage in output, got: %s", out)
+	}
+}
 
-	// Verify the trigger used the original payload.
-	payload, ok := triggerBody["payload"]
-	if !ok {
-		t.Fatal("expected payload in trigger body")
+func TestRunsCancel_BulkRuns(t *testing.T) {
+	t.Parallel()
+
+	var bulkBody map[string]any
+	var bulkCalls int
+	var deleteCalls int
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"POST /v1/runs/bulk-cancel": func(w http.ResponseWriter, r *http.Request) {
+			assertAuth(t, r, "test-key")
+			bulkCalls++
+			readJSONBody(t, r, &bulkBody)
+			respondJSON(t, w, http.StatusOK, map[string]any{
+				"results": []map[string]any{
+					{"id": "run-1", "canceled": true, "status": "canceled"},
+					{"id": "run-2", "canceled": true, "status": "canceled"},
+				},
+				"total":    2,
+				"canceled": 2,
+			})
+		},
+		"DELETE /v1/runs/run-1": func(_ http.ResponseWriter, _ *http.Request) {
+			deleteCalls++
+		},
+		"DELETE /v1/runs/run-2": func(_ http.ResponseWriter, _ *http.Request) {
+			deleteCalls++
+		},
+	})
+
+	state := newTestState(t, srv)
+	cmd := newRunsCancelCommand(state)
+	cmd.SetArgs([]string{"run-1", "run-2", "--yes"})
+
+	out := captureStateOutput(t, state, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if bulkCalls != 1 {
+		t.Fatalf("expected exactly one bulk-cancel call, got %d", bulkCalls)
 	}
-	payloadMap, ok := payload.(map[string]any)
-	if !ok {
-		t.Fatalf("expected payload to be a map, got: %T", payload)
+	if deleteCalls != 0 {
+		t.Fatalf("expected no per-run DELETE calls, got %d", deleteCalls)
 	}
-	if payloadMap["key"] != "value" {
-		t.Fatalf("expected original payload key=value, got: %v", payloadMap)
+	ids, ok := bulkBody["ids"].([]any)
+	if !ok || len(ids) != 2 {
+		t.Fatalf("expected 2 ids in bulk body, got: %v", bulkBody)
+	}
+	if !strings.Contains(out, "run-1") || !strings.Contains(out, "run-2") {
+		t.Fatalf("expected run-1 and run-2 in output, got: %s", out)
 	}
 }
 
@@ -202,7 +246,7 @@ func TestRunsLast_Success(t *testing.T) {
 	cmd := newRunsLastCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -250,7 +294,7 @@ func TestRunsDiff_Success(t *testing.T) {
 	cmd := newRunsDiffCommand(state)
 	cmd.SetArgs([]string{"run-1", "run-2"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

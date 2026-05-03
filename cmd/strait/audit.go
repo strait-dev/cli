@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -110,11 +109,11 @@ func newAuditCommand(state *appState) *cobra.Command {
 // It is intentionally decoupled from the server response so the CLI can expose
 // a self-contained contract (status enum, first_break object, duration).
 type auditVerifyResult struct {
-	ProjectID     string                `json:"project_id"`
-	Status        string                `json:"status"`
-	EventsChecked int                   `json:"events_checked"`
-	FirstBreak    *auditVerifyBreak     `json:"first_break"`
-	DurationMS    int64                 `json:"duration_ms"`
+	ProjectID     string            `json:"project_id"`
+	Status        string            `json:"status"`
+	EventsChecked int               `json:"events_checked"`
+	FirstBreak    *auditVerifyBreak `json:"first_break"`
+	DurationMS    int64             `json:"duration_ms"`
 }
 
 type auditVerifyBreak struct {
@@ -216,14 +215,15 @@ func newAuditVerifyCommand(state *appState) *cobra.Command {
 }
 
 func renderAuditVerify(state *appState, format string, result auditVerifyResult) error {
+	w := state.out()
 	if format == "json" {
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
 		return enc.Encode(result)
 	}
 
 	rich := isTTYRich(state)
-	status := result.Status
+	var status string
 	if rich {
 		if result.Status == "passed" {
 			status = styles.Green.Render("PASS")
@@ -238,11 +238,11 @@ func renderAuditVerify(state *appState, format string, result auditVerifyResult)
 		}
 	}
 
-	fmt.Fprintf(os.Stdout, "Audit chain verification for project %s: %s\n", result.ProjectID, status)
-	fmt.Fprintf(os.Stdout, "  events checked: %d\n", result.EventsChecked)
-	fmt.Fprintf(os.Stdout, "  duration:       %dms\n", result.DurationMS)
+	fmt.Fprintf(w, "Audit chain verification for project %s: %s\n", result.ProjectID, status)
+	fmt.Fprintf(w, "  events checked: %d\n", result.EventsChecked)
+	fmt.Fprintf(w, "  duration:       %dms\n", result.DurationMS)
 	if result.FirstBreak != nil {
-		fmt.Fprintf(os.Stdout, "  first break:    event=%s reason=%s\n",
+		fmt.Fprintf(w, "  first break:    event=%s reason=%s\n",
 			dashIfEmpty(result.FirstBreak.EventID), result.FirstBreak.Reason)
 	}
 	return nil

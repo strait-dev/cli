@@ -21,6 +21,7 @@ func newJobsCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "jobs",
 		Short: "Manage jobs",
+		Long:  idOrSlugLong("job", "Manage jobs."),
 	}
 
 	getCmd := newJobsGetCommand(state)
@@ -43,6 +44,14 @@ func newJobsCommand(state *appState) *cobra.Command {
 	resumeCmd.ValidArgsFunction = completeJobSlugs(state)
 	updateCmd := newJobsUpdateCommand(state)
 	updateCmd.ValidArgsFunction = completeJobSlugs(state)
+	cloneCmd := newJobsCloneCommand(state)
+	cloneCmd.ValidArgsFunction = completeJobSlugs(state)
+	healthCmd := newJobsHealthCommand(state)
+	healthCmd.ValidArgsFunction = completeJobSlugs(state)
+	dependenciesCmd := newJobsDependenciesCommand(state)
+	dependenciesCmd.ValidArgsFunction = completeJobSlugs(state)
+	addDependencyCmd := newJobsAddDependencyCommand(state)
+	addDependencyCmd.ValidArgsFunction = completeJobSlugs(state)
 
 	cmd.AddCommand(newJobsListCommand(state))
 	cmd.AddCommand(getCmd)
@@ -56,6 +65,11 @@ func newJobsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(pauseCmd)
 	cmd.AddCommand(resumeCmd)
 	cmd.AddCommand(updateCmd)
+	cmd.AddCommand(cloneCmd)
+	cmd.AddCommand(healthCmd)
+	cmd.AddCommand(dependenciesCmd)
+	cmd.AddCommand(addDependencyCmd)
+	cmd.AddCommand(newJobsBatchCommand(state))
 
 	return cmd
 }
@@ -65,7 +79,7 @@ func newJobsDeleteCommand(state *appState) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "delete <job-id-or-slug>",
-		Short: "Disable a job by ID or slug",
+		Short: "Delete a job by ID or slug",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := requireConfirmation(state, "Delete this job?", yes); err != nil {
@@ -367,7 +381,7 @@ func runInteractiveJobEdit(ctx context.Context, cli *client.Client, state *appSt
 
 	cmd := exec.Command(editor, tmpPath) //nolint:gosec // editor is from $EDITOR env var or default vi, tmpPath is a temp file
 	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
+	cmd.Stdout = os.Stdout // printdata-ok: subprocess stdout passthrough for $EDITOR
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return err

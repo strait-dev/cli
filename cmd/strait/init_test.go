@@ -364,9 +364,8 @@ func TestInit_TemplateFullCreatesDefinitions(t *testing.T) {
 	}
 }
 
+// TestWriteStraitIgnore_CreatesFile is not parallel: os.Chdir is process-global.
 func TestWriteStraitIgnore_CreatesFile(t *testing.T) {
-	t.Parallel()
-
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
 	t.Cleanup(func() { _ = os.Chdir(origDir) })
@@ -391,9 +390,8 @@ func TestWriteStraitIgnore_CreatesFile(t *testing.T) {
 	}
 }
 
+// TestWriteStraitIgnore_SkipsIfExists is not parallel: os.Chdir is process-global.
 func TestWriteStraitIgnore_SkipsIfExists(t *testing.T) {
-	t.Parallel()
-
 	dir := t.TempDir()
 	origDir, _ := os.Getwd()
 	t.Cleanup(func() { _ = os.Chdir(origDir) })
@@ -528,7 +526,7 @@ func TestInitFromServer_ScaffoldsJobManifest(t *testing.T) {
 	cmd := newInitCommand(state)
 	cmd.SetArgs([]string{"--from-server"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -616,7 +614,7 @@ func TestInitFromServer_ForceOverwrites(t *testing.T) {
 	cmd := newInitCommand(state)
 	cmd.SetArgs([]string{"--from-server", "--force"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error with --force: %v", err)
 		}

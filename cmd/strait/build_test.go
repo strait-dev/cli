@@ -1,16 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 )
-
-var stdoutCaptureMu sync.Mutex
 
 func TestBuildCommand_JSONEmitsSingleDocumentAndDoesNotWriteFile(t *testing.T) {
 	dir := t.TempDir()
@@ -19,11 +16,11 @@ func TestBuildCommand_JSONEmitsSingleDocumentAndDoesNotWriteFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state := &appState{opts: &rootOptions{}}
+	state := &appState{opts: &rootOptions{}, stdout: &bytes.Buffer{}}
 	cmd := newBuildCommand(state)
 	cmd.SetArgs([]string{"--config", configPath, "--json"})
 
-	output := captureCommandStdout(t, func() {
+	output := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("build --json: %v", err)
 		}
@@ -48,11 +45,11 @@ func TestBuildCommand_DryRunDoesNotWriteFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state := &appState{opts: &rootOptions{}}
+	state := &appState{opts: &rootOptions{}, stdout: &bytes.Buffer{}}
 	cmd := newBuildCommand(state)
 	cmd.SetArgs([]string{"--config", configPath, "--dry-run"})
 
-	output := captureCommandStdout(t, func() {
+	output := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("build --dry-run: %v", err)
 		}
@@ -64,37 +61,4 @@ func TestBuildCommand_DryRunDoesNotWriteFile(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, ".strait", "manifest.json")); !os.IsNotExist(err) {
 		t.Fatalf("build --dry-run should not write manifest.json, stat err=%v", err)
 	}
-}
-
-func captureCommandStdout(t *testing.T, fn func()) string {
-	t.Helper()
-	stdoutCaptureMu.Lock()
-	defer stdoutCaptureMu.Unlock()
-
-	originalStdout := os.Stdout
-	reader, writer, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("create stdout pipe: %v", err)
-	}
-
-	os.Stdout = writer
-	t.Cleanup(func() {
-		os.Stdout = originalStdout
-	})
-
-	fn()
-
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close stdout writer: %v", err)
-	}
-	data, err := io.ReadAll(reader)
-	if err != nil {
-		t.Fatalf("read stdout: %v", err)
-	}
-	if err := reader.Close(); err != nil {
-		t.Fatalf("close stdout reader: %v", err)
-	}
-
-	os.Stdout = originalStdout
-	return string(data)
 }

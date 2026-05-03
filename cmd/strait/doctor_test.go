@@ -32,7 +32,7 @@ func TestDoctorCommand_PassesWhenServerCapabilitiesEnabled(t *testing.T) {
 	cmd := newDoctorCommand(state)
 	cmd.SetArgs([]string{})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		_ = cmd.Execute()
 	})
 
@@ -65,7 +65,7 @@ func TestDoctorCommand_FailsWhenCodeDeployDisabled(t *testing.T) {
 	cmd := newDoctorCommand(state)
 	cmd.SetArgs([]string{})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil || !strings.Contains(err.Error(), "failing check") {
 			t.Fatalf("expected failing checks error, got: %v", err)
@@ -100,7 +100,7 @@ func TestDoctorCommand_WarnsWhenCapabilitiesEndpointUnavailable(t *testing.T) {
 	cmd := newDoctorCommand(state)
 	cmd.SetArgs([]string{})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		// may or may not return error depending on other checks
 		_ = cmd.Execute()
 	})
@@ -132,7 +132,7 @@ func TestDoctorCommand_RuntimeDetectedCheck(t *testing.T) {
 	cmd := newDoctorCommand(state)
 	cmd.SetArgs([]string{})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		_ = cmd.Execute()
 	})
 
@@ -165,7 +165,7 @@ func TestDoctorCommand_OutputIncludesNewChecks(t *testing.T) {
 	cmd := newDoctorCommand(state)
 	cmd.SetArgs([]string{})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		_ = cmd.Execute()
 	})
 
@@ -195,12 +195,13 @@ func TestDoctorCommand_FormatJSONOutputIsValidJSON(t *testing.T) {
 		},
 	})
 
-	// Wire through root so --format is a known flag.
-	root := newRootCommand()
-	root.SetArgs([]string{"--format", "json", "--server", srv.URL, "--api-key", "test-key", "--project", "proj-1", "doctor"})
+	state := newTestState(t, srv)
+	state.opts.outputFormat = "json"
+	cmd := newDoctorCommand(state)
+	cmd.SetArgs([]string{})
 
-	out := captureCommandOutput(t, func() {
-		_ = root.Execute()
+	out := captureStateOutput(t, state, func() {
+		_ = cmd.Execute()
 	})
 
 	var checks []doctorCheck
@@ -221,7 +222,7 @@ func TestDoctorCommand_NoJSONFlag(t *testing.T) {
 	cmd := newDoctorCommand(state)
 	cmd.SetArgs([]string{"--json"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil {
 			t.Fatal("expected error for unknown --json flag, got nil")
@@ -252,18 +253,13 @@ func TestDoctorCheckEndpoints_StandaloneIncludesLiveJobCheck(t *testing.T) {
 		},
 	})
 
-	root := newRootCommand()
-	root.SetArgs([]string{
-		"--format", "json",
-		"--server", srv.URL,
-		"--api-key", "test-key",
-		"--project", "proj-1",
-		"doctor",
-		"--check-endpoints",
-	})
+	state := newTestState(t, srv)
+	state.opts.outputFormat = "json"
+	cmd := newDoctorCommand(state)
+	cmd.SetArgs([]string{"--check-endpoints"})
 
-	out := captureCommandOutput(t, func() {
-		_ = root.Execute()
+	out := captureStateOutput(t, state, func() {
+		_ = cmd.Execute()
 	})
 
 	// Endpoint check for the live job should appear (will fail since localhost:3000 isn't running).
@@ -293,18 +289,13 @@ func TestDoctorCheckEndpoints_StandaloneNoJobsReturnsWarn(t *testing.T) {
 		},
 	})
 
-	root := newRootCommand()
-	root.SetArgs([]string{
-		"--format", "json",
-		"--server", srv.URL,
-		"--api-key", "test-key",
-		"--project", "proj-1",
-		"doctor",
-		"--check-endpoints",
-	})
+	state := newTestState(t, srv)
+	state.opts.outputFormat = "json"
+	cmd := newDoctorCommand(state)
+	cmd.SetArgs([]string{"--check-endpoints"})
 
-	out := captureCommandOutput(t, func() {
-		_ = root.Execute()
+	out := captureStateOutput(t, state, func() {
+		_ = cmd.Execute()
 	})
 
 	if !strings.Contains(out, "endpoints_live") {

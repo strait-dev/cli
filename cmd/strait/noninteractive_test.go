@@ -83,7 +83,7 @@ func TestNonInteractiveFlagShortCircuitsJobDelete(t *testing.T) {
 	cmd := newJobsCommand(state)
 	cmd.SetArgs([]string{"delete", "job-abc"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil || !strings.Contains(err.Error(), "non-interactive") {
 			t.Fatalf("expected non-interactive error, got: %v", err)
@@ -115,7 +115,7 @@ func TestNonInteractiveFlagWithYesAllowsJobDelete(t *testing.T) {
 	cmd := newJobsCommand(state)
 	cmd.SetArgs([]string{"delete", "job-abc", "--yes"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error with --yes: %v", err)
 		}

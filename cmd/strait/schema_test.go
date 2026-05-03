@@ -34,7 +34,7 @@ func TestSchemaRuntimes_OutputIsValidJSON(t *testing.T) {
 	cmd := newSchemaCommand(state)
 	cmd.SetArgs([]string{"runtimes"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -67,7 +67,7 @@ func TestSchemaJob_OutputIsValidJSON(t *testing.T) {
 	cmd := newSchemaCommand(state)
 	cmd.SetArgs([]string{"job"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -103,7 +103,7 @@ func TestSchemaDeployment_OutputIsValidJSON(t *testing.T) {
 	cmd := newSchemaCommand(state)
 	cmd.SetArgs([]string{"deployment"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -142,7 +142,7 @@ func TestSchemaWorkflow_OutputIsValidJSON(t *testing.T) {
 	cmd := newSchemaCommand(state)
 	cmd.SetArgs([]string{"workflow"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -165,7 +165,7 @@ func TestSchemaRun_ContainsRunStatuses(t *testing.T) {
 	cmd := newSchemaCommand(state)
 	cmd.SetArgs([]string{"run"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -187,7 +187,7 @@ func TestSchemaTrigger_OutputIsValidJSON(t *testing.T) {
 	cmd := newSchemaCommand(state)
 	cmd.SetArgs([]string{"trigger"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -219,7 +219,7 @@ func TestSchemaSecret_OutputIsValidJSON(t *testing.T) {
 	cmd := newSchemaCommand(state)
 	cmd.SetArgs([]string{"secret"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -251,7 +251,7 @@ func TestSchemaAPIKey_OutputIsValidJSON(t *testing.T) {
 	cmd := newSchemaCommand(state)
 	cmd.SetArgs([]string{"api-key"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

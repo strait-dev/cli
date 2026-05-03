@@ -53,7 +53,7 @@ Supported providers: github, gitlab, generic.`,
 			}
 
 			if dryRun {
-				fmt.Println(content)
+				fmt.Fprintln(state.out(), content)
 				return nil
 			}
 

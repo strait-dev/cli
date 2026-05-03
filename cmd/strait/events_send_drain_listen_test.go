@@ -28,7 +28,7 @@ func TestEvents_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newEventsCommand(state)
 	cmd.SetArgs([]string{"--run", "run-1"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -65,7 +65,7 @@ func TestSend_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newSendCommand(state)
 	cmd.SetArgs([]string{"user.signup", "--data", `{"user_id":"u1"}`})
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -113,7 +113,7 @@ func TestDrain_EmptyQueue(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newDrainCommand(state)
 	cmd.SetArgs([]string{"--timeout", "5s"})
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -132,7 +132,7 @@ func TestDrain_Timeout(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newDrainCommand(state)
 	cmd.SetArgs([]string{"--timeout", "100ms", "--interval", "20ms"})
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil || !strings.Contains(err.Error(), "drain timeout") {
 			t.Fatalf("expected drain timeout error, got: %v", err)
@@ -201,7 +201,7 @@ func TestTrace_Success(t *testing.T) {
 	cmd.SetArgs([]string{"run-1"})
 
 	// trace writes to stdout directly with fmt.Print, not printData.
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -229,7 +229,7 @@ func TestStatus_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newStatusCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -268,7 +268,7 @@ func TestDebugBundle_CreatesZip(t *testing.T) {
 	outputPath := t.TempDir() + "/debug.zip"
 	cmd := newDebugBundleCommand(state)
 	cmd.SetArgs([]string{"run-1", "--output", outputPath})
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -305,7 +305,7 @@ func TestFixturesCreate_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newFixturesCreateCommand(state)
 	cmd.SetArgs([]string{"--template", "minimal"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -341,7 +341,7 @@ func TestAPICommand_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newAPICommand(state)
 	cmd.SetArgs([]string{"GET", "/v1/custom-endpoint"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -363,7 +363,7 @@ func TestAPICommand_WithFields(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newAPICommand(state)
 	cmd.SetArgs([]string{"POST", "/v1/test", "--field", "name=test", "--field", "count=5"})
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -464,12 +464,13 @@ func TestDoctorCommand_RunsAndProducesOutput(t *testing.T) {
 			respondJSON(t, w, http.StatusOK, map[string]int{"queued": 0, "executing": 0, "delayed": 0})
 		},
 	})
-	// Use root command so --format is a known persistent flag.
-	root := newRootCommand()
-	root.SetArgs([]string{"--format", "json", "--server", srv.URL, "--api-key", "test-key", "--project", "proj-1", "doctor"})
-	out := captureCommandOutput(t, func() {
+	state := newTestState(t, srv)
+	state.opts.outputFormat = "json"
+	cmd := newDoctorCommand(state)
+	cmd.SetArgs([]string{})
+	out := captureStateOutput(t, state, func() {
 		// Doctor may fail due to env var checks, that's OK.
-		_ = root.Execute()
+		_ = cmd.Execute()
 	})
 	// Should produce JSON array of check results.
 	var checks []map[string]any

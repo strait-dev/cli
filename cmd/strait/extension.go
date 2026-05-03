@@ -78,7 +78,7 @@ func newExtensionRunCommand() *cobra.Command {
 
 			extCmd := exec.Command(binPath, args[1:]...) //nolint:gosec // extension name from CLI args, path-resolved
 			extCmd.Stdin = os.Stdin
-			extCmd.Stdout = os.Stdout
+			extCmd.Stdout = os.Stdout // printdata-ok: extension subprocess inherits the terminal
 			extCmd.Stderr = os.Stderr
 			return extCmd.Run()
 		},

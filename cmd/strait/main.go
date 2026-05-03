@@ -35,7 +35,7 @@ func run(ctx context.Context) (exitCode int) {
 	if err := newRootCommand().ExecuteContext(ctx); err != nil {
 		code := exitCodeFromError(err)
 		if isJSONOutputMode() {
-			enc := json.NewEncoder(os.Stdout)
+			enc := json.NewEncoder(os.Stdout) // printdata-ok: top-level fatal handler runs without appState in scope
 			out := map[string]any{
 				"error":     err.Error(),
 				"exit_code": code,

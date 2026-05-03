@@ -68,7 +68,7 @@ After saving, validates the config file is still loadable.`,
 
 			cmd := exec.Command(editorCmd, configPath) //nolint:gosec // editor from $EDITOR env or --editor flag
 			cmd.Stdin = os.Stdin
-			cmd.Stdout = os.Stdout
+			cmd.Stdout = os.Stdout // printdata-ok: interactive editor inherits the terminal
 			cmd.Stderr = os.Stderr
 
 			if err := cmd.Run(); err != nil {
@@ -102,7 +102,7 @@ func newConfigPathCommand(state *appState) *cobra.Command {
 				}
 				configPath = homePath
 			}
-			fmt.Println(configPath)
+			fmt.Fprintln(state.out(), configPath)
 			return nil
 		},
 	}

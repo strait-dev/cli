@@ -24,7 +24,7 @@ func TestDiagnose_RunsChecks(t *testing.T) {
 
 	// Diagnose may report failing checks due to env vars (DATABASE_URL etc.)
 	// not being set in CI. We just verify it runs and produces output.
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		_ = cmd.Execute()
 	})
 
@@ -53,7 +53,7 @@ func TestDiagnose_ServerUnreachable(t *testing.T) {
 	cmd := newDiagnoseCommand(state)
 	cmd.SetArgs([]string{})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil || !strings.Contains(err.Error(), "failing checks") {
 			t.Fatalf("expected failing checks error, got: %v", err)
@@ -72,7 +72,7 @@ func TestDiagnose_MissingConfig(t *testing.T) {
 	cmd := newDiagnoseCommand(state)
 	cmd.SetArgs([]string{})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil || !strings.Contains(err.Error(), "failing checks") {
 			t.Fatalf("expected failing checks, got: %v", err)

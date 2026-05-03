@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"os"
+	"io"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -35,16 +35,16 @@ type llmsManifest struct {
 	Commands []llmsCommand `json:"commands"`
 }
 
-// printLLMSManifest writes the full command tree of root as compact JSON to
-// stdout. Compact (no indentation) is intentional — this output is consumed by
-// LLMs where token efficiency matters.
-func printLLMSManifest(root *cobra.Command) error {
+// printLLMSManifest writes the full command tree of root as compact JSON to w.
+// Compact (no indentation) is intentional — this output is consumed by LLMs
+// where token efficiency matters.
+func printLLMSManifest(w io.Writer, root *cobra.Command) error {
 	manifest := llmsManifest{
 		CLI:      "strait",
 		Version:  version,
 		Commands: buildCommandTree(root.Commands()),
 	}
-	enc := json.NewEncoder(os.Stdout)
+	enc := json.NewEncoder(w)
 	return enc.Encode(manifest)
 }
 

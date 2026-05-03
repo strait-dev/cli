@@ -83,7 +83,7 @@ func TestJSONErrorOutput_EmitsStructuredJSON(t *testing.T) {
 	cmd.SetArgs([]string{"get", "nonexistent"})
 
 	// Capture stdout — JSON error should land there.
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		_ = cmd.Execute()
 	})
 

@@ -40,7 +40,7 @@ func TestJobsList_Success(t *testing.T) {
 	cmd := newJobsListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -83,7 +83,7 @@ func TestJobsGet_ByID(t *testing.T) {
 	cmd := newJobsGetCommand(state)
 	cmd.SetArgs([]string{"job-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -113,7 +113,7 @@ func TestJobsGet_BySlug_Resolves(t *testing.T) {
 	cmd := newJobsGetCommand(state)
 	cmd.SetArgs([]string{"test-job"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -145,7 +145,7 @@ func TestJobsCreate_Success(t *testing.T) {
 		"--endpoint", "https://example.com/hook",
 	})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -198,7 +198,7 @@ func TestJobsTrigger_Success(t *testing.T) {
 	cmd := newJobsTriggerCommand(state)
 	cmd.SetArgs([]string{"job-1", "--payload", `{"key":"value"}`})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -293,7 +293,7 @@ func TestJobsVersions_Success(t *testing.T) {
 	cmd := newJobsVersionsCommand(state)
 	cmd.SetArgs([]string{"job-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -351,7 +351,7 @@ func TestJobsTriggerBulk_Success(t *testing.T) {
 	items, _ := json.Marshal([]map[string]any{{"payload": map[string]any{"id": "1"}}})
 	cmd.SetArgs([]string{"job-1", "--items-json", string(items)})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -500,7 +500,7 @@ func TestJobsList_ShowsSourceType(t *testing.T) {
 	cmd.SetArgs([]string{"--project", "proj-test"})
 
 	var rows []map[string]any
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

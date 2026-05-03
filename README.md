@@ -17,7 +17,7 @@
 
 ---
 
-The official CLI for [Strait](https://strait.dev) — an open-source job execution and workflow orchestration platform. A single Go binary with 55+ commands covering job management, workflow orchestration, deployment, declarative GitOps, local development, and real-time monitoring.
+The official CLI for [Strait](https://strait.dev) — an open-source job execution and workflow orchestration platform. A single Go binary with 70+ top-level commands covering job and workflow management, deployment, environments and webhooks, declarative GitOps, billing and analytics, RBAC, local development, and real-time monitoring.
 
 [Website](https://strait.dev) | [Platform Repo](https://github.com/strait-dev/strait) | [Documentation](https://docs.strait.dev) | [Releases](https://github.com/strait-dev/cli/releases)
 
@@ -48,16 +48,24 @@ strait tui                                         # Open the dashboard
 
 | Category | Commands | Docs |
 |---|---|---|
-| Jobs | `create job`, `trigger`, `jobs list/get/describe/edit/delete` | [jobs](docs/cli-reference/jobs.mdx) |
-| Runs | `runs list/get/watch/cancel/replay/diff`, `wait run` | [runs](docs/cli-reference/runs.mdx) |
-| Workflows | `create workflow`, `workflows list/describe/visualize/trigger` | [workflows](docs/cli-reference/workflows.mdx) |
-| Deployment | `deploy`, `deploy create/finalize/promote/rollback/list`, `verify` | [deployment](docs/guides/deployment.mdx) |
+| Jobs | `create job`, `trigger`, `jobs list/get/describe/edit/delete/pause/resume/clone/health/dependencies/add-dependency/batch` | [jobs](docs/cli-reference/jobs.mdx) |
+| Runs | `runs list/get/watch/cancel/replay/diff/reschedule/dlq/dlq-replay/outputs/tool-calls/usage/checkpoints`, `wait run` | [runs](docs/cli-reference/runs.mdx) |
+| Workflows | `create workflow`, `workflows list/describe/visualize/trigger/clone/dry-run/plan/simulate/versions/diff/policy` | [workflows](docs/cli-reference/workflows.mdx) |
+| Workflow runs | `workflow-runs list/get/pause/resume/retry/approve-step/retry-step/skip-step/force-complete-step` | [workflow-runs](docs/cli-reference/workflow-runs.mdx) |
+| Deployment | `deploy`, `deploy create/finalize/promote/rollback/list`, `deployments create-from-source/get/logs/rollback/watch`, `verify` | [deployment](docs/guides/deployment.mdx) |
+| Environments | `environments list/get/create/update/delete/variables` | [environments](docs/cli-reference/environments.mdx) |
+| Webhooks | `webhooks list/get/create/delete/deliveries/retry/test` | [webhooks](docs/cli-reference/webhooks.mdx) |
+| Event sources | `event-sources list/get/create/update/delete` | [event-sources](docs/cli-reference/event-sources.mdx) |
+| Job groups | `job-groups list/get/create/update/delete/jobs/pause/resume/stats` | [job-groups](docs/cli-reference/job-groups.mdx) |
+| Notifications | `notifications list/get/create/update/delete` | [notifications](docs/cli-reference/notifications.mdx) |
+| Log drains | `log-drains list/get/create/update/delete` | [log-drains](docs/cli-reference/log-drains.mdx) |
 | Logs | `logs`, `events`, `send` | [logs](docs/cli-reference/logs.mdx) |
 | GitOps | `validate`, `check`, `diff`, `apply`, `export`, `build`, `project` | [gitops](docs/guides/gitops.mdx) |
 | Secrets | `secrets list/create/delete`, `api-keys list/create/rotate/revoke` | [secrets](docs/cli-reference/secrets.mdx) |
-| Team | `team list/add/remove/roles`, `audit` | [team](docs/cli-reference/team.mdx) |
+| Team | `team list/add/remove/roles`, `team policies list/create/delete`, `audit` | [team](docs/cli-reference/team.mdx) |
 | Triggers | `triggers list/get/send/purge` | [triggers](docs/cli-reference/triggers.mdx) |
-| Monitoring | `doctor`, `status`, `health`, `listen`, `top`, `trace`, `perf`, `stats` | [monitoring](docs/guides/monitoring.mdx) |
+| Monitoring | `doctor`, `status`, `health`, `listen`, `top`, `trace`, `perf`, `stats`, `analytics costs/reliability/top-failing` | [monitoring](docs/guides/monitoring.mdx) |
+| Billing | `usage current/history/forecast` | [billing](docs/cli-reference/usage.mdx) |
 | Local dev | `dev test`, `dev tunnel`, `dev status`, `run` | [local dev](docs/guides/local-development.mdx) |
 | CI/CD | `ci setup`, `ci check` | [ci-cd](docs/guides/ci-cd.mdx) |
 | Extensions | `extension list/install/run/create/remove` | [extensions](docs/guides/extensions.mdx) |

@@ -27,7 +27,7 @@ func TestWatchRunUntilDone_Completed(t *testing.T) {
 	defer srv.Close()
 
 	state := &appState{opts: &rootOptions{serverURL: srv.URL, outputFormat: "json"}}
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := watchRunUntilDone(context.Background(), state, "run-1", 10*time.Millisecond, 5*time.Second)
 		if err != nil {
 			t.Fatalf("expected nil error, got: %v", err)
@@ -45,7 +45,7 @@ func TestWatchRunUntilDone_Failed(t *testing.T) {
 	defer srv.Close()
 
 	state := &appState{opts: &rootOptions{serverURL: srv.URL, outputFormat: "json"}}
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := watchRunUntilDone(context.Background(), state, "run-1", 10*time.Millisecond, 5*time.Second)
 		if err == nil {
 			t.Fatal("expected error for failed run")
@@ -66,7 +66,7 @@ func TestWatchRunUntilDone_Timeout(t *testing.T) {
 	defer srv.Close()
 
 	state := &appState{opts: &rootOptions{serverURL: srv.URL, outputFormat: "json"}}
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := watchRunUntilDone(context.Background(), state, "run-1", 20*time.Millisecond, 100*time.Millisecond)
 		if err == nil {
 			t.Fatal("expected timeout error")
@@ -112,7 +112,7 @@ func TestWatchRunUntilDone_PrintsEachPoll(t *testing.T) {
 	defer srv.Close()
 
 	state := &appState{opts: &rootOptions{serverURL: srv.URL, outputFormat: "json"}}
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := watchRunUntilDone(context.Background(), state, "run-1", 10*time.Millisecond, 5*time.Second)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -136,7 +136,7 @@ func TestRunsWatch_DefaultSucceedsOnCompleted(t *testing.T) {
 	cmd := newRunsWatchCommand(state)
 	cmd.SetArgs([]string{"run-1", "--interval", "10ms", "--timeout", "5s"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("expected success on completed run, got: %v", err)
 		}
@@ -156,7 +156,7 @@ func TestRunsWatch_DefaultFailsOnFailed(t *testing.T) {
 	cmd := newRunsWatchCommand(state)
 	cmd.SetArgs([]string{"run-1", "--interval", "10ms", "--timeout", "5s"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil {
 			t.Fatal("expected error on failed run, got nil")
@@ -180,7 +180,7 @@ func TestRunsWatch_UntilAcceptsFailedAsSuccess(t *testing.T) {
 	cmd := newRunsWatchCommand(state)
 	cmd.SetArgs([]string{"run-1", "--until", "completed,failed", "--interval", "10ms", "--timeout", "5s"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("expected success with --until completed,failed on failed run, got: %v", err)
 		}
@@ -200,7 +200,7 @@ func TestRunsWatch_UntilFailsOnUnexpectedStatus(t *testing.T) {
 	cmd := newRunsWatchCommand(state)
 	cmd.SetArgs([]string{"run-1", "--until", "completed,failed", "--interval", "10ms", "--timeout", "5s"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil {
 			t.Fatal("expected error when status not in --until set, got nil")

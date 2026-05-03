@@ -21,6 +21,7 @@ func newCodeDeploymentsCommand(state *appState) *cobra.Command {
 	}
 
 	cmd.AddCommand(newCodeDeploymentsListCommand(state))
+	cmd.AddCommand(newCodeDeploymentsCreateFromSourceCommand(state))
 
 	getCmd, getJobSlug := newCodeDeploymentGetCommand(state)
 	getCmd.ValidArgsFunction = completeDeploymentIDs(state, func() string { return *getJobSlug })
@@ -207,13 +208,14 @@ func newCodeDeploymentLogsCommand(state *appState) (*cobra.Command, *string) {
 			// explicitly request non-streaming output.
 			wantStream := stream || d.Status == "building"
 			if wantStream {
+				w := state.out()
 				return cli.StreamDeploymentLogs(cmd.Context(), job.ID, deploymentID, func(chunk string) error {
-					fmt.Fprint(os.Stdout, chunk)
+					fmt.Fprint(w, chunk)
 					return nil
 				})
 			}
 
-			fmt.Print(d.BuildLogs)
+			fmt.Fprint(state.out(), d.BuildLogs)
 			return nil
 		},
 	}
@@ -372,8 +374,9 @@ Safe to use in CI pipelines and agent workflows.`,
 
 			// Try streaming logs first.
 			streamCompleted := false
+			w := state.out()
 			streamErr := cli.StreamDeploymentLogs(ctx, job.ID, deploymentID, func(chunk string) error {
-				fmt.Fprint(os.Stdout, chunk)
+				fmt.Fprint(w, chunk)
 				return nil
 			})
 			if streamErr == nil {

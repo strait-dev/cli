@@ -33,7 +33,7 @@ func TestSecretsList_Success(t *testing.T) {
 	cmd := newSecretsListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -60,7 +60,7 @@ func TestSecretsList_FilterEnv(t *testing.T) {
 	cmd := newSecretsListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test", "--environment", "production"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -91,7 +91,7 @@ func TestSecretsCreate_Success(t *testing.T) {
 		"--value", "s3cret",
 	})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

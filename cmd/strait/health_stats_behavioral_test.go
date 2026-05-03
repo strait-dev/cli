@@ -16,7 +16,7 @@ func TestHealth_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newHealthCommand(state)
 	cmd.SetArgs([]string{})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -36,7 +36,7 @@ func TestHealthReady_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newHealthCommand(state)
 	cmd.SetArgs([]string{"--ready"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -58,7 +58,7 @@ func TestStats_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newStatsCommand(state)
 	cmd.SetArgs([]string{})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

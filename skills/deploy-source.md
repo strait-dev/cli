@@ -28,7 +28,7 @@ Returns a JSON list of supported runtimes and their marker files.
 ### 2. Dry-run to verify what will be packed
 
 ```
-strait deploy source --job <job-slug> --dry-run --dir <path>
+strait deployments create-from-source --job <job-slug> --dry-run --dir <path>
 ```
 
 Prints the list of files that would be included without uploading anything.
@@ -37,13 +37,17 @@ Use this to verify `.straitignore` is excluding unnecessary files.
 ### 3. Deploy
 
 ```
-strait deploy source \
+strait deployments create-from-source \
   --job <job-slug> \
   --dir <path> \
   --runtime <runtime>
 ```
 
 Omit `--runtime` to auto-detect from the source directory.
+
+> The legacy `strait deploy source` form continues to work but prints a
+> deprecation warning. New code paths should use
+> `strait deployments create-from-source`.
 
 ### 4. Watch the build (if you need to wait for completion)
 
@@ -73,7 +77,7 @@ strait deployments rollback <deployment-id> --job <job-slug> --yes
 ## Example (non-interactive / agent mode)
 
 ```bash
-strait deploy source \
+strait deployments create-from-source \
   --job payment-processor \
   --dir ./services/payments \
   --runtime go \

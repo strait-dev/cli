@@ -50,7 +50,7 @@ func TestDebugRequestCommand_GETReturnsJSON(t *testing.T) {
 	cmd := newDebugRequestCommand(state)
 	cmd.SetArgs([]string{"GET", "/v1/jobs"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -76,7 +76,7 @@ func TestDebugRequestCommand_POSTWithBody(t *testing.T) {
 	cmd := newDebugRequestCommand(state)
 	cmd.SetArgs([]string{"POST", "/v1/jobs", "--body", `{"name":"test","slug":"test"}`})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -114,7 +114,7 @@ func TestDebugRequestCommand_NonJSONResponsePrinted(t *testing.T) {
 	cmd := newDebugRequestCommand(state)
 	cmd.SetArgs([]string{"GET", "/v1/health"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -140,7 +140,7 @@ func TestDebugRequestCommand_SendsAuthHeader(t *testing.T) {
 	cmd := newDebugRequestCommand(state)
 	cmd.SetArgs([]string{"GET", "/v1/jobs"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

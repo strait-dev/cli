@@ -32,7 +32,7 @@ func TestTriggersList_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newTriggersListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -65,7 +65,7 @@ func TestTriggersGet_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newTriggersGetCommand(state)
 	cmd.SetArgs([]string{"my-event-key"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -85,7 +85,7 @@ func TestTriggersSend_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newTriggersSendCommand(state)
 	cmd.SetArgs([]string{"my-event-key", "--payload", `{"data":"value"}`})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -105,7 +105,7 @@ func TestTriggersPurge_Success(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newTriggersPurgeCommand(state)
 	cmd.SetArgs([]string{"--older-than", "30"})
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

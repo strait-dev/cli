@@ -87,6 +87,26 @@ type HealthStatus struct {
 	Status string `json:"status"`
 }
 
+// BulkCancelRunsRequest is the request body for bulk-canceling runs.
+type BulkCancelRunsRequest struct {
+	IDs []string `json:"ids"`
+}
+
+// BulkCancelResult is the per-run result inside a bulk cancel response.
+type BulkCancelResult struct {
+	ID       string `json:"id"`
+	Canceled bool   `json:"canceled"`
+	Status   string `json:"status,omitempty"`
+	Error    string `json:"error,omitempty"`
+}
+
+// BulkCancelRunsResponse is the response from bulk-canceling runs.
+type BulkCancelRunsResponse struct {
+	Results  []BulkCancelResult `json:"results"`
+	Total    int                `json:"total"`
+	Canceled int                `json:"canceled"`
+}
+
 // WorkflowStepRequest is a step definition in workflow create/update requests.
 type WorkflowStepRequest struct {
 	JobID     string          `json:"job_id"`
@@ -393,4 +413,167 @@ type RunStreamMessage struct {
 	From      string          `json:"from,omitempty"`
 	To        string          `json:"to,omitempty"`
 	Error     string          `json:"error,omitempty"`
+}
+
+// CreateEnvironmentRequest is the request body for creating an environment.
+type CreateEnvironmentRequest struct {
+	ProjectID  string            `json:"project_id"`
+	Name       string            `json:"name"`
+	Slug       string            `json:"slug"`
+	ParentID   string            `json:"parent_id,omitempty"`
+	IsStandard bool              `json:"is_standard,omitempty"`
+	Variables  map[string]string `json:"variables,omitempty"`
+}
+
+// UpdateEnvironmentRequest is the request body for updating an environment.
+type UpdateEnvironmentRequest struct {
+	Name      *string            `json:"name,omitempty"`
+	Slug      *string            `json:"slug,omitempty"`
+	ParentID  *string            `json:"parent_id,omitempty"`
+	Variables *map[string]string `json:"variables,omitempty"`
+}
+
+// CreateWebhookRequest is the request body for creating a webhook subscription.
+type CreateWebhookRequest struct {
+	ProjectID  string   `json:"project_id"`
+	URL        string   `json:"url"`
+	Events     []string `json:"events"`
+	Secret     string   `json:"secret,omitempty"`
+	Active     *bool    `json:"active,omitempty"`
+	HeadersRaw string   `json:"-"`
+}
+
+// UpdateWebhookRequest is the request body for updating a webhook.
+type UpdateWebhookRequest struct {
+	URL    *string   `json:"url,omitempty"`
+	Events *[]string `json:"events,omitempty"`
+	Secret *string   `json:"secret,omitempty"`
+	Active *bool     `json:"active,omitempty"`
+}
+
+// TestWebhookResponse is the response from a webhook test ping.
+type TestWebhookResponse struct {
+	DeliveryID string `json:"delivery_id"`
+	Status     string `json:"status"`
+}
+
+// CreateEventSourceRequest is the request body for creating an event source.
+type CreateEventSourceRequest struct {
+	ProjectID string          `json:"project_id"`
+	Name      string          `json:"name"`
+	Slug      string          `json:"slug"`
+	Type      string          `json:"type"`
+	Config    json.RawMessage `json:"config,omitempty"`
+	Enabled   *bool           `json:"enabled,omitempty"`
+}
+
+// UpdateEventSourceRequest is the request body for updating an event source.
+type UpdateEventSourceRequest struct {
+	Name    *string          `json:"name,omitempty"`
+	Slug    *string          `json:"slug,omitempty"`
+	Config  *json.RawMessage `json:"config,omitempty"`
+	Enabled *bool            `json:"enabled,omitempty"`
+}
+
+// CreateJobGroupRequest is the request body for creating a job group.
+type CreateJobGroupRequest struct {
+	ProjectID   string `json:"project_id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	Description string `json:"description,omitempty"`
+}
+
+// UpdateJobGroupRequest is the request body for updating a job group.
+type UpdateJobGroupRequest struct {
+	Name        *string `json:"name,omitempty"`
+	Slug        *string `json:"slug,omitempty"`
+	Description *string `json:"description,omitempty"`
+}
+
+// CreateNotificationChannelRequest is the request body for creating a notification channel.
+type CreateNotificationChannelRequest struct {
+	ProjectID string          `json:"project_id"`
+	Name      string          `json:"name"`
+	Type      string          `json:"type"`
+	Config    json.RawMessage `json:"config"`
+	Enabled   *bool           `json:"enabled,omitempty"`
+}
+
+// UpdateNotificationChannelRequest is the request body for updating a notification channel.
+type UpdateNotificationChannelRequest struct {
+	Name    *string          `json:"name,omitempty"`
+	Config  *json.RawMessage `json:"config,omitempty"`
+	Enabled *bool            `json:"enabled,omitempty"`
+}
+
+// CreateLogDrainRequest is the request body for creating a log drain.
+type CreateLogDrainRequest struct {
+	ProjectID string          `json:"project_id"`
+	Name      string          `json:"name"`
+	Type      string          `json:"type"`
+	Config    json.RawMessage `json:"config"`
+	Enabled   *bool           `json:"enabled,omitempty"`
+}
+
+// UpdateLogDrainRequest is the request body for updating a log drain.
+type UpdateLogDrainRequest struct {
+	Name    *string          `json:"name,omitempty"`
+	Config  *json.RawMessage `json:"config,omitempty"`
+	Enabled *bool            `json:"enabled,omitempty"`
+}
+
+// CloneJobRequest is the request body for cloning a job.
+type CloneJobRequest struct {
+	Name string `json:"name,omitempty"`
+	Slug string `json:"slug,omitempty"`
+}
+
+// AddJobDependencyRequest is the request body for adding a job dependency.
+type AddJobDependencyRequest struct {
+	DependsOn string `json:"depends_on"`
+	Type      string `json:"type,omitempty"`
+}
+
+// BatchUpdateJobsRequest is the request body for batch-updating jobs.
+type BatchUpdateJobsRequest struct {
+	Updates []BatchJobUpdate `json:"updates"`
+}
+
+// BatchJobUpdate is a single update entry in a batch.
+type BatchJobUpdate struct {
+	ID    string           `json:"id"`
+	Patch UpdateJobRequest `json:"patch"`
+}
+
+// BatchUpdateJobsResponse summarises a batch update.
+type BatchUpdateJobsResponse struct {
+	Updated []string `json:"updated"`
+	Failed  []struct {
+		ID     string `json:"id"`
+		Reason string `json:"reason"`
+	} `json:"failed,omitempty"`
+}
+
+// CloneWorkflowRequest is the request body for cloning a workflow.
+type CloneWorkflowRequest struct {
+	Name string `json:"name,omitempty"`
+	Slug string `json:"slug,omitempty"`
+}
+
+// SetWorkflowPolicyRequest is the request body for setting a workflow policy.
+type SetWorkflowPolicyRequest struct {
+	Policy json.RawMessage `json:"policy"`
+}
+
+// RescheduleRunRequest is the request body for rescheduling a run.
+type RescheduleRunRequest struct {
+	ScheduledAt time.Time `json:"scheduled_at"`
+}
+
+// CreateTeamPolicyRequest is the request body for creating a team policy.
+type CreateTeamPolicyRequest struct {
+	Name            string   `json:"name"`
+	ResourcePattern string   `json:"resource_pattern,omitempty"`
+	TagPattern      string   `json:"tag_pattern,omitempty"`
+	Permissions     []string `json:"permissions"`
 }

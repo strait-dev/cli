@@ -37,7 +37,7 @@ func TestCleanup_DryRun(t *testing.T) {
 	cmd := newCleanupCommand(state)
 	cmd.SetArgs([]string{"--runs-older-than", "720h", "--dry-run"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -64,7 +64,7 @@ func TestCleanup_NoMatches(t *testing.T) {
 	cmd := newCleanupCommand(state)
 	cmd.SetArgs([]string{"--runs-older-than", "720h"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -92,7 +92,7 @@ func TestCleanup_CIBlocksPrompt(t *testing.T) {
 	cmd := newCleanupCommand(state)
 	cmd.SetArgs([]string{"--runs-older-than", "720h"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		err := cmd.Execute()
 		if err == nil || !strings.Contains(err.Error(), "non-interactive") {
 			t.Fatalf("expected non-interactive error, got: %v", err)

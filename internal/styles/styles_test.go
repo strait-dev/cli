@@ -429,6 +429,89 @@ func TestStatus(t *testing.T) {
 	}
 }
 
+func TestSafeText(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "empty", in: "", want: ""},
+		{name: "plain ASCII", in: "hello world", want: "hello world"},
+		{name: "preserve newline", in: "line1\nline2", want: "line1\nline2"},
+		{name: "preserve tab", in: "a\tb", want: "a\tb"},
+		{name: "strip ESC", in: "before\x1b[2Jafter", want: "before�[2Jafter"},
+		{name: "strip BEL", in: "ding\x07ding", want: "ding�ding"},
+		{name: "strip BS", in: "abc\x08def", want: "abc�def"},
+		{name: "strip CR", in: "abc\rxyz", want: "abc�xyz"},
+		{name: "strip null", in: "a\x00b", want: "a�b"},
+		{name: "strip DEL", in: "a\x7fb", want: "a�b"},
+		{name: "strip OSC title-set", in: "\x1b]0;evil-title\x07rest", want: "�]0;evil-title�rest"},
+		{name: "preserve unicode", in: "héllo 世界 ✓", want: "héllo 世界 ✓"},
+		{name: "all controls", in: "\x00\x01\x02\x03\x04\x05\x06\x07", want: "��������"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := SafeText(tc.in)
+			if got != tc.want {
+				t.Fatalf("SafeText(%q): got %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestSafeTextNoEscapesLeak(t *testing.T) {
+	t.Parallel()
+
+	hostile := []string{
+		"\x1b[2J",
+		"\x1b]0;hacked\x07",
+		"\x1b[?1049h",
+		"good\x1bbad",
+	}
+	for _, h := range hostile {
+		out := SafeText(h)
+		if strings.ContainsAny(out, "\x1b\x07\x00\x08\r") {
+			t.Fatalf("SafeText(%q) leaked control chars: %q", h, out)
+		}
+	}
+}
+
+func TestStyleHelpersSanitizeServerInput(t *testing.T) {
+	t.Parallel()
+
+	hostile := "evil\x1b[2J\x07name"
+
+	helpers := map[string]string{
+		"DetailLine label": DetailLine(hostile, "ok"),
+		"DetailLine value": DetailLine("ok", hostile),
+		"KeyValue key":     KeyValue(hostile, "ok"),
+		"KeyValue value":   KeyValue("ok", hostile),
+		"SectionHeader":    SectionHeader(hostile, 0),
+		"Status":           Status(hostile),
+		"StatusBadge":      StatusBadge(hostile),
+		"LogLevel":         LogLevel(hostile),
+		"FilePath":         FilePath(hostile),
+		"ResourceKind":     ResourceKind(hostile),
+		"Success":          Success(hostile),
+		"Warn":             Warn(hostile),
+		"Err":              Err(hostile),
+		"Info":             Info(hostile),
+	}
+
+	for name, out := range helpers {
+		if strings.Contains(out, "\x1b[2J") {
+			t.Errorf("%s: leaked ESC sequence: %q", name, out)
+		}
+		if strings.ContainsRune(out, '\x07') {
+			t.Errorf("%s: leaked BEL: %q", name, out)
+		}
+	}
+}
+
 func TestForceNoColor(t *testing.T) {
 	// Not parallel -- modifies global state, but init() already called it.
 	funcs := map[string]string{
