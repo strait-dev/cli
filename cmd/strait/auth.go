@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"syscall"
 	"time"
 
 	cliauth "github.com/strait-dev/cli/internal/auth"
@@ -17,7 +16,6 @@ import (
 	"github.com/strait-dev/cli/internal/styles"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 func newLoginCommand(state *appState) *cobra.Command {
@@ -61,7 +59,7 @@ an API key directly, or --with-token to read one from stdin.`,
 			}
 
 			// Non-interactive or non-TTY without explicit token: error with guidance.
-			if state.opts.nonInteractive || !term.IsTerminal(syscall.Stdin) {
+			if state.opts.nonInteractive || !stdinIsTerminal() {
 				return fmt.Errorf("non-interactive mode: use --token <api-key> or STRAIT_API_KEY env var to authenticate")
 			}
 
@@ -360,7 +358,7 @@ func resolveAPIKeyInput(flagValue string, withToken bool) (string, error) {
 	}
 
 	fmt.Fprint(os.Stderr, "API key: ")
-	secret, err := term.ReadPassword(syscall.Stdin)
+	secret, err := readStdinPassword()
 	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return "", err

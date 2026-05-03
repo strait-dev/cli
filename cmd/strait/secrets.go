@@ -7,7 +7,6 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"syscall"
 
 	"github.com/strait-dev/cli/internal/client"
 	cliconfig "github.com/strait-dev/cli/internal/config"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/zalando/go-keyring"
-	"golang.org/x/term"
 )
 
 const secretServiceName = "strait-secrets"
@@ -395,7 +393,7 @@ func resolveSecretValue(fromEnv, fromFile string) (string, error) {
 	}
 
 	fmt.Fprint(os.Stderr, "Secret value: ")
-	secret, err := term.ReadPassword(syscall.Stdin)
+	secret, err := readStdinPassword()
 	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return "", err
