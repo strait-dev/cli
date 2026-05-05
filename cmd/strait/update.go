@@ -107,7 +107,7 @@ func updateCachePath() string {
 	return filepath.Join(home, ".cache", "strait", "update-check.json")
 }
 
-func newUpgradeCommand() *cobra.Command {
+func newUpgradeCommand(state *appState) *cobra.Command {
 	var apply bool
 
 	cmd := &cobra.Command{
@@ -125,17 +125,18 @@ With --apply, downloads and replaces the current binary in place.`,
 
 			setCachedUpdate(latest)
 
+			w := state.out()
 			current := strings.TrimPrefix(version, "v")
 			if current == latest {
-				fmt.Printf("Already up to date (v%s)\n", current)
+				fmt.Fprintf(w, "Already up to date (v%s)\n", current)
 				return nil
 			}
 
-			fmt.Printf("Current: v%s\nLatest:  v%s\n", current, latest)
+			fmt.Fprintf(w, "Current: v%s\nLatest:  v%s\n", current, latest)
 
 			if !apply {
-				fmt.Println("\nTo upgrade, run: strait upgrade --apply")
-				fmt.Printf("Or download from: https://github.com/strait-dev/cli/releases/tag/v%s\n", latest)
+				fmt.Fprintln(w, "\nTo upgrade, run: strait upgrade --apply")
+				fmt.Fprintf(w, "Or download from: https://github.com/strait-dev/cli/releases/tag/v%s\n", latest)
 				return nil
 			}
 
@@ -167,7 +168,7 @@ func selfUpdate(version string) error {
 	}
 
 	downloadURL := fmt.Sprintf("https://github.com/strait-dev/cli/releases/download/v%s/%s", version, archiveName)
-	fmt.Printf("Downloading %s...\n", downloadURL)
+	fmt.Fprintf(os.Stderr, "Downloading %s...\n", downloadURL)
 
 	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Get(downloadURL) //nolint:noctx // short-lived CLI command
@@ -215,7 +216,7 @@ func selfUpdate(version string) error {
 		return fmt.Errorf("replace binary: %w (try running with elevated permissions)", err)
 	}
 
-	fmt.Printf("Upgraded to v%s\n", version)
+	fmt.Fprintf(os.Stderr, "Upgraded to v%s\n", version)
 	return nil
 }
 

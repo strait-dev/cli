@@ -171,7 +171,7 @@ func TestLogsCommand_FollowReturnsEventListError(t *testing.T) {
 	cmd.SetArgs([]string{"--follow", "--run", "run-1"})
 
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "request failed with status 502") {
+	if err == nil || !strings.Contains(err.Error(), "request failed (502)") {
 		t.Fatalf("expected event list error, got: %v", err)
 	}
 }

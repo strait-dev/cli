@@ -10,6 +10,7 @@ import (
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/dag"
 	"github.com/strait-dev/cli/internal/styles"
+	"github.com/strait-dev/cli/internal/validate"
 
 	"github.com/spf13/cobra"
 )
@@ -18,6 +19,7 @@ func newWorkflowsCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "workflows",
 		Short: "Manage workflows",
+		Long:  idOrSlugLong("workflow", "Manage workflows."),
 	}
 
 	getCmd := newWorkflowsGetCommand(state)
@@ -34,6 +36,20 @@ func newWorkflowsCommand(state *appState) *cobra.Command {
 	triggerCmd.ValidArgsFunction = completeWorkflowSlugs(state)
 	visualizeCmd := newWorkflowsVisualizeCommand(state)
 	visualizeCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	cloneCmd := newWorkflowsCloneCommand(state)
+	cloneCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	dryRunCmd := newWorkflowsDryRunCommand(state)
+	dryRunCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	planCmd := newWorkflowsPlanCommand(state)
+	planCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	simulateCmd := newWorkflowsSimulateCommand(state)
+	simulateCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	versionsCmd := newWorkflowsVersionsCommand(state)
+	versionsCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	diffCmd := newWorkflowsDiffCommand(state)
+	diffCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	policyCmd := newWorkflowsPolicyCommand(state)
+	policyCmd.ValidArgsFunction = completeWorkflowSlugs(state)
 
 	cmd.AddCommand(newWorkflowsListCommand(state))
 	cmd.AddCommand(getCmd)
@@ -44,6 +60,13 @@ func newWorkflowsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(runsCmd)
 	cmd.AddCommand(triggerCmd)
 	cmd.AddCommand(visualizeCmd)
+	cmd.AddCommand(cloneCmd)
+	cmd.AddCommand(dryRunCmd)
+	cmd.AddCommand(planCmd)
+	cmd.AddCommand(simulateCmd)
+	cmd.AddCommand(versionsCmd)
+	cmd.AddCommand(diffCmd)
+	cmd.AddCommand(policyCmd)
 
 	return cmd
 }
@@ -500,18 +523,28 @@ func newWorkflowsTriggerCommand(state *appState) *cobra.Command {
 }
 
 func resolveWorkflowIdentifier(ctx context.Context, cli *client.Client, state *appState, idOrSlug string) (string, error) {
-	if _, err := cli.GetWorkflow(ctx, idOrSlug); err == nil {
+	if err := validate.SlugOrID(idOrSlug); err != nil {
+		return "", fmt.Errorf("invalid workflow identifier: %w", err)
+	}
+	if validate.IsUUID(idOrSlug) {
 		return idOrSlug, nil
 	}
+	_, err := cli.GetWorkflow(ctx, idOrSlug)
+	if err == nil {
+		return idOrSlug, nil
+	}
+	if !client.IsNotFound(err) {
+		return "", fmt.Errorf("resolving workflow %q: %w", idOrSlug, err)
+	}
 
-	projectID, err := requireProjectID(state, "")
-	if err != nil {
+	projectID, perr := requireProjectID(state, "")
+	if perr != nil {
 		return "", fmt.Errorf("project is required to resolve slug %q", idOrSlug)
 	}
 
-	workflows, err := cli.ListWorkflows(ctx, projectID)
-	if err != nil {
-		return "", fmt.Errorf("resolving workflow %q: %w", idOrSlug, err)
+	workflows, lerr := cli.ListWorkflows(ctx, projectID)
+	if lerr != nil {
+		return "", fmt.Errorf("resolving workflow %q: %w", idOrSlug, lerr)
 	}
 
 	for _, workflow := range workflows {
@@ -569,8 +602,35 @@ func newWorkflowsVisualizeCommand(state *appState) *cobra.Command {
 				}
 			}
 
+			format := state.opts.outputFormat
+			if format != "" && format != "table" && format != "wide" {
+				nodes := make([]map[string]any, 0, len(wf.Steps))
+				for _, s := range wf.Steps {
+					node := map[string]any{
+						"step_ref":   s.StepRef,
+						"depends_on": s.DependsOn,
+					}
+					if statusMap != nil {
+						node["status"] = statusMap[s.StepRef]
+					}
+					nodes = append(nodes, node)
+				}
+				edges := make([]map[string]any, 0)
+				for _, s := range wf.Steps {
+					for _, dep := range s.DependsOn {
+						edges = append(edges, map[string]any{"from": dep, "to": s.StepRef})
+					}
+				}
+				return printData(state, map[string]any{
+					"workflow_id":     workflowID,
+					"workflow_run_id": workflowRunID,
+					"nodes":           nodes,
+					"edges":           edges,
+				})
+			}
+
 			rendered := dag.RenderDAG(steps, statusMap)
-			fmt.Print(rendered)
+			fmt.Fprint(state.out(), rendered)
 			return nil
 		},
 	}

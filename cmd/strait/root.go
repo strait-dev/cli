@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"runtime"
@@ -40,6 +41,21 @@ type appState struct {
 	configPath string
 	config     *cliconfig.File
 	resolved   cliconfig.Resolved
+	// stdout is where machine-readable output (printData, printQuietIDs,
+	// renderAuditVerify, printLLMSManifest, etc.) is written. When nil it
+	// defaults to os.Stdout. Tests inject a *bytes.Buffer to capture output
+	// without swapping the global os.Stdout under a process-wide mutex,
+	// which previously caused parallel-test races and flakes.
+	stdout io.Writer
+}
+
+// out returns the writer for machine-readable output, defaulting to os.Stdout
+// when no writer has been injected.
+func (s *appState) out() io.Writer {
+	if s.stdout == nil {
+		return os.Stdout // printdata-ok: this method *is* the official accessor for stdout
+	}
+	return s.stdout
 }
 
 func newRootCommand() *cobra.Command {
@@ -56,7 +72,7 @@ func newRootCommand() *cobra.Command {
 		// RunE handles `strait --llms` (no subcommand).
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if llms {
-				return printLLMSManifest(cmd)
+				return printLLMSManifest(state.out(), cmd)
 			}
 			return cmd.Help()
 		},
@@ -174,7 +190,7 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newDevCommand(state))
 	cmd.AddCommand(newInitCommand(state))
 	cmd.AddCommand(newVersionCommand(state))
-	cmd.AddCommand(newCompletionCommand(cmd))
+	cmd.AddCommand(newCompletionCommand(state, cmd))
 	cmd.AddCommand(newContextCommand(state))
 	cmd.AddCommand(newAliasCommand(state))
 	cmd.AddCommand(newLoginCommand(state))
@@ -214,7 +230,7 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newListenCommand(state))
 	cmd.AddCommand(newDrainCommand(state))
 	cmd.AddCommand(newTraceCommand(state))
-	cmd.AddCommand(newUpgradeCommand())
+	cmd.AddCommand(newUpgradeCommand(state))
 	cmd.AddCommand(newBackupCommand(state))
 	cmd.AddCommand(newProfileCommand(state))
 	cmd.AddCommand(newDeployCommand(state))
@@ -234,6 +250,14 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newConfigCommand(state))
 	cmd.AddCommand(newSchemaCommand(state))
 	cmd.AddCommand(newAgentCommand(state))
+	cmd.AddCommand(newEnvironmentsCommand(state))
+	cmd.AddCommand(newWebhooksCommand(state))
+	cmd.AddCommand(newEventSourcesCommand(state))
+	cmd.AddCommand(newJobGroupsCommand(state))
+	cmd.AddCommand(newNotificationsCommand(state))
+	cmd.AddCommand(newLogDrainsCommand(state))
+	cmd.AddCommand(newUsageCommand(state))
+	cmd.AddCommand(newAnalyticsCommand(state))
 
 	rawArgs := os.Args[1:]
 	configPath := extractConfigPath(rawArgs)
@@ -334,6 +358,21 @@ func normalizeLegacyArgs(args []string) []string {
 		"config":        {},
 		"schema":        {},
 		"agent":         {},
+		"environments":  {},
+		"environment":   {},
+		"envs":          {},
+		"env":           {},
+		"webhooks":      {},
+		"event-sources": {},
+		"event-source":  {},
+		"job-groups":    {},
+		"job-group":     {},
+		"notifications": {},
+		"notification":  {},
+		"log-drains":    {},
+		"log-drain":     {},
+		"usage":         {},
+		"analytics":     {},
 	}
 
 	first := args[0]
@@ -366,8 +405,9 @@ func newVersionCommand(state *appState) *cobra.Command {
 		Use:   "version",
 		Short: "Print CLI version information",
 		RunE: func(_ *cobra.Command, _ []string) error {
+			w := state.out()
 			if short {
-				fmt.Println(version)
+				fmt.Fprintln(w, version)
 				return nil
 			}
 
@@ -395,29 +435,29 @@ func newVersionCommand(state *appState) *cobra.Command {
 			}
 
 			if asJSON {
-				enc := json.NewEncoder(os.Stdout)
+				enc := json.NewEncoder(w)
 				enc.SetIndent("", "  ")
 				return enc.Encode(info)
 			}
 
 			if isTTYRich(state) {
-				fmt.Println(styles.TitleStyle.Render("Strait CLI"))
-				fmt.Println(styles.KeyValue("Version", info["version"]))
-				fmt.Println(styles.KeyValue("Commit", info["commit"]))
-				fmt.Println(styles.KeyValue("Date", info["date"]))
-				fmt.Println(styles.KeyValue("Go", info["go"]))
-				fmt.Println(styles.KeyValue("OS/Arch", info["os_arch"]))
+				fmt.Fprintln(w, styles.TitleStyle.Render("Strait CLI"))
+				fmt.Fprintln(w, styles.KeyValue("Version", info["version"]))
+				fmt.Fprintln(w, styles.KeyValue("Commit", info["commit"]))
+				fmt.Fprintln(w, styles.KeyValue("Date", info["date"]))
+				fmt.Fprintln(w, styles.KeyValue("Go", info["go"]))
+				fmt.Fprintln(w, styles.KeyValue("OS/Arch", info["os_arch"]))
 				if checkServer {
-					fmt.Println(styles.KeyValue("Server", info["server"]))
+					fmt.Fprintln(w, styles.KeyValue("Server", info["server"]))
 				}
 			} else {
-				fmt.Printf("version: %s\n", info["version"])
-				fmt.Printf("commit: %s\n", info["commit"])
-				fmt.Printf("date: %s\n", info["date"])
-				fmt.Printf("go: %s\n", info["go"])
-				fmt.Printf("os/arch: %s\n", info["os_arch"])
+				fmt.Fprintf(w, "version: %s\n", info["version"])
+				fmt.Fprintf(w, "commit: %s\n", info["commit"])
+				fmt.Fprintf(w, "date: %s\n", info["date"])
+				fmt.Fprintf(w, "go: %s\n", info["go"])
+				fmt.Fprintf(w, "os/arch: %s\n", info["os_arch"])
 				if checkServer {
-					fmt.Printf("server: %s\n", info["server"])
+					fmt.Fprintf(w, "server: %s\n", info["server"])
 				}
 			}
 
@@ -432,12 +472,12 @@ func newVersionCommand(state *appState) *cobra.Command {
 				if latest != "" {
 					current := strings.TrimPrefix(version, "v")
 					if current == latest {
-						fmt.Println("update: up to date")
+						fmt.Fprintln(w, "update: up to date")
 					} else {
-						fmt.Printf("update: v%s available (current: v%s)\n", latest, current)
+						fmt.Fprintf(w, "update: v%s available (current: v%s)\n", latest, current)
 					}
 				} else {
-					fmt.Println("update: check failed")
+					fmt.Fprintln(w, "update: check failed")
 				}
 			}
 			return nil
@@ -452,22 +492,23 @@ func newVersionCommand(state *appState) *cobra.Command {
 	return cmd
 }
 
-func newCompletionCommand(root *cobra.Command) *cobra.Command {
+func newCompletionCommand(state *appState, root *cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:       "completion [bash|zsh|fish|powershell]",
 		Short:     "Generate shell completion scripts",
 		ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
 		Args:      cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
+			w := state.out()
 			switch args[0] {
 			case "bash":
-				return root.GenBashCompletion(os.Stdout)
+				return root.GenBashCompletion(w)
 			case "zsh":
-				return root.GenZshCompletion(os.Stdout)
+				return root.GenZshCompletion(w)
 			case "fish":
-				return root.GenFishCompletion(os.Stdout, true)
+				return root.GenFishCompletion(w, true)
 			case "powershell":
-				return root.GenPowerShellCompletionWithDesc(os.Stdout)
+				return root.GenPowerShellCompletionWithDesc(w)
 			default:
 				return fmt.Errorf("unsupported shell %q", args[0])
 			}

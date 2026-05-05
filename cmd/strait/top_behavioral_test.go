@@ -286,7 +286,7 @@ func TestTopJobsCommand_ReturnsListErrors(t *testing.T) {
 		cmd := newTopJobsCommand(state)
 		cmd.SetArgs([]string{"--project", "proj-test"})
 		err := cmd.Execute()
-		if err == nil || !strings.Contains(err.Error(), "request failed with status 502") {
+		if err == nil || !strings.Contains(err.Error(), "request failed (502)") {
 			t.Fatalf("expected list jobs error, got: %v", err)
 		}
 	})
@@ -305,7 +305,7 @@ func TestTopJobsCommand_ReturnsListErrors(t *testing.T) {
 		cmd := newTopJobsCommand(state)
 		cmd.SetArgs([]string{"--project", "proj-test"})
 		err := cmd.Execute()
-		if err == nil || !strings.Contains(err.Error(), "request failed with status 502") {
+		if err == nil || !strings.Contains(err.Error(), "request failed (502)") {
 			t.Fatalf("expected list runs error, got: %v", err)
 		}
 	})

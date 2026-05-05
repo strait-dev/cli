@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -26,6 +27,9 @@ func (c *Client) ListJobs(ctx context.Context, projectID string) ([]types.Job, e
 
 // GetJob returns a job by ID.
 func (c *Client) GetJob(ctx context.Context, id string) (*types.Job, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
 	var out types.Job
 	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/jobs", id), nil, nil, &out); err != nil {
 		return nil, err
@@ -48,11 +52,17 @@ func (c *Client) CreateJob(ctx context.Context, req CreateJobRequest, idempotenc
 
 // DeleteJob deletes a job by ID.
 func (c *Client) DeleteJob(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid job id: %w", err)
+	}
 	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/jobs", id), nil, nil, nil)
 }
 
 // UpdateJob updates a job by ID.
 func (c *Client) UpdateJob(ctx context.Context, id string, req UpdateJobRequest) (*types.Job, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
 	var out types.Job
 	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/jobs", id), nil, req, &out); err != nil {
 		return nil, err
@@ -62,6 +72,9 @@ func (c *Client) UpdateJob(ctx context.Context, id string, req UpdateJobRequest)
 
 // TriggerJob triggers a job run.
 func (c *Client) TriggerJob(ctx context.Context, jobID string, req TriggerJobRequest, idempotencyKey string) (*TriggerJobResponse, error) {
+	if err := validatePathSegment(jobID); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
 	var out TriggerJobResponse
 	headers := map[string]string{}
 	if strings.TrimSpace(idempotencyKey) != "" {
@@ -75,6 +88,9 @@ func (c *Client) TriggerJob(ctx context.Context, jobID string, req TriggerJobReq
 
 // BulkTriggerJob triggers multiple job runs at once.
 func (c *Client) BulkTriggerJob(ctx context.Context, jobID string, req BulkTriggerRequest) (*BulkTriggerResponse, error) {
+	if err := validatePathSegment(jobID); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
 	var out BulkTriggerResponse
 	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "trigger", "bulk"), nil, req, &out); err != nil {
 		return nil, err
@@ -84,6 +100,9 @@ func (c *Client) BulkTriggerJob(ctx context.Context, jobID string, req BulkTrigg
 
 // ListJobVersions returns all versions for a job.
 func (c *Client) ListJobVersions(ctx context.Context, jobID string) ([]types.JobVersion, error) {
+	if err := validatePathSegment(jobID); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
 	var out []types.JobVersion
 	if err := c.doListJSON(ctx, path.Join("/v1/jobs", jobID, "versions"), nil, &out); err != nil {
 		return nil, err
@@ -135,6 +154,9 @@ func (c *Client) ListAllRuns(ctx context.Context, projectID, status string) ([]t
 
 // GetRun returns a run by ID.
 func (c *Client) GetRun(ctx context.Context, runID string) (*types.JobRun, error) {
+	if err := validatePathSegment(runID); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
 	var out types.JobRun
 	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/runs", runID), nil, nil, &out); err != nil {
 		return nil, err
@@ -144,6 +166,9 @@ func (c *Client) GetRun(ctx context.Context, runID string) (*types.JobRun, error
 
 // CancelRun cancels a run by ID.
 func (c *Client) CancelRun(ctx context.Context, runID string) (*types.JobRun, error) {
+	if err := validatePathSegment(runID); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
 	var out types.JobRun
 	if err := c.doJSON(ctx, http.MethodDelete, path.Join("/v1/runs", runID), nil, nil, &out); err != nil {
 		return nil, err
@@ -151,8 +176,33 @@ func (c *Client) CancelRun(ctx context.Context, runID string) (*types.JobRun, er
 	return &out, nil
 }
 
+// BulkCancelRuns cancels many runs in a single request.
+func (c *Client) BulkCancelRuns(ctx context.Context, ids []string) (*BulkCancelRunsResponse, error) {
+	req := BulkCancelRunsRequest{IDs: ids}
+	var out BulkCancelRunsResponse
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/runs/bulk-cancel", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ReplayRun replays a run by ID, preserving lineage to the original run.
+func (c *Client) ReplayRun(ctx context.Context, runID string) (*types.JobRun, error) {
+	if err := validatePathSegment(runID); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
+	var out types.JobRun
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/runs", runID, "replay"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
 // ListRunEvents returns events for a run.
 func (c *Client) ListRunEvents(ctx context.Context, runID, level, eventType string) ([]types.RunEvent, error) {
+	if err := validatePathSegment(runID); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
 	query := url.Values{}
 	if strings.TrimSpace(level) != "" {
 		query.Set("level", strings.TrimSpace(level))
@@ -200,6 +250,9 @@ func (c *Client) ListWorkflows(ctx context.Context, projectID string) ([]types.W
 
 // GetWorkflow returns a workflow by ID.
 func (c *Client) GetWorkflow(ctx context.Context, workflowID string) (*WorkflowResponse, error) {
+	if err := validatePathSegment(workflowID); err != nil {
+		return nil, fmt.Errorf("invalid workflow id: %w", err)
+	}
 	var out WorkflowResponse
 	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/workflows", workflowID), nil, nil, &out); err != nil {
 		return nil, err
@@ -222,6 +275,9 @@ func (c *Client) CreateWorkflow(ctx context.Context, req CreateWorkflowRequest, 
 
 // UpdateWorkflow updates a workflow by ID.
 func (c *Client) UpdateWorkflow(ctx context.Context, id string, req UpdateWorkflowRequest) (*WorkflowResponse, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid workflow id: %w", err)
+	}
 	var out WorkflowResponse
 	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/workflows", id), nil, req, &out); err != nil {
 		return nil, err
@@ -231,11 +287,17 @@ func (c *Client) UpdateWorkflow(ctx context.Context, id string, req UpdateWorkfl
 
 // DeleteWorkflow deletes a workflow by ID.
 func (c *Client) DeleteWorkflow(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid workflow id: %w", err)
+	}
 	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/workflows", id), nil, nil, &map[string]string{})
 }
 
 // TriggerWorkflow triggers a workflow run.
 func (c *Client) TriggerWorkflow(ctx context.Context, workflowID string, req TriggerWorkflowRequest) (*types.WorkflowRun, error) {
+	if err := validatePathSegment(workflowID); err != nil {
+		return nil, fmt.Errorf("invalid workflow id: %w", err)
+	}
 	var out types.WorkflowRun
 	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflows", workflowID, "trigger"), nil, req, &out); err != nil {
 		return nil, err
@@ -245,6 +307,9 @@ func (c *Client) TriggerWorkflow(ctx context.Context, workflowID string, req Tri
 
 // ListWorkflowRuns returns runs for a workflow.
 func (c *Client) ListWorkflowRuns(ctx context.Context, workflowID string, limit, offset int) ([]types.WorkflowRun, error) {
+	if err := validatePathSegment(workflowID); err != nil {
+		return nil, fmt.Errorf("invalid workflow id: %w", err)
+	}
 	query := url.Values{}
 	if limit > 0 {
 		query.Set("limit", fmt.Sprintf("%d", limit))
@@ -280,6 +345,9 @@ func (c *Client) ListWorkflowRunsByProject(ctx context.Context, projectID, statu
 
 // GetWorkflowRun returns a workflow run by ID.
 func (c *Client) GetWorkflowRun(ctx context.Context, workflowRunID string) (*types.WorkflowRun, error) {
+	if err := validatePathSegment(workflowRunID); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
 	var out types.WorkflowRun
 	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/workflow-runs", workflowRunID), nil, nil, &out); err != nil {
 		return nil, err
@@ -289,6 +357,9 @@ func (c *Client) GetWorkflowRun(ctx context.Context, workflowRunID string) (*typ
 
 // CancelWorkflowRun cancels a workflow run.
 func (c *Client) CancelWorkflowRun(ctx context.Context, workflowRunID string) (*types.WorkflowRun, error) {
+	if err := validatePathSegment(workflowRunID); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
 	var out types.WorkflowRun
 	if err := c.doJSON(ctx, http.MethodDelete, path.Join("/v1/workflow-runs", workflowRunID), nil, nil, &out); err != nil {
 		return nil, err
@@ -298,6 +369,9 @@ func (c *Client) CancelWorkflowRun(ctx context.Context, workflowRunID string) (*
 
 // ListWorkflowStepRuns returns step runs for a workflow run.
 func (c *Client) ListWorkflowStepRuns(ctx context.Context, workflowRunID string) ([]types.WorkflowStepRun, error) {
+	if err := validatePathSegment(workflowRunID); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
 	var out []types.WorkflowStepRun
 	if err := c.doListJSON(ctx, path.Join("/v1/workflow-runs", workflowRunID, "steps"), nil, &out); err != nil {
 		return nil, err
@@ -328,11 +402,17 @@ func (c *Client) ListAPIKeys(ctx context.Context, projectID string) ([]types.API
 
 // RevokeAPIKey revokes an API key.
 func (c *Client) RevokeAPIKey(ctx context.Context, keyID string) error {
+	if err := validatePathSegment(keyID); err != nil {
+		return fmt.Errorf("invalid api key id: %w", err)
+	}
 	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/api-keys", keyID), nil, nil, &map[string]string{})
 }
 
 // RotateAPIKey rotates an API key.
 func (c *Client) RotateAPIKey(ctx context.Context, keyID string, req RotateAPIKeyRequest) (*RotateAPIKeyResponse, error) {
+	if err := validatePathSegment(keyID); err != nil {
+		return nil, fmt.Errorf("invalid api key id: %w", err)
+	}
 	var out RotateAPIKeyResponse
 	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/api-keys", keyID, "rotate"), nil, req, &out); err != nil {
 		return nil, err
@@ -366,6 +446,9 @@ func (c *Client) ListEventTriggers(ctx context.Context, projectID, status string
 
 // GetEventTrigger returns an event trigger by key.
 func (c *Client) GetEventTrigger(ctx context.Context, eventKey string) (*types.EventTrigger, error) {
+	if err := validatePathSegment(eventKey); err != nil {
+		return nil, fmt.Errorf("invalid event key: %w", err)
+	}
 	var out types.EventTrigger
 	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/events", eventKey), nil, nil, &out); err != nil {
 		return nil, err
@@ -375,6 +458,9 @@ func (c *Client) GetEventTrigger(ctx context.Context, eventKey string) (*types.E
 
 // SendEvent sends an event to resolve a trigger.
 func (c *Client) SendEvent(ctx context.Context, eventKey string, payload map[string]any) (*types.EventTrigger, error) {
+	if err := validatePathSegment(eventKey); err != nil {
+		return nil, fmt.Errorf("invalid event key: %w", err)
+	}
 	body := map[string]any{}
 	if payload != nil {
 		body["payload"] = payload
@@ -431,16 +517,25 @@ func (c *Client) CreateDeploymentVersion(ctx context.Context, req CreateDeployme
 
 // FinalizeDeployment finalizes a deployment version.
 func (c *Client) FinalizeDeployment(ctx context.Context, id string, req FinalizeDeploymentRequest) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid deployment id: %w", err)
+	}
 	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/deployments", id, "finalize"), nil, req, nil)
 }
 
 // PromoteDeployment promotes a deployment version.
 func (c *Client) PromoteDeployment(ctx context.Context, id string, req PromoteDeploymentRequest) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid deployment id: %w", err)
+	}
 	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/deployments", id, "promote"), nil, req, nil)
 }
 
 // RollbackDeployment rolls back a deployment.
 func (c *Client) RollbackDeployment(ctx context.Context, id string, req RollbackDeploymentRequest) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid deployment id: %w", err)
+	}
 	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/deployments", id, "rollback"), nil, req, nil)
 }
 
@@ -485,6 +580,9 @@ func (c *Client) CreateServerSecret(ctx context.Context, req CreateServerSecretR
 
 // DeleteServerSecret deletes a server-side secret.
 func (c *Client) DeleteServerSecret(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid secret id: %w", err)
+	}
 	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/secrets", id), nil, nil, nil)
 }
 
@@ -526,6 +624,9 @@ func (c *Client) AddMember(ctx context.Context, req AssignMemberRequest) (*Proje
 
 // RemoveMember removes a member from a project.
 func (c *Client) RemoveMember(ctx context.Context, userID string) error {
+	if err := validatePathSegment(userID); err != nil {
+		return fmt.Errorf("invalid member id: %w", err)
+	}
 	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/members", userID), nil, nil, nil)
 }
 
@@ -615,6 +716,9 @@ func (c *Client) GetJobBySlug(ctx context.Context, projectID, slug string) (*typ
 // CreateCodeDeployment creates a new code-first deployment and returns the
 // deployment record plus a presigned PUT URL for uploading the source tarball.
 func (c *Client) CreateCodeDeployment(ctx context.Context, jobID string, req CreateCodeDeploymentRequest) (*CreateCodeDeploymentResponse, error) {
+	if err := validatePathSegment(jobID); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
 	var out CreateCodeDeploymentResponse
 	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments"), nil, req, &out); err != nil {
 		return nil, err
@@ -624,6 +728,12 @@ func (c *Client) CreateCodeDeployment(ctx context.Context, jobID string, req Cre
 
 // ConfirmCodeDeployment marks the tarball upload complete, triggering the build.
 func (c *Client) ConfirmCodeDeployment(ctx context.Context, jobID, deploymentID string, req ConfirmCodeDeploymentRequest) (*CodeDeployment, error) {
+	if err := validatePathSegment(jobID); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
+	if err := validatePathSegment(deploymentID); err != nil {
+		return nil, fmt.Errorf("invalid deployment id: %w", err)
+	}
 	var out CodeDeployment
 	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments", deploymentID, "confirm"), nil, req, &out); err != nil {
 		return nil, err
@@ -633,6 +743,12 @@ func (c *Client) ConfirmCodeDeployment(ctx context.Context, jobID, deploymentID 
 
 // GetCodeDeployment fetches a single code deployment by ID.
 func (c *Client) GetCodeDeployment(ctx context.Context, jobID, deploymentID string) (*CodeDeployment, error) {
+	if err := validatePathSegment(jobID); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
+	if err := validatePathSegment(deploymentID); err != nil {
+		return nil, fmt.Errorf("invalid deployment id: %w", err)
+	}
 	var out CodeDeployment
 	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/jobs", jobID, "deployments", deploymentID), nil, nil, &out); err != nil {
 		return nil, err
@@ -642,6 +758,9 @@ func (c *Client) GetCodeDeployment(ctx context.Context, jobID, deploymentID stri
 
 // ListCodeDeployments lists code deployments for a job.
 func (c *Client) ListCodeDeployments(ctx context.Context, jobID string, limit int) ([]CodeDeployment, error) {
+	if err := validatePathSegment(jobID); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
 	query := url.Values{}
 	if limit > 0 {
 		query.Set("limit", fmt.Sprintf("%d", limit))
@@ -656,6 +775,12 @@ func (c *Client) ListCodeDeployments(ctx context.Context, jobID string, limit in
 // RollbackCodeDeployment activates a previously ready deployment as the active
 // deployment for the job, effectively rolling back to that version.
 func (c *Client) RollbackCodeDeployment(ctx context.Context, jobID, deploymentID, projectID string) (*CodeDeployment, error) {
+	if err := validatePathSegment(jobID); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
+	if err := validatePathSegment(deploymentID); err != nil {
+		return nil, fmt.Errorf("invalid deployment id: %w", err)
+	}
 	body := ConfirmCodeDeploymentRequest{ProjectID: projectID}
 	var out CodeDeployment
 	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments", deploymentID, "rollback"), nil, body, &out); err != nil {
@@ -679,4 +804,824 @@ func (c *Client) GetServerCapabilities(ctx context.Context) (*ServerCapabilities
 		return nil, err
 	}
 	return &out, nil
+}
+
+// GetEnvironment returns an environment by ID.
+func (c *Client) GetEnvironment(ctx context.Context, id string) (*types.Environment, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid environment id: %w", err)
+	}
+	var out types.Environment
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/environments", id), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateEnvironment creates a new environment.
+func (c *Client) CreateEnvironment(ctx context.Context, req CreateEnvironmentRequest) (*types.Environment, error) {
+	var out types.Environment
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/environments", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateEnvironment updates an environment by ID.
+func (c *Client) UpdateEnvironment(ctx context.Context, id string, req UpdateEnvironmentRequest) (*types.Environment, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid environment id: %w", err)
+	}
+	var out types.Environment
+	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/environments", id), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteEnvironment deletes an environment by ID.
+func (c *Client) DeleteEnvironment(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid environment id: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/environments", id), nil, nil, &map[string]string{})
+}
+
+// ListEnvironmentVariables returns the variables map for an environment.
+func (c *Client) ListEnvironmentVariables(ctx context.Context, id string) (map[string]string, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid environment id: %w", err)
+	}
+	var out map[string]string
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/environments", id, "variables"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListWebhooks returns webhook subscriptions for a project.
+func (c *Client) ListWebhooks(ctx context.Context, projectID string) ([]types.Webhook, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	var out []types.Webhook
+	if err := c.doListJSON(ctx, "/v1/webhooks", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetWebhook returns a webhook subscription by ID.
+func (c *Client) GetWebhook(ctx context.Context, id string) (*types.Webhook, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid webhook id: %w", err)
+	}
+	var out types.Webhook
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/webhooks", id), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateWebhook creates a new webhook subscription.
+func (c *Client) CreateWebhook(ctx context.Context, req CreateWebhookRequest) (*types.Webhook, error) {
+	var out types.Webhook
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/webhooks", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateWebhook updates a webhook subscription.
+func (c *Client) UpdateWebhook(ctx context.Context, id string, req UpdateWebhookRequest) (*types.Webhook, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid webhook id: %w", err)
+	}
+	var out types.Webhook
+	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/webhooks", id), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteWebhook deletes a webhook subscription by ID.
+func (c *Client) DeleteWebhook(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid webhook id: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/webhooks", id), nil, nil, &map[string]string{})
+}
+
+// ListWebhookDeliveries returns delivery records for a webhook.
+func (c *Client) ListWebhookDeliveries(ctx context.Context, id string, limit int) ([]types.WebhookDelivery, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid webhook id: %w", err)
+	}
+	query := url.Values{}
+	if limit > 0 {
+		query.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	var out []types.WebhookDelivery
+	if err := c.doListJSON(ctx, path.Join("/v1/webhooks", id, "deliveries"), query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// RetryWebhookDelivery re-attempts a previous webhook delivery.
+func (c *Client) RetryWebhookDelivery(ctx context.Context, deliveryID string) (*types.WebhookDelivery, error) {
+	if err := validatePathSegment(deliveryID); err != nil {
+		return nil, fmt.Errorf("invalid delivery id: %w", err)
+	}
+	var out types.WebhookDelivery
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/webhook-deliveries", deliveryID, "retry"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// TestWebhook sends a synthetic test event to a webhook.
+func (c *Client) TestWebhook(ctx context.Context, id string) (*TestWebhookResponse, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid webhook id: %w", err)
+	}
+	var out TestWebhookResponse
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/webhooks", id, "test"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListEventSources returns event sources for a project.
+func (c *Client) ListEventSources(ctx context.Context, projectID string) ([]types.EventSource, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	var out []types.EventSource
+	if err := c.doListJSON(ctx, "/v1/event-sources", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetEventSource returns an event source by ID.
+func (c *Client) GetEventSource(ctx context.Context, id string) (*types.EventSource, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid event source id: %w", err)
+	}
+	var out types.EventSource
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/event-sources", id), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateEventSource creates a new event source.
+func (c *Client) CreateEventSource(ctx context.Context, req CreateEventSourceRequest) (*types.EventSource, error) {
+	var out types.EventSource
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/event-sources", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateEventSource updates an event source by ID.
+func (c *Client) UpdateEventSource(ctx context.Context, id string, req UpdateEventSourceRequest) (*types.EventSource, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid event source id: %w", err)
+	}
+	var out types.EventSource
+	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/event-sources", id), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteEventSource deletes an event source by ID.
+func (c *Client) DeleteEventSource(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid event source id: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/event-sources", id), nil, nil, &map[string]string{})
+}
+
+// ListJobGroups returns job groups for a project.
+func (c *Client) ListJobGroups(ctx context.Context, projectID string) ([]types.JobGroup, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	var out []types.JobGroup
+	if err := c.doListJSON(ctx, "/v1/job-groups", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetJobGroup returns a job group by ID.
+func (c *Client) GetJobGroup(ctx context.Context, id string) (*types.JobGroup, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid job group id: %w", err)
+	}
+	var out types.JobGroup
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/job-groups", id), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateJobGroup creates a new job group.
+func (c *Client) CreateJobGroup(ctx context.Context, req CreateJobGroupRequest) (*types.JobGroup, error) {
+	var out types.JobGroup
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/job-groups", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateJobGroup updates a job group by ID.
+func (c *Client) UpdateJobGroup(ctx context.Context, id string, req UpdateJobGroupRequest) (*types.JobGroup, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid job group id: %w", err)
+	}
+	var out types.JobGroup
+	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/job-groups", id), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteJobGroup deletes a job group by ID.
+func (c *Client) DeleteJobGroup(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid job group id: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/job-groups", id), nil, nil, &map[string]string{})
+}
+
+// ListJobsInGroup returns jobs that belong to a job group.
+func (c *Client) ListJobsInGroup(ctx context.Context, id string) ([]types.Job, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid job group id: %w", err)
+	}
+	var out []types.Job
+	if err := c.doListJSON(ctx, path.Join("/v1/job-groups", id, "jobs"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PauseJobGroup pauses execution for all jobs in a group.
+func (c *Client) PauseJobGroup(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid job group id: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/job-groups", id, "pause"), nil, nil, &map[string]string{})
+}
+
+// ResumeJobGroup resumes execution for all jobs in a group.
+func (c *Client) ResumeJobGroup(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid job group id: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/job-groups", id, "resume"), nil, nil, &map[string]string{})
+}
+
+// GetJobGroupStats returns aggregate stats for a job group.
+func (c *Client) GetJobGroupStats(ctx context.Context, id string) (*types.JobGroupStats, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid job group id: %w", err)
+	}
+	var out types.JobGroupStats
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/job-groups", id, "stats"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListNotificationChannels returns notification channels for a project.
+func (c *Client) ListNotificationChannels(ctx context.Context, projectID string) ([]types.NotificationChannel, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	var out []types.NotificationChannel
+	if err := c.doListJSON(ctx, "/v1/notification-channels", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetNotificationChannel returns a notification channel by ID.
+func (c *Client) GetNotificationChannel(ctx context.Context, id string) (*types.NotificationChannel, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid notification channel id: %w", err)
+	}
+	var out types.NotificationChannel
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/notification-channels", id), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateNotificationChannel creates a new notification channel.
+func (c *Client) CreateNotificationChannel(ctx context.Context, req CreateNotificationChannelRequest) (*types.NotificationChannel, error) {
+	var out types.NotificationChannel
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/notification-channels", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateNotificationChannel updates a notification channel by ID.
+func (c *Client) UpdateNotificationChannel(ctx context.Context, id string, req UpdateNotificationChannelRequest) (*types.NotificationChannel, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid notification channel id: %w", err)
+	}
+	var out types.NotificationChannel
+	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/notification-channels", id), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteNotificationChannel deletes a notification channel by ID.
+func (c *Client) DeleteNotificationChannel(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid notification channel id: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/notification-channels", id), nil, nil, &map[string]string{})
+}
+
+// ListLogDrains returns log drains for a project.
+func (c *Client) ListLogDrains(ctx context.Context, projectID string) ([]types.LogDrain, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	var out []types.LogDrain
+	if err := c.doListJSON(ctx, "/v1/log-drains", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetLogDrain returns a log drain by ID.
+func (c *Client) GetLogDrain(ctx context.Context, id string) (*types.LogDrain, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid log drain id: %w", err)
+	}
+	var out types.LogDrain
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/log-drains", id), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CreateLogDrain creates a new log drain.
+func (c *Client) CreateLogDrain(ctx context.Context, req CreateLogDrainRequest) (*types.LogDrain, error) {
+	var out types.LogDrain
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/log-drains", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// UpdateLogDrain updates a log drain by ID.
+func (c *Client) UpdateLogDrain(ctx context.Context, id string, req UpdateLogDrainRequest) (*types.LogDrain, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid log drain id: %w", err)
+	}
+	var out types.LogDrain
+	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/log-drains", id), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteLogDrain deletes a log drain by ID.
+func (c *Client) DeleteLogDrain(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid log drain id: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/log-drains", id), nil, nil, &map[string]string{})
+}
+
+// CloneJob clones a job and returns the new copy.
+func (c *Client) CloneJob(ctx context.Context, id string, req CloneJobRequest) (*types.Job, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
+	var out types.Job
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", id, "clone"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetJobHealth returns the health summary for a job.
+func (c *Client) GetJobHealth(ctx context.Context, id string) (*types.JobHealth, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
+	var out types.JobHealth
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/jobs", id, "health"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListJobDependencies returns the dependency edges for a job.
+func (c *Client) ListJobDependencies(ctx context.Context, id string) ([]types.JobDependency, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
+	var out []types.JobDependency
+	if err := c.doListJSON(ctx, path.Join("/v1/jobs", id, "dependencies"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AddJobDependency creates a new dependency edge for a job.
+func (c *Client) AddJobDependency(ctx context.Context, id string, req AddJobDependencyRequest) (*types.JobDependency, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid job id: %w", err)
+	}
+	var out types.JobDependency
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", id, "dependencies"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// BatchUpdateJobs applies multiple job updates in one call.
+func (c *Client) BatchUpdateJobs(ctx context.Context, req BatchUpdateJobsRequest) (*BatchUpdateJobsResponse, error) {
+	var out BatchUpdateJobsResponse
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/jobs/batch", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// CloneWorkflow clones a workflow and returns the new copy.
+func (c *Client) CloneWorkflow(ctx context.Context, id string, req CloneWorkflowRequest) (*WorkflowResponse, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid workflow id: %w", err)
+	}
+	var out WorkflowResponse
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflows", id, "clone"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DryRunWorkflow performs a workflow dry-run without persisting state.
+func (c *Client) DryRunWorkflow(ctx context.Context, id string, payload json.RawMessage) (json.RawMessage, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid workflow id: %w", err)
+	}
+	body := map[string]json.RawMessage{}
+	if len(payload) > 0 {
+		body["payload"] = payload
+	}
+	var out json.RawMessage
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflows", id, "dry-run"), nil, body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PlanWorkflow returns the planned execution graph without running.
+func (c *Client) PlanWorkflow(ctx context.Context, id string, payload json.RawMessage) (json.RawMessage, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid workflow id: %w", err)
+	}
+	body := map[string]json.RawMessage{}
+	if len(payload) > 0 {
+		body["payload"] = payload
+	}
+	var out json.RawMessage
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflows", id, "plan"), nil, body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SimulateWorkflow simulates running a workflow.
+func (c *Client) SimulateWorkflow(ctx context.Context, id string, payload json.RawMessage) (json.RawMessage, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid workflow id: %w", err)
+	}
+	body := map[string]json.RawMessage{}
+	if len(payload) > 0 {
+		body["payload"] = payload
+	}
+	var out json.RawMessage
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflows", id, "simulate"), nil, body, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListWorkflowVersions returns the version history for a workflow.
+func (c *Client) ListWorkflowVersions(ctx context.Context, id string) ([]types.WorkflowVersion, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid workflow id: %w", err)
+	}
+	var out []types.WorkflowVersion
+	if err := c.doListJSON(ctx, path.Join("/v1/workflows", id, "versions"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DiffWorkflowVersions returns the diff between two workflow versions.
+func (c *Client) DiffWorkflowVersions(ctx context.Context, id string, fromV, toV int) (*types.WorkflowDiff, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid workflow id: %w", err)
+	}
+	query := url.Values{}
+	query.Set("from", fmt.Sprintf("%d", fromV))
+	query.Set("to", fmt.Sprintf("%d", toV))
+	var out types.WorkflowDiff
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/workflows", id, "diff"), query, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetWorkflowPolicy returns the current run-time policy for a workflow.
+func (c *Client) GetWorkflowPolicy(ctx context.Context, id string) (*types.WorkflowPolicy, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid workflow id: %w", err)
+	}
+	var out types.WorkflowPolicy
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/workflows", id, "policy"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SetWorkflowPolicy replaces the run-time policy for a workflow.
+func (c *Client) SetWorkflowPolicy(ctx context.Context, id string, policy json.RawMessage) (*types.WorkflowPolicy, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid workflow id: %w", err)
+	}
+	req := SetWorkflowPolicyRequest{Policy: policy}
+	var out types.WorkflowPolicy
+	if err := c.doJSON(ctx, http.MethodPut, path.Join("/v1/workflows", id, "policy"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// PauseWorkflowRun pauses an in-flight workflow run.
+func (c *Client) PauseWorkflowRun(ctx context.Context, id string) (*types.WorkflowRun, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
+	var out types.WorkflowRun
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", id, "pause"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ResumeWorkflowRun resumes a paused workflow run.
+func (c *Client) ResumeWorkflowRun(ctx context.Context, id string) (*types.WorkflowRun, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
+	var out types.WorkflowRun
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", id, "resume"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// RetryWorkflowRun retries a failed workflow run.
+func (c *Client) RetryWorkflowRun(ctx context.Context, id string) (*types.WorkflowRun, error) {
+	if err := validatePathSegment(id); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
+	var out types.WorkflowRun
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", id, "retry"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ApproveWorkflowStep approves a workflow step pending review.
+func (c *Client) ApproveWorkflowStep(ctx context.Context, runID, stepRef string) error {
+	if err := validatePathSegment(runID); err != nil {
+		return fmt.Errorf("invalid run id: %w", err)
+	}
+	if err := validatePathSegment(stepRef); err != nil {
+		return fmt.Errorf("invalid step ref: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", runID, "steps", stepRef, "approve"), nil, nil, &map[string]string{})
+}
+
+// RetryWorkflowStep retries an individual workflow step.
+func (c *Client) RetryWorkflowStep(ctx context.Context, runID, stepRef string) error {
+	if err := validatePathSegment(runID); err != nil {
+		return fmt.Errorf("invalid run id: %w", err)
+	}
+	if err := validatePathSegment(stepRef); err != nil {
+		return fmt.Errorf("invalid step ref: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", runID, "steps", stepRef, "retry"), nil, nil, &map[string]string{})
+}
+
+// SkipWorkflowStep skips a workflow step.
+func (c *Client) SkipWorkflowStep(ctx context.Context, runID, stepRef string) error {
+	if err := validatePathSegment(runID); err != nil {
+		return fmt.Errorf("invalid run id: %w", err)
+	}
+	if err := validatePathSegment(stepRef); err != nil {
+		return fmt.Errorf("invalid step ref: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", runID, "steps", stepRef, "skip"), nil, nil, &map[string]string{})
+}
+
+// ForceCompleteWorkflowStep marks a workflow step as completed regardless of state.
+func (c *Client) ForceCompleteWorkflowStep(ctx context.Context, runID, stepRef string) error {
+	if err := validatePathSegment(runID); err != nil {
+		return fmt.Errorf("invalid run id: %w", err)
+	}
+	if err := validatePathSegment(stepRef); err != nil {
+		return fmt.Errorf("invalid step ref: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/workflow-runs", runID, "steps", stepRef, "force-complete"), nil, nil, &map[string]string{})
+}
+
+// RescheduleRun reschedules a run for a future execution time.
+func (c *Client) RescheduleRun(ctx context.Context, runID string, at time.Time) (*types.JobRun, error) {
+	if err := validatePathSegment(runID); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
+	req := RescheduleRunRequest{ScheduledAt: at}
+	var out types.JobRun
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/runs", runID, "reschedule"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListDLQ returns runs that have been moved to the dead letter queue.
+func (c *Client) ListDLQ(ctx context.Context, projectID string) ([]types.DLQRun, error) {
+	query := url.Values{}
+	if projectID != "" {
+		query.Set("project_id", projectID)
+	}
+	var out []types.DLQRun
+	if err := c.doListJSON(ctx, "/v1/runs/dlq", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ReplayDLQ replays a run from the dead letter queue.
+func (c *Client) ReplayDLQ(ctx context.Context, dlqID string) (*types.JobRun, error) {
+	if err := validatePathSegment(dlqID); err != nil {
+		return nil, fmt.Errorf("invalid dlq id: %w", err)
+	}
+	var out types.JobRun
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/runs/dlq", dlqID, "replay"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListRunOutputs returns the structured outputs produced by a run.
+func (c *Client) ListRunOutputs(ctx context.Context, runID string) ([]types.RunOutput, error) {
+	if err := validatePathSegment(runID); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
+	var out []types.RunOutput
+	if err := c.doListJSON(ctx, path.Join("/v1/runs", runID, "outputs"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListRunToolCalls returns the tool calls invoked during a run.
+func (c *Client) ListRunToolCalls(ctx context.Context, runID string) ([]types.RunToolCall, error) {
+	if err := validatePathSegment(runID); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
+	var out []types.RunToolCall
+	if err := c.doListJSON(ctx, path.Join("/v1/runs", runID, "tool-calls"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetRunUsage returns resource usage for a run.
+func (c *Client) GetRunUsage(ctx context.Context, runID string) (*types.RunUsage, error) {
+	if err := validatePathSegment(runID); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
+	var out types.RunUsage
+	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/runs", runID, "usage"), nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListRunCheckpoints returns checkpoints recorded during a run.
+func (c *Client) ListRunCheckpoints(ctx context.Context, runID string) ([]types.RunCheckpoint, error) {
+	if err := validatePathSegment(runID); err != nil {
+		return nil, fmt.Errorf("invalid run id: %w", err)
+	}
+	var out []types.RunCheckpoint
+	if err := c.doListJSON(ctx, path.Join("/v1/runs", runID, "checkpoints"), nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetCurrentUsage returns the active billing period usage.
+func (c *Client) GetCurrentUsage(ctx context.Context) (*types.UsagePeriod, error) {
+	var out types.UsagePeriod
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/billing/usage", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetUsageHistory returns historical billing periods.
+func (c *Client) GetUsageHistory(ctx context.Context) ([]types.UsagePeriod, error) {
+	var out []types.UsagePeriod
+	if err := c.doListJSON(ctx, "/v1/billing/usage/history", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// GetUsageForecast returns projected end-of-period usage.
+func (c *Client) GetUsageForecast(ctx context.Context) (*types.UsagePeriod, error) {
+	var out types.UsagePeriod
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/billing/usage/forecast", nil, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetCostsAnalytics returns cost analytics for a project.
+func (c *Client) GetCostsAnalytics(ctx context.Context, projectID string, periodHours int) (*types.CostsAnalytics, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	query.Set("period_hours", fmt.Sprintf("%d", periodHours))
+	var out types.CostsAnalytics
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/analytics/costs", query, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// GetReliabilityAnalytics returns reliability metrics for a project.
+func (c *Client) GetReliabilityAnalytics(ctx context.Context, projectID string, periodHours int) (*types.ReliabilityAnalytics, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	query.Set("period_hours", fmt.Sprintf("%d", periodHours))
+	var out types.ReliabilityAnalytics
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/analytics/reliability", query, nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListTopFailingJobs returns the jobs with the highest failure rate.
+func (c *Client) ListTopFailingJobs(ctx context.Context, projectID string, periodHours, limit int) ([]types.TopFailingJob, error) {
+	query := url.Values{}
+	query.Set("project_id", projectID)
+	query.Set("period_hours", fmt.Sprintf("%d", periodHours))
+	if limit > 0 {
+		query.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	var out []types.TopFailingJob
+	if err := c.doListJSON(ctx, "/v1/analytics/top-failing", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ListTeamPolicies returns the RBAC policies attached to the team.
+func (c *Client) ListTeamPolicies(ctx context.Context) ([]types.TeamPolicy, error) {
+	var out []types.TeamPolicy
+	if err := c.doListJSON(ctx, "/v1/team/policies", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// CreateTeamPolicy creates a new RBAC policy on the team.
+func (c *Client) CreateTeamPolicy(ctx context.Context, req CreateTeamPolicyRequest) (*types.TeamPolicy, error) {
+	var out types.TeamPolicy
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/team/policies", nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// DeleteTeamPolicy removes an RBAC policy from the team.
+func (c *Client) DeleteTeamPolicy(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid policy id: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/team/policies", id), nil, nil, &map[string]string{})
 }

@@ -152,7 +152,7 @@ func TestCreateJob_IdempotencyKeyIsSentAsHeader(t *testing.T) {
 		"--idempotency-key", "key-abc-123",
 	})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -184,7 +184,7 @@ func TestCreateJob_NoIdempotencyKeyOmitsHeader(t *testing.T) {
 		"--endpoint", "http://localhost:3000/jobs",
 	})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -217,7 +217,7 @@ func TestCreateWorkflow_IdempotencyKeyIsSentAsHeader(t *testing.T) {
 		"--idempotency-key", "wf-key-xyz",
 	})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -283,7 +283,7 @@ func TestCreateJob_JSONModeForwardsIdempotencyKey(t *testing.T) {
 	input := `{"name":"my-job","slug":"my-job","endpoint_url":"http://localhost:3000"}`
 	cmd.SetIn(bytes.NewBufferString(input))
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

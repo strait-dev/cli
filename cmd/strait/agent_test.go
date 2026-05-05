@@ -50,7 +50,7 @@ func TestAgentCapabilities_OutputIsValidJSON(t *testing.T) {
 	cmd := newAgentCommand(state)
 	cmd.SetArgs([]string{"capabilities"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -92,7 +92,7 @@ func TestAgentContext_OutputIsValidJSON(t *testing.T) {
 	cmd := newAgentCommand(state)
 	cmd.SetArgs([]string{"context"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -120,11 +120,16 @@ func TestAgentContext_OutputIsValidJSON(t *testing.T) {
 func TestAgentDescribe_JobsCommand(t *testing.T) {
 	t.Parallel()
 
-	// describe walks cmd.Root(), so it must be wired into the full command tree.
+	// describe walks cmd.Root(), so build a fresh root and inject a buffer
+	// into its persistent appState via cmd.SetOut. We instead drive it through
+	// the agent command using a state we control so output goes to state.out().
+	srv := newTestServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	state := newTestState(t, srv)
 	root := newRootCommand()
-	root.SetArgs([]string{"agent", "describe", "jobs"})
+	root.AddCommand(newAgentDescribeCommand(state))
+	root.SetArgs([]string{"describe", "jobs"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := root.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -144,12 +149,12 @@ func TestAgentDescribe_UnknownCommand(t *testing.T) {
 	root := newRootCommand()
 	root.SetArgs([]string{"agent", "describe", "nonexistent-command-xyz"})
 
-	captureCommandOutput(t, func() {
-		err := root.Execute()
-		if err == nil || !strings.Contains(err.Error(), "not found") {
-			t.Fatalf("expected not-found error, got: %v", err)
-		}
-	})
+	// No output capture: the unknown-command path returns an error before
+	// writing to stdout, so we just assert the error.
+	err := root.Execute()
+	if err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Fatalf("expected not-found error, got: %v", err)
+	}
 }
 
 func TestAgentSkills_OutputIsValidJSON(t *testing.T) {
@@ -160,7 +165,7 @@ func TestAgentSkills_OutputIsValidJSON(t *testing.T) {
 	cmd := newAgentCommand(state)
 	cmd.SetArgs([]string{"skills"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -174,18 +179,29 @@ func TestAgentSkills_OutputIsValidJSON(t *testing.T) {
 	// but it must be a valid JSON array.
 }
 
+// runSkillsGenerate builds a fresh root command tree with the given state
+// driving the skills-generate handler. Parenting it to root preserves the
+// behavior of cmd.Root() walks performed by the handler.
+func runSkillsGenerate(t *testing.T, state *appState, args ...string) string {
+	t.Helper()
+	root := newRootCommand()
+	gen := newAgentSkillsGenerateCommand(state)
+	root.AddCommand(gen)
+	root.SetArgs(append([]string{"generate"}, args...))
+	return captureStateOutput(t, state, func() {
+		if err := root.Execute(); err != nil {
+			t.Fatalf("skills generate %v: %v", args, err)
+		}
+	})
+}
+
 func TestAgentSkillsGenerate_CreatesFiles(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	root := newRootCommand()
-	root.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir})
-
-	out := captureCommandOutput(t, func() {
-		if err := root.Execute(); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	srv := newTestServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	state := newTestState(t, srv)
+	out := runSkillsGenerate(t, state, "--output-dir", dir)
 
 	var results []skillFileResult
 	if err := json.Unmarshal([]byte(out), &results); err != nil {
@@ -195,7 +211,6 @@ func TestAgentSkillsGenerate_CreatesFiles(t *testing.T) {
 		t.Fatal("expected at least one skill file to be generated")
 	}
 
-	// Every result should be "created".
 	for _, r := range results {
 		if r.Status != "created" {
 			t.Errorf("expected status=created for %q, got %q", r.Command, r.Status)
@@ -210,25 +225,11 @@ func TestAgentSkillsGenerate_SkipsExistingWithoutOverwrite(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	root := newRootCommand()
+	srv := newTestServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	state := newTestState(t, srv)
 
-	// First run — creates files.
-	root.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir})
-	captureCommandOutput(t, func() {
-		if err := root.Execute(); err != nil {
-			t.Fatalf("first generate: %v", err)
-		}
-	})
-
-	// Second run — should skip all files.
-	root2 := newRootCommand()
-	root2.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir})
-
-	out := captureCommandOutput(t, func() {
-		if err := root2.Execute(); err != nil {
-			t.Fatalf("second generate: %v", err)
-		}
-	})
+	runSkillsGenerate(t, state, "--output-dir", dir)
+	out := runSkillsGenerate(t, state, "--output-dir", dir)
 
 	var results []skillFileResult
 	if err := json.Unmarshal([]byte(out), &results); err != nil {
@@ -245,21 +246,11 @@ func TestAgentSkillsGenerate_OverwriteReplacesFiles(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	root := newRootCommand()
-	root.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir})
-	captureCommandOutput(t, func() {
-		if err := root.Execute(); err != nil {
-			t.Fatalf("first generate: %v", err)
-		}
-	})
+	srv := newTestServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	state := newTestState(t, srv)
 
-	root2 := newRootCommand()
-	root2.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir, "--overwrite"})
-	out := captureCommandOutput(t, func() {
-		if err := root2.Execute(); err != nil {
-			t.Fatalf("overwrite generate: %v", err)
-		}
-	})
+	runSkillsGenerate(t, state, "--output-dir", dir)
+	out := runSkillsGenerate(t, state, "--output-dir", dir, "--overwrite")
 
 	var results []skillFileResult
 	if err := json.Unmarshal([]byte(out), &results); err != nil {
@@ -279,15 +270,10 @@ func TestAgentSkillsGenerate_FileContainsSkillHeader(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	root := newRootCommand()
-	root.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir})
-	captureCommandOutput(t, func() {
-		if err := root.Execute(); err != nil {
-			t.Fatalf("generate: %v", err)
-		}
-	})
+	srv := newTestServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	state := newTestState(t, srv)
+	runSkillsGenerate(t, state, "--output-dir", dir)
 
-	// Find the jobs.md file specifically.
 	content, err := os.ReadFile(dir + "/jobs.md")
 	if err != nil {
 		t.Fatalf("jobs.md not found: %v", err)
@@ -309,15 +295,10 @@ func TestAgentSkillsGenerate_HiddenCommandsExcluded(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	root := newRootCommand()
-	root.SetArgs([]string{"agent", "skills", "generate", "--output-dir", dir})
-	captureCommandOutput(t, func() {
-		if err := root.Execute(); err != nil {
-			t.Fatalf("generate: %v", err)
-		}
-	})
+	srv := newTestServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	state := newTestState(t, srv)
+	runSkillsGenerate(t, state, "--output-dir", dir)
 
-	// "help" and "completion" should not be generated.
 	for _, name := range []string{"help", "completion"} {
 		if _, err := os.Stat(dir + "/" + name + ".md"); err == nil {
 			t.Errorf("unexpected skill file generated for hidden command %q", name)

@@ -106,8 +106,52 @@ var (
 			Bold(true)
 )
 
+// SafeText sanitizes a server-supplied string for safe rendering on a TTY.
+//
+// It strips ESC (0x1B), BEL (0x07), and other C0/DEL control characters that a
+// hostile or compromised server could embed to move the cursor, change the
+// terminal title, clear the screen, or trigger paste-injection sequences.
+// Tab and newline are preserved because they're benign in normal output. The
+// replacement character is U+FFFD so the offending bytes remain visible to
+// the operator rather than vanishing silently.
+func SafeText(s string) string {
+	if s == "" {
+		return ""
+	}
+	if !needsSanitize(s) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		switch {
+		case r == '\t' || r == '\n':
+			b.WriteRune(r)
+		case r < 0x20 || r == 0x7f:
+			b.WriteRune('�')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func needsSanitize(s string) bool {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '\t' || c == '\n' {
+			continue
+		}
+		if c < 0x20 || c == 0x7f {
+			return true
+		}
+	}
+	return false
+}
+
 // StatusBadge returns a colored badge for a run/workflow/deployment status.
 func StatusBadge(status string) string {
+	status = SafeText(status)
 	switch strings.ToLower(status) {
 	case "completed", "ok", "pass", "promoted", "true":
 		return BadgeOK.Render("OK")
@@ -130,6 +174,7 @@ func StatusBadge(status string) string {
 
 // Status colorizes a status string with foreground color (for inline use in tables).
 func Status(s string) string {
+	s = SafeText(s)
 	switch s {
 	case "completed":
 		return Green.Render(s)
@@ -158,26 +203,27 @@ func Enabled(enabled bool) string {
 
 // Success returns a green success message with checkmark.
 func Success(msg string) string {
-	return lipgloss.NewStyle().Foreground(SuccessColor).Render("\u2713") + " " + msg
+	return lipgloss.NewStyle().Foreground(SuccessColor).Render("\u2713") + " " + SafeText(msg)
 }
 
 // Warn returns an orange warning message.
 func Warn(msg string) string {
-	return lipgloss.NewStyle().Foreground(WarningColor).Render("\u26a0") + " " + msg
+	return lipgloss.NewStyle().Foreground(WarningColor).Render("\u26a0") + " " + SafeText(msg)
 }
 
 // Err returns a red error message.
 func Err(msg string) string {
-	return lipgloss.NewStyle().Foreground(ErrorColor).Render("\u2717") + " " + msg
+	return lipgloss.NewStyle().Foreground(ErrorColor).Render("\u2717") + " " + SafeText(msg)
 }
 
 // Info returns a blue informational message.
 func Info(msg string) string {
-	return lipgloss.NewStyle().Foreground(InfoColor).Render("\u25cf") + " " + msg
+	return lipgloss.NewStyle().Foreground(InfoColor).Render("\u25cf") + " " + SafeText(msg)
 }
 
 // LogLevel colorizes a log level string.
 func LogLevel(level string) string {
+	level = SafeText(level)
 	switch strings.ToLower(level) {
 	case "debug":
 		return MutedStyle.Render(level)
@@ -196,11 +242,12 @@ func LogLevel(level string) string {
 
 // KeyValue renders a labeled value with dimmed key.
 func KeyValue(key, value string) string {
-	return LabelStyle.Render(fmt.Sprintf("  %-14s", key+":")) + " " + value
+	return LabelStyle.Render(fmt.Sprintf("  %-14s", SafeText(key)+":")) + " " + SafeText(value)
 }
 
 // SectionHeader renders a bold section header with optional count.
 func SectionHeader(title string, count int) string {
+	title = SafeText(title)
 	if count >= 0 {
 		return HeaderStyle.Render(fmt.Sprintf("=== %s (%d) ===", title, count))
 	}
@@ -271,12 +318,12 @@ func Duration(d time.Duration) string {
 
 // FilePath renders a dimmed file path.
 func FilePath(path string) string {
-	return MutedStyle.Render(path)
+	return MutedStyle.Render(SafeText(path))
 }
 
 // ResourceKind renders a colored resource type label.
 func ResourceKind(kind string) string {
-	return lipgloss.NewStyle().Foreground(AccentColor).Bold(true).Render(kind)
+	return lipgloss.NewStyle().Foreground(AccentColor).Bold(true).Render(SafeText(kind))
 }
 
 // Detail panel with box-drawing borders.
@@ -324,7 +371,7 @@ func DetailBox(title string, lines []string) string {
 
 // DetailLine renders a label: value pair for use inside DetailBox.
 func DetailLine(label, value string) string {
-	return LabelStyle.Render(fmt.Sprintf("%-12s", label+":")) + " " + value
+	return LabelStyle.Render(fmt.Sprintf("%-12s", SafeText(label)+":")) + " " + SafeText(value)
 }
 
 // ForceNoColor disables all color output by switching to an ASCII-only profile.

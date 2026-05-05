@@ -660,3 +660,247 @@ type StepOverride struct {
 	StepRef string `json:"step_ref"`
 	Enabled bool   `json:"enabled"`
 }
+
+// Webhook represents an outbound webhook subscription.
+type Webhook struct {
+	ID         string     `json:"id"`
+	ProjectID  string     `json:"project_id"`
+	URL        string     `json:"url"`
+	Events     []string   `json:"events"`
+	Secret     string     `json:"secret,omitempty"`
+	Active     bool       `json:"active"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
+	LastSentAt *time.Time `json:"last_sent_at,omitempty"`
+}
+
+// WebhookDelivery represents a single webhook delivery attempt.
+type WebhookDelivery struct {
+	ID           string     `json:"id"`
+	WebhookID    string     `json:"webhook_id"`
+	EventType    string     `json:"event_type"`
+	Status       string     `json:"status"`
+	StatusCode   int        `json:"status_code,omitempty"`
+	AttemptCount int        `json:"attempt_count"`
+	Error        string     `json:"error,omitempty"`
+	RequestedAt  time.Time  `json:"requested_at"`
+	DeliveredAt  *time.Time `json:"delivered_at,omitempty"`
+}
+
+// EventSource represents an external event source feeding the project.
+type EventSource struct {
+	ID        string          `json:"id"`
+	ProjectID string          `json:"project_id"`
+	Name      string          `json:"name"`
+	Slug      string          `json:"slug"`
+	Type      string          `json:"type"`
+	Config    json.RawMessage `json:"config,omitempty"`
+	Enabled   bool            `json:"enabled"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+// JobGroup represents a logical grouping of jobs.
+type JobGroup struct {
+	ID          string    `json:"id"`
+	ProjectID   string    `json:"project_id"`
+	Name        string    `json:"name"`
+	Slug        string    `json:"slug"`
+	Description string    `json:"description,omitempty"`
+	Paused      bool      `json:"paused"`
+	JobCount    int       `json:"job_count,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// JobGroupStats holds aggregate execution metrics for a job group.
+type JobGroupStats struct {
+	GroupID    string `json:"group_id"`
+	JobCount   int    `json:"job_count"`
+	RunsTotal  int64  `json:"runs_total"`
+	RunsFailed int64  `json:"runs_failed"`
+	RunsActive int64  `json:"runs_active"`
+}
+
+// NotificationChannel represents a notification delivery channel.
+type NotificationChannel struct {
+	ID        string          `json:"id"`
+	ProjectID string          `json:"project_id"`
+	Name      string          `json:"name"`
+	Type      string          `json:"type"`
+	Config    json.RawMessage `json:"config,omitempty"`
+	Enabled   bool            `json:"enabled"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+// LogDrain represents a destination for streaming logs.
+type LogDrain struct {
+	ID        string          `json:"id"`
+	ProjectID string          `json:"project_id"`
+	Name      string          `json:"name"`
+	Type      string          `json:"type"`
+	Config    json.RawMessage `json:"config,omitempty"`
+	Enabled   bool            `json:"enabled"`
+	CreatedAt time.Time       `json:"created_at"`
+	UpdatedAt time.Time       `json:"updated_at"`
+}
+
+// JobHealth captures health status for a job.
+type JobHealth struct {
+	JobID         string    `json:"job_id"`
+	Status        string    `json:"status"`
+	LastRunStatus string    `json:"last_run_status,omitempty"`
+	LastRunAt     time.Time `json:"last_run_at,omitzero"`
+	SuccessRate   float64   `json:"success_rate,omitempty"`
+	P95DurationMS int64     `json:"p95_duration_ms,omitempty"`
+}
+
+// JobDependency represents a dependency edge between two jobs.
+type JobDependency struct {
+	ID        string    `json:"id"`
+	JobID     string    `json:"job_id"`
+	DependsOn string    `json:"depends_on"`
+	Type      string    `json:"type,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// WorkflowVersion represents a versioned workflow definition.
+type WorkflowVersion struct {
+	WorkflowID string    `json:"workflow_id"`
+	Version    int       `json:"version"`
+	CreatedAt  time.Time `json:"created_at"`
+	CreatedBy  string    `json:"created_by,omitempty"`
+}
+
+// WorkflowDiff represents the difference between two workflow versions.
+type WorkflowDiff struct {
+	WorkflowID string          `json:"workflow_id"`
+	From       int             `json:"from"`
+	To         int             `json:"to"`
+	Changes    json.RawMessage `json:"changes,omitempty"`
+}
+
+// WorkflowPolicy represents the run-time policy for a workflow.
+type WorkflowPolicy struct {
+	WorkflowID string          `json:"workflow_id"`
+	Policy     json.RawMessage `json:"policy"`
+	UpdatedAt  time.Time       `json:"updated_at"`
+}
+
+// RunOutput represents output produced by a run.
+type RunOutput struct {
+	ID        string          `json:"id"`
+	RunID     string          `json:"run_id"`
+	Key       string          `json:"key"`
+	Value     json.RawMessage `json:"value,omitempty"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
+// RunToolCall represents a tool invocation within a run.
+type RunToolCall struct {
+	ID         string          `json:"id"`
+	RunID      string          `json:"run_id"`
+	Tool       string          `json:"tool"`
+	Args       json.RawMessage `json:"args,omitempty"`
+	Result     json.RawMessage `json:"result,omitempty"`
+	DurationMS int64           `json:"duration_ms,omitempty"`
+	CreatedAt  time.Time       `json:"created_at"`
+}
+
+// RunUsage captures resource usage for a run.
+type RunUsage struct {
+	RunID         string  `json:"run_id"`
+	TokensInput   int64   `json:"tokens_input,omitempty"`
+	TokensOutput  int64   `json:"tokens_output,omitempty"`
+	CostUSD       float64 `json:"cost_usd,omitempty"`
+	DurationMS    int64   `json:"duration_ms,omitempty"`
+	CPUSeconds    float64 `json:"cpu_seconds,omitempty"`
+	MemoryMBHours float64 `json:"memory_mb_hours,omitempty"`
+}
+
+// RunCheckpoint represents a checkpoint in a run.
+type RunCheckpoint struct {
+	ID        string          `json:"id"`
+	RunID     string          `json:"run_id"`
+	Name      string          `json:"name,omitempty"`
+	State     json.RawMessage `json:"state,omitempty"`
+	CreatedAt time.Time       `json:"created_at"`
+}
+
+// DLQRun represents a run that has been moved to the dead letter queue.
+type DLQRun struct {
+	ID         string    `json:"id"`
+	RunID      string    `json:"run_id"`
+	JobID      string    `json:"job_id,omitempty"`
+	Reason     string    `json:"reason"`
+	FailedAt   time.Time `json:"failed_at"`
+	AttemptCnt int       `json:"attempt_count"`
+}
+
+// UsagePeriod represents resource usage and billing for a billing period.
+type UsagePeriod struct {
+	PeriodStart      time.Time `json:"period_start"`
+	PeriodEnd        time.Time `json:"period_end"`
+	Runs             int64     `json:"runs"`
+	WorkflowRuns     int64     `json:"workflow_runs"`
+	ComputeMinutes   float64   `json:"compute_minutes"`
+	StorageMBHours   float64   `json:"storage_mb_hours,omitempty"`
+	EgressMB         float64   `json:"egress_mb,omitempty"`
+	TokensInput      int64     `json:"tokens_input,omitempty"`
+	TokensOutput     int64     `json:"tokens_output,omitempty"`
+	CostUSD          float64   `json:"cost_usd"`
+	IncludedQuotaPct float64   `json:"included_quota_pct,omitempty"`
+}
+
+// CostsAnalytics summarises spend for the analytics period.
+type CostsAnalytics struct {
+	PeriodHours int                    `json:"period_hours"`
+	TotalUSD    float64                `json:"total_usd"`
+	ByJob       []CostByJob            `json:"by_job,omitempty"`
+	ByCategory  map[string]float64     `json:"by_category,omitempty"`
+	Series      []CostsTimeseriesPoint `json:"series,omitempty"`
+}
+
+// CostByJob is a per-job cost breakdown.
+type CostByJob struct {
+	JobID   string  `json:"job_id"`
+	JobSlug string  `json:"job_slug"`
+	Runs    int64   `json:"runs"`
+	USD     float64 `json:"usd"`
+}
+
+// CostsTimeseriesPoint is one bucket of the cost timeseries.
+type CostsTimeseriesPoint struct {
+	BucketStart time.Time `json:"bucket_start"`
+	USD         float64   `json:"usd"`
+}
+
+// ReliabilityAnalytics summarises reliability over the analytics period.
+type ReliabilityAnalytics struct {
+	PeriodHours       int     `json:"period_hours"`
+	SuccessRate       float64 `json:"success_rate"`
+	AvgDurationSecs   float64 `json:"avg_duration_secs"`
+	P95DurationSecs   float64 `json:"p95_duration_secs"`
+	RetriedRunPercent float64 `json:"retried_run_percent,omitempty"`
+}
+
+// TopFailingJob represents a job with elevated failure rate.
+type TopFailingJob struct {
+	JobID       string  `json:"job_id"`
+	JobSlug     string  `json:"job_slug"`
+	TotalRuns   int64   `json:"total_runs"`
+	FailedRuns  int64   `json:"failed_runs"`
+	FailureRate float64 `json:"failure_rate"`
+}
+
+// TeamPolicy represents an RBAC policy granting permissions to a team.
+type TeamPolicy struct {
+	ID              string    `json:"id"`
+	Name            string    `json:"name"`
+	ResourcePattern string    `json:"resource_pattern,omitempty"`
+	TagPattern      string    `json:"tag_pattern,omitempty"`
+	Permissions     []string  `json:"permissions"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}

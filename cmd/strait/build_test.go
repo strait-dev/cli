@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -15,11 +16,11 @@ func TestBuildCommand_JSONEmitsSingleDocumentAndDoesNotWriteFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state := &appState{opts: &rootOptions{}}
+	state := &appState{opts: &rootOptions{}, stdout: &bytes.Buffer{}}
 	cmd := newBuildCommand(state)
 	cmd.SetArgs([]string{"--config", configPath, "--json"})
 
-	output := captureCommandOutput(t, func() {
+	output := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("build --json: %v", err)
 		}
@@ -44,11 +45,11 @@ func TestBuildCommand_DryRunDoesNotWriteFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	state := &appState{opts: &rootOptions{}}
+	state := &appState{opts: &rootOptions{}, stdout: &bytes.Buffer{}}
 	cmd := newBuildCommand(state)
 	cmd.SetArgs([]string{"--config", configPath, "--dry-run"})
 
-	output := captureCommandOutput(t, func() {
+	output := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("build --dry-run: %v", err)
 		}
@@ -75,10 +76,10 @@ func TestBuildCommand_AutoDiscoversConfigAndWritesDefaultOutput(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 
-	state := &appState{opts: &rootOptions{outputFormat: "json", ciMode: true}}
+	state := &appState{opts: &rootOptions{outputFormat: "json", ciMode: true}, stdout: &bytes.Buffer{}}
 	cmd := newBuildCommand(state)
 
-	output := captureCommandOutput(t, func() {
+	output := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("build autodiscovery: %v", err)
 		}
@@ -106,11 +107,11 @@ func TestBuildCommand_UsesConfigBuildOutDir(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 
-	state := &appState{opts: &rootOptions{outputFormat: "json", ciMode: true}}
+	state := &appState{opts: &rootOptions{outputFormat: "json", ciMode: true}, stdout: &bytes.Buffer{}}
 	cmd := newBuildCommand(state)
 	cmd.SetArgs([]string{"--config", "strait.config.yaml"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("build with config outDir: %v", err)
 		}
@@ -134,11 +135,11 @@ func TestBuildCommand_OutDirFlagOverridesConfigBuildOutDir(t *testing.T) {
 		t.Fatalf("chdir: %v", err)
 	}
 
-	state := &appState{opts: &rootOptions{outputFormat: "json", ciMode: true}}
+	state := &appState{opts: &rootOptions{outputFormat: "json", ciMode: true}, stdout: &bytes.Buffer{}}
 	cmd := newBuildCommand(state)
 	cmd.SetArgs([]string{"--config", "strait.config.yaml", "--out-dir", "custom-out"})
 
-	captureCommandOutput(t, func() {
+	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("build with explicit outDir: %v", err)
 		}

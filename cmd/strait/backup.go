@@ -80,7 +80,7 @@ Requires pg_dump to be installed and available in PATH.`,
 			}
 
 			pgDump := exec.Command("pg_dump", args...) //nolint:gosec // args built from validated flags, not user-controlled input
-			pgDump.Stdout = os.Stdout
+			pgDump.Stdout = os.Stdout                  // printdata-ok: subprocess inherits the terminal
 			pgDump.Stderr = os.Stderr
 
 			if verbose || state.opts.verbose {
@@ -204,7 +204,7 @@ func restoreWithPsql(dsn, input string, verbose bool) error {
 	}
 
 	psql := exec.Command("psql", args...) //nolint:gosec // args built from validated flags
-	psql.Stdout = os.Stdout
+	psql.Stdout = os.Stdout               // printdata-ok: subprocess stdout passthrough
 	psql.Stderr = os.Stderr
 
 	if err := psql.Run(); err != nil {
@@ -233,7 +233,7 @@ func restoreWithPgRestore(dsn, input string, clean, verbose bool) error {
 	}
 
 	pgRestore := exec.Command("pg_restore", args...) //nolint:gosec // args built from validated flags
-	pgRestore.Stdout = os.Stdout
+	pgRestore.Stdout = os.Stdout                     // printdata-ok: subprocess stdout passthrough
 	pgRestore.Stderr = os.Stderr
 
 	if err := pgRestore.Run(); err != nil {

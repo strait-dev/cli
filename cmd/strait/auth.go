@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"syscall"
 	"time"
 
 	cliauth "github.com/strait-dev/cli/internal/auth"
@@ -17,12 +16,11 @@ import (
 	"github.com/strait-dev/cli/internal/styles"
 
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 var (
-	authIsTerminal          = term.IsTerminal
-	authReadSecret          = term.ReadPassword
+	authIsTerminal          = stdinIsTerminal
+	authReadSecret          = readStdinPassword
 	authValidateAPIKey      = cliauth.ValidateAPIKey
 	authSaveAPIKey          = cliauth.SaveAPIKey
 	authLoadAPIKey          = cliauth.LoadAPIKey
@@ -72,7 +70,7 @@ an API key directly, or --with-token to read one from stdin.`,
 			}
 
 			// Non-interactive or non-TTY without explicit token: error with guidance.
-			if state.opts.nonInteractive || !authIsTerminal(syscall.Stdin) {
+			if state.opts.nonInteractive || !authIsTerminal() {
 				return fmt.Errorf("non-interactive mode: use --token <api-key> or STRAIT_API_KEY env var to authenticate")
 			}
 
@@ -357,7 +355,7 @@ func resolveAPIKeyInput(flagValue string, withToken bool) (string, error) {
 	}
 
 	fmt.Fprint(os.Stderr, "API key: ")
-	secret, err := authReadSecret(syscall.Stdin)
+	secret, err := authReadSecret()
 	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return "", err

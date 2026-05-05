@@ -29,6 +29,27 @@ func formatUploadSize(bytes int64) string {
 }
 
 func newDeploySourceCommand(state *appState) *cobra.Command {
+	return newCodeFirstDeployCommand(state, codeFirstDeployCommandConfig{
+		Use:        "source",
+		Short:      "Deploy source code directly (DEPRECATED: use 'deployments create-from-source')",
+		Deprecated: true,
+	})
+}
+
+func newCodeDeploymentsCreateFromSourceCommand(state *appState) *cobra.Command {
+	return newCodeFirstDeployCommand(state, codeFirstDeployCommandConfig{
+		Use:   "create-from-source",
+		Short: "Deploy source code directly (code-first deployment)",
+	})
+}
+
+type codeFirstDeployCommandConfig struct {
+	Use        string
+	Short      string
+	Deprecated bool
+}
+
+func newCodeFirstDeployCommand(state *appState, cfg codeFirstDeployCommandConfig) *cobra.Command {
 	var (
 		jobSlug    string
 		runtime    string
@@ -40,13 +61,18 @@ func newDeploySourceCommand(state *appState) *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "source",
-		Short: "Deploy source code directly (code-first deployment)",
+		Use:   cfg.Use,
+		Short: cfg.Short,
 		Long: `Pack the source directory, upload it to Strait, and trigger a BuildKit build.
 
 The build runs server-side. Build logs are streamed in real time.
 On success the job switches to use the newly built image.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if cfg.Deprecated {
+				fmt.Fprintln(os.Stderr, styles.MutedStyle.Render(
+					"warning: 'strait deploy source' is deprecated; use 'strait deployments create-from-source' instead.",
+				))
+			}
 			if jobSlug == "" {
 				return fmt.Errorf("--job is required")
 			}

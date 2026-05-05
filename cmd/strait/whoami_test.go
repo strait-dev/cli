@@ -20,7 +20,7 @@ func TestWhoami_Authenticated(t *testing.T) {
 	state.configPath = "/tmp/test-config.yaml"
 	cmd := newWhoamiCommand(state)
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -48,7 +48,7 @@ func TestWhoami_NotAuthenticated(t *testing.T) {
 	state.opts.apiKey = ""
 	cmd := newWhoamiCommand(state)
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

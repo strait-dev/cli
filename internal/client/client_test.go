@@ -697,6 +697,80 @@ func TestCancelRun(t *testing.T) {
 	}
 }
 
+func TestBulkCancelRuns(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/runs/bulk-cancel")
+		assertAuth(t, r, "test-key")
+		assertContentType(t, r)
+
+		var req BulkCancelRunsRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode request body: %v", err)
+		}
+		if len(req.IDs) != 3 {
+			t.Fatalf("expected 3 ids, got %d", len(req.IDs))
+		}
+
+		respondJSON(t, w, http.StatusOK, BulkCancelRunsResponse{
+			Results: []BulkCancelResult{
+				{ID: "run-1", Canceled: true, Status: "canceled"},
+				{ID: "run-2", Canceled: true, Status: "canceled"},
+				{ID: "run-3", Canceled: false, Error: "already terminal"},
+			},
+			Total:    3,
+			Canceled: 2,
+		})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	got, err := c.BulkCancelRuns(context.Background(), []string{"run-1", "run-2", "run-3"})
+	if err != nil {
+		t.Fatalf("BulkCancelRuns: %v", err)
+	}
+	if got.Total != 3 || got.Canceled != 2 {
+		t.Fatalf("unexpected counters: %+v", got)
+	}
+	if len(got.Results) != 3 {
+		t.Fatalf("expected 3 results, got %d", len(got.Results))
+	}
+	if got.Results[2].Canceled || got.Results[2].Error == "" {
+		t.Fatalf("expected third run to be reported as failed, got %+v", got.Results[2])
+	}
+}
+
+func TestReplayRun(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/runs/run-1/replay")
+		assertAuth(t, r, "test-key")
+		respondJSON(t, w, http.StatusOK, types.JobRun{
+			ID:          "run-2",
+			JobID:       "job-1",
+			ParentRunID: "run-1",
+			Status:      types.StatusQueued,
+		})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	got, err := c.ReplayRun(context.Background(), "run-1")
+	if err != nil {
+		t.Fatalf("ReplayRun: %v", err)
+	}
+	if got.ID != "run-2" {
+		t.Fatalf("expected replayed run id run-2, got %s", got.ID)
+	}
+	if got.ParentRunID != "run-1" {
+		t.Fatalf("expected ParentRunID=run-1, got %q", got.ParentRunID)
+	}
+}
+
 func TestListRunEvents(t *testing.T) {
 	t.Parallel()
 
@@ -1386,6 +1460,298 @@ func TestPurgeEventTriggers_DryRun(t *testing.T) {
 	}
 	if got != 7 {
 		t.Fatalf("expected 7, got %d", got)
+	}
+}
+
+func TestEnvironmentCRUD(t *testing.T) {
+	t.Parallel()
+
+	env := types.Environment{ID: "env-1", ProjectID: "proj-1", Name: "Production", Slug: "prod", IsStandard: true}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/environments/env-1":
+			respondJSON(t, w, http.StatusOK, env)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/environments":
+			respondJSON(t, w, http.StatusCreated, env)
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/environments/env-1":
+			respondJSON(t, w, http.StatusOK, env)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/environments/env-1":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/environments/env-1/variables":
+			respondJSON(t, w, http.StatusOK, map[string]string{"FOO": "bar"})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if got, err := c.GetEnvironment(context.Background(), "env-1"); err != nil || got.Slug != "prod" {
+		t.Fatalf("GetEnvironment: %v / got=%+v", err, got)
+	}
+	if got, err := c.CreateEnvironment(context.Background(), CreateEnvironmentRequest{ProjectID: "proj-1", Name: "Production", Slug: "prod"}); err != nil || got.ID != "env-1" {
+		t.Fatalf("CreateEnvironment: %v / got=%+v", err, got)
+	}
+	name := "Prod"
+	if got, err := c.UpdateEnvironment(context.Background(), "env-1", UpdateEnvironmentRequest{Name: &name}); err != nil || got.ID != "env-1" {
+		t.Fatalf("UpdateEnvironment: %v / got=%+v", err, got)
+	}
+	if err := c.DeleteEnvironment(context.Background(), "env-1"); err != nil {
+		t.Fatalf("DeleteEnvironment: %v", err)
+	}
+	vars, err := c.ListEnvironmentVariables(context.Background(), "env-1")
+	if err != nil || vars["FOO"] != "bar" {
+		t.Fatalf("ListEnvironmentVariables: %v / got=%+v", err, vars)
+	}
+}
+
+func TestWebhookLifecycle(t *testing.T) {
+	t.Parallel()
+
+	hook := types.Webhook{ID: "wh-1", ProjectID: "proj-1", URL: "https://example.com/hook", Events: []string{"run.completed"}, Active: true}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks":
+			respondPaginated(t, w, http.StatusOK, []types.Webhook{hook})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/wh-1":
+			respondJSON(t, w, http.StatusOK, hook)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks":
+			respondJSON(t, w, http.StatusCreated, hook)
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/webhooks/wh-1":
+			respondJSON(t, w, http.StatusOK, hook)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/webhooks/wh-1":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/wh-1/deliveries":
+			respondPaginated(t, w, http.StatusOK, []types.WebhookDelivery{{ID: "wd-1", WebhookID: "wh-1", Status: "ok"}})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/wh-1/test":
+			respondJSON(t, w, http.StatusOK, TestWebhookResponse{DeliveryID: "wd-9", Status: "queued"})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhook-deliveries/wd-1/retry":
+			respondJSON(t, w, http.StatusOK, types.WebhookDelivery{ID: "wd-1", WebhookID: "wh-1", Status: "queued"})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if got, err := c.ListWebhooks(context.Background(), "proj-1"); err != nil || len(got) != 1 {
+		t.Fatalf("ListWebhooks: %v / got=%+v", err, got)
+	}
+	if _, err := c.GetWebhook(context.Background(), "wh-1"); err != nil {
+		t.Fatalf("GetWebhook: %v", err)
+	}
+	if _, err := c.CreateWebhook(context.Background(), CreateWebhookRequest{ProjectID: "proj-1", URL: "https://example.com/hook", Events: []string{"run.completed"}}); err != nil {
+		t.Fatalf("CreateWebhook: %v", err)
+	}
+	url := "https://new.example.com"
+	if _, err := c.UpdateWebhook(context.Background(), "wh-1", UpdateWebhookRequest{URL: &url}); err != nil {
+		t.Fatalf("UpdateWebhook: %v", err)
+	}
+	if err := c.DeleteWebhook(context.Background(), "wh-1"); err != nil {
+		t.Fatalf("DeleteWebhook: %v", err)
+	}
+	if got, err := c.ListWebhookDeliveries(context.Background(), "wh-1", 10); err != nil || len(got) != 1 {
+		t.Fatalf("ListWebhookDeliveries: %v / got=%+v", err, got)
+	}
+	if got, err := c.TestWebhook(context.Background(), "wh-1"); err != nil || got.DeliveryID != "wd-9" {
+		t.Fatalf("TestWebhook: %v / got=%+v", err, got)
+	}
+	if got, err := c.RetryWebhookDelivery(context.Background(), "wd-1"); err != nil || got.ID != "wd-1" {
+		t.Fatalf("RetryWebhookDelivery: %v / got=%+v", err, got)
+	}
+}
+
+func TestEventSourceCRUD(t *testing.T) {
+	t.Parallel()
+
+	src := types.EventSource{ID: "es-1", ProjectID: "proj-1", Name: "Kafka", Slug: "kafka", Type: "kafka", Enabled: true}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/event-sources":
+			respondPaginated(t, w, http.StatusOK, []types.EventSource{src})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/event-sources/es-1":
+			respondJSON(t, w, http.StatusOK, src)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/event-sources":
+			respondJSON(t, w, http.StatusCreated, src)
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/event-sources/es-1":
+			respondJSON(t, w, http.StatusOK, src)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/event-sources/es-1":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if _, err := c.ListEventSources(context.Background(), "proj-1"); err != nil {
+		t.Fatalf("ListEventSources: %v", err)
+	}
+	if _, err := c.GetEventSource(context.Background(), "es-1"); err != nil {
+		t.Fatalf("GetEventSource: %v", err)
+	}
+	if _, err := c.CreateEventSource(context.Background(), CreateEventSourceRequest{ProjectID: "proj-1", Name: "Kafka", Slug: "kafka", Type: "kafka"}); err != nil {
+		t.Fatalf("CreateEventSource: %v", err)
+	}
+	name := "Kafka2"
+	if _, err := c.UpdateEventSource(context.Background(), "es-1", UpdateEventSourceRequest{Name: &name}); err != nil {
+		t.Fatalf("UpdateEventSource: %v", err)
+	}
+	if err := c.DeleteEventSource(context.Background(), "es-1"); err != nil {
+		t.Fatalf("DeleteEventSource: %v", err)
+	}
+}
+
+func TestJobGroupLifecycle(t *testing.T) {
+	t.Parallel()
+
+	group := types.JobGroup{ID: "jg-1", ProjectID: "proj-1", Name: "ETL", Slug: "etl", JobCount: 3}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/job-groups":
+			respondPaginated(t, w, http.StatusOK, []types.JobGroup{group})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/job-groups/jg-1":
+			respondJSON(t, w, http.StatusOK, group)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups":
+			respondJSON(t, w, http.StatusCreated, group)
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/job-groups/jg-1":
+			respondJSON(t, w, http.StatusOK, group)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/job-groups/jg-1":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/job-groups/jg-1/jobs":
+			respondPaginated(t, w, http.StatusOK, []types.Job{{ID: "job-1"}})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups/jg-1/pause":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups/jg-1/resume":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/job-groups/jg-1/stats":
+			respondJSON(t, w, http.StatusOK, types.JobGroupStats{GroupID: "jg-1", JobCount: 3, RunsTotal: 100})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if _, err := c.ListJobGroups(context.Background(), "proj-1"); err != nil {
+		t.Fatalf("ListJobGroups: %v", err)
+	}
+	if _, err := c.GetJobGroup(context.Background(), "jg-1"); err != nil {
+		t.Fatalf("GetJobGroup: %v", err)
+	}
+	if _, err := c.CreateJobGroup(context.Background(), CreateJobGroupRequest{ProjectID: "proj-1", Name: "ETL", Slug: "etl"}); err != nil {
+		t.Fatalf("CreateJobGroup: %v", err)
+	}
+	name := "etl-v2"
+	if _, err := c.UpdateJobGroup(context.Background(), "jg-1", UpdateJobGroupRequest{Name: &name}); err != nil {
+		t.Fatalf("UpdateJobGroup: %v", err)
+	}
+	if err := c.DeleteJobGroup(context.Background(), "jg-1"); err != nil {
+		t.Fatalf("DeleteJobGroup: %v", err)
+	}
+	if _, err := c.ListJobsInGroup(context.Background(), "jg-1"); err != nil {
+		t.Fatalf("ListJobsInGroup: %v", err)
+	}
+	if err := c.PauseJobGroup(context.Background(), "jg-1"); err != nil {
+		t.Fatalf("PauseJobGroup: %v", err)
+	}
+	if err := c.ResumeJobGroup(context.Background(), "jg-1"); err != nil {
+		t.Fatalf("ResumeJobGroup: %v", err)
+	}
+	if got, err := c.GetJobGroupStats(context.Background(), "jg-1"); err != nil || got.RunsTotal != 100 {
+		t.Fatalf("GetJobGroupStats: %v / got=%+v", err, got)
+	}
+}
+
+func TestNotificationChannelCRUD(t *testing.T) {
+	t.Parallel()
+
+	channel := types.NotificationChannel{ID: "nc-1", ProjectID: "proj-1", Name: "oncall", Type: "slack", Enabled: true}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/notification-channels":
+			respondPaginated(t, w, http.StatusOK, []types.NotificationChannel{channel})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/notification-channels/nc-1":
+			respondJSON(t, w, http.StatusOK, channel)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/notification-channels":
+			respondJSON(t, w, http.StatusCreated, channel)
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/notification-channels/nc-1":
+			respondJSON(t, w, http.StatusOK, channel)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/notification-channels/nc-1":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if _, err := c.ListNotificationChannels(context.Background(), "proj-1"); err != nil {
+		t.Fatalf("ListNotificationChannels: %v", err)
+	}
+	if _, err := c.GetNotificationChannel(context.Background(), "nc-1"); err != nil {
+		t.Fatalf("GetNotificationChannel: %v", err)
+	}
+	if _, err := c.CreateNotificationChannel(context.Background(), CreateNotificationChannelRequest{
+		ProjectID: "proj-1", Name: "oncall", Type: "slack", Config: json.RawMessage(`{"webhook_url":"https://hooks.example"}`),
+	}); err != nil {
+		t.Fatalf("CreateNotificationChannel: %v", err)
+	}
+	name := "oncall-v2"
+	if _, err := c.UpdateNotificationChannel(context.Background(), "nc-1", UpdateNotificationChannelRequest{Name: &name}); err != nil {
+		t.Fatalf("UpdateNotificationChannel: %v", err)
+	}
+	if err := c.DeleteNotificationChannel(context.Background(), "nc-1"); err != nil {
+		t.Fatalf("DeleteNotificationChannel: %v", err)
+	}
+}
+
+func TestLogDrainCRUD(t *testing.T) {
+	t.Parallel()
+
+	drain := types.LogDrain{ID: "ld-1", ProjectID: "proj-1", Name: "datadog-prod", Type: "datadog", Enabled: true}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/log-drains":
+			respondPaginated(t, w, http.StatusOK, []types.LogDrain{drain})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/log-drains/ld-1":
+			respondJSON(t, w, http.StatusOK, drain)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/log-drains":
+			respondJSON(t, w, http.StatusCreated, drain)
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/log-drains/ld-1":
+			respondJSON(t, w, http.StatusOK, drain)
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/log-drains/ld-1":
+			respondJSON(t, w, http.StatusOK, map[string]string{})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if _, err := c.ListLogDrains(context.Background(), "proj-1"); err != nil {
+		t.Fatalf("ListLogDrains: %v", err)
+	}
+	if _, err := c.GetLogDrain(context.Background(), "ld-1"); err != nil {
+		t.Fatalf("GetLogDrain: %v", err)
+	}
+	if _, err := c.CreateLogDrain(context.Background(), CreateLogDrainRequest{
+		ProjectID: "proj-1", Name: "datadog-prod", Type: "datadog", Config: json.RawMessage(`{"api_key":"x"}`),
+	}); err != nil {
+		t.Fatalf("CreateLogDrain: %v", err)
+	}
+	name := "datadog-prod-v2"
+	if _, err := c.UpdateLogDrain(context.Background(), "ld-1", UpdateLogDrainRequest{Name: &name}); err != nil {
+		t.Fatalf("UpdateLogDrain: %v", err)
+	}
+	if err := c.DeleteLogDrain(context.Background(), "ld-1"); err != nil {
+		t.Fatalf("DeleteLogDrain: %v", err)
 	}
 }
 
@@ -2208,5 +2574,515 @@ func TestVerifyAuditChain_SincePassedAsQuery(t *testing.T) {
 	c := mustClient(t, srv.URL)
 	if _, err := c.VerifyAuditChain(context.Background(), VerifyAuditChainParams{ProjectID: "p", Since: &since}); err != nil {
 		t.Fatalf("VerifyAuditChain: %v", err)
+	}
+}
+
+func TestCloneJob(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/jobs/job-1/clone")
+		respondJSON(t, w, http.StatusOK, types.Job{ID: "job-2", Slug: "job-2"})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	got, err := c.CloneJob(context.Background(), "job-1", CloneJobRequest{Name: "Clone", Slug: "job-2"})
+	if err != nil {
+		t.Fatalf("CloneJob: %v", err)
+	}
+	if got.Slug != "job-2" {
+		t.Fatalf("unexpected slug: %q", got.Slug)
+	}
+}
+
+func TestGetJobHealth(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodGet)
+		assertPath(t, r, "/v1/jobs/job-1/health")
+		respondJSON(t, w, http.StatusOK, types.JobHealth{
+			JobID: "job-1", Status: "healthy", SuccessRate: 0.99, P95DurationMS: 1200,
+		})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	got, err := c.GetJobHealth(context.Background(), "job-1")
+	if err != nil {
+		t.Fatalf("GetJobHealth: %v", err)
+	}
+	if got.Status != "healthy" || got.SuccessRate != 0.99 {
+		t.Fatalf("unexpected health: %+v", got)
+	}
+}
+
+func TestListJobDependencies(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodGet)
+		assertPath(t, r, "/v1/jobs/job-1/dependencies")
+		respondPaginated(t, w, http.StatusOK, []types.JobDependency{{ID: "dep-1", JobID: "job-1", DependsOn: "job-0", Type: "success"}})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	deps, err := c.ListJobDependencies(context.Background(), "job-1")
+	if err != nil {
+		t.Fatalf("ListJobDependencies: %v", err)
+	}
+	if len(deps) != 1 || deps[0].DependsOn != "job-0" {
+		t.Fatalf("unexpected deps: %+v", deps)
+	}
+}
+
+func TestAddJobDependency(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/jobs/job-1/dependencies")
+		var body AddJobDependencyRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if body.DependsOn != "job-0" || body.Type != "success" {
+			t.Fatalf("unexpected body: %+v", body)
+		}
+		respondJSON(t, w, http.StatusOK, types.JobDependency{ID: "dep-9", JobID: "job-1", DependsOn: body.DependsOn, Type: body.Type})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	dep, err := c.AddJobDependency(context.Background(), "job-1", AddJobDependencyRequest{DependsOn: "job-0", Type: "success"})
+	if err != nil {
+		t.Fatalf("AddJobDependency: %v", err)
+	}
+	if dep.ID != "dep-9" {
+		t.Fatalf("unexpected dep: %+v", dep)
+	}
+}
+
+func TestBatchUpdateJobs(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/jobs/batch")
+		respondJSON(t, w, http.StatusOK, map[string]any{
+			"updated": []string{"job-1", "job-2"},
+			"failed": []map[string]string{
+				{"id": "job-3", "reason": "not found"},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	resp, err := c.BatchUpdateJobs(context.Background(), BatchUpdateJobsRequest{Updates: []BatchJobUpdate{{ID: "job-1"}}})
+	if err != nil {
+		t.Fatalf("BatchUpdateJobs: %v", err)
+	}
+	if len(resp.Updated) != 2 || len(resp.Failed) != 1 {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+}
+
+func TestCloneWorkflow(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/workflows/wf-1/clone")
+		respondJSON(t, w, http.StatusOK, map[string]any{"id": "wf-2", "slug": "wf-2"})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	wf, err := c.CloneWorkflow(context.Background(), "wf-1", CloneWorkflowRequest{Name: "Clone", Slug: "wf-2"})
+	if err != nil {
+		t.Fatalf("CloneWorkflow: %v", err)
+	}
+	if wf.Slug != "wf-2" {
+		t.Fatalf("unexpected slug: %q", wf.Slug)
+	}
+}
+
+func TestDryRunWorkflow(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/workflows/wf-1/dry-run")
+		respondJSON(t, w, http.StatusOK, map[string]any{"ok": true})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	out, err := c.DryRunWorkflow(context.Background(), "wf-1", json.RawMessage(`{"x":1}`))
+	if err != nil {
+		t.Fatalf("DryRunWorkflow: %v", err)
+	}
+	if len(out) == 0 {
+		t.Fatalf("expected payload, got empty")
+	}
+}
+
+func TestListWorkflowVersions(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodGet)
+		assertPath(t, r, "/v1/workflows/wf-1/versions")
+		respondPaginated(t, w, http.StatusOK, []types.WorkflowVersion{{WorkflowID: "wf-1", Version: 1}})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	versions, err := c.ListWorkflowVersions(context.Background(), "wf-1")
+	if err != nil {
+		t.Fatalf("ListWorkflowVersions: %v", err)
+	}
+	if len(versions) != 1 || versions[0].Version != 1 {
+		t.Fatalf("unexpected versions: %+v", versions)
+	}
+}
+
+func TestDiffWorkflowVersions(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodGet)
+		assertPath(t, r, "/v1/workflows/wf-1/diff")
+		if r.URL.Query().Get("from") != "1" || r.URL.Query().Get("to") != "2" {
+			t.Fatalf("unexpected query: %q", r.URL.RawQuery)
+		}
+		respondJSON(t, w, http.StatusOK, types.WorkflowDiff{WorkflowID: "wf-1", From: 1, To: 2})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	diff, err := c.DiffWorkflowVersions(context.Background(), "wf-1", 1, 2)
+	if err != nil {
+		t.Fatalf("DiffWorkflowVersions: %v", err)
+	}
+	if diff.From != 1 || diff.To != 2 {
+		t.Fatalf("unexpected diff: %+v", diff)
+	}
+}
+
+func TestWorkflowPolicy(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertPath(t, r, "/v1/workflows/wf-1/policy")
+		switch r.Method {
+		case http.MethodGet:
+			respondJSON(t, w, http.StatusOK, types.WorkflowPolicy{WorkflowID: "wf-1", Policy: json.RawMessage(`{"max":1}`)})
+		case http.MethodPut:
+			respondJSON(t, w, http.StatusOK, types.WorkflowPolicy{WorkflowID: "wf-1", Policy: json.RawMessage(`{"max":2}`)})
+		default:
+			t.Fatalf("unexpected method %q", r.Method)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	got, err := c.GetWorkflowPolicy(context.Background(), "wf-1")
+	if err != nil {
+		t.Fatalf("GetWorkflowPolicy: %v", err)
+	}
+	if got.WorkflowID != "wf-1" {
+		t.Fatalf("unexpected: %+v", got)
+	}
+	updated, err := c.SetWorkflowPolicy(context.Background(), "wf-1", json.RawMessage(`{"max":2}`))
+	if err != nil {
+		t.Fatalf("SetWorkflowPolicy: %v", err)
+	}
+	if updated.WorkflowID != "wf-1" {
+		t.Fatalf("unexpected updated: %+v", updated)
+	}
+}
+
+func TestPauseResumeRetryWorkflowRun(t *testing.T) {
+	t.Parallel()
+
+	expected := map[string]string{
+		"/v1/workflow-runs/wfr-1/pause":  "paused",
+		"/v1/workflow-runs/wfr-1/resume": "running",
+		"/v1/workflow-runs/wfr-1/retry":  "queued",
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		status, ok := expected[r.URL.Path]
+		if !ok {
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+		respondJSON(t, w, http.StatusOK, map[string]any{"id": "wfr-1", "status": status})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if _, err := c.PauseWorkflowRun(context.Background(), "wfr-1"); err != nil {
+		t.Fatalf("PauseWorkflowRun: %v", err)
+	}
+	if _, err := c.ResumeWorkflowRun(context.Background(), "wfr-1"); err != nil {
+		t.Fatalf("ResumeWorkflowRun: %v", err)
+	}
+	if _, err := c.RetryWorkflowRun(context.Background(), "wfr-1"); err != nil {
+		t.Fatalf("RetryWorkflowRun: %v", err)
+	}
+}
+
+func TestWorkflowStepActions(t *testing.T) {
+	t.Parallel()
+
+	expected := map[string]struct{}{
+		"/v1/workflow-runs/wfr-1/steps/build/approve":        {},
+		"/v1/workflow-runs/wfr-1/steps/build/retry":          {},
+		"/v1/workflow-runs/wfr-1/steps/build/skip":           {},
+		"/v1/workflow-runs/wfr-1/steps/build/force-complete": {},
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		if _, ok := expected[r.URL.Path]; !ok {
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+		respondJSON(t, w, http.StatusOK, map[string]string{})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if err := c.ApproveWorkflowStep(context.Background(), "wfr-1", "build"); err != nil {
+		t.Fatalf("ApproveWorkflowStep: %v", err)
+	}
+	if err := c.RetryWorkflowStep(context.Background(), "wfr-1", "build"); err != nil {
+		t.Fatalf("RetryWorkflowStep: %v", err)
+	}
+	if err := c.SkipWorkflowStep(context.Background(), "wfr-1", "build"); err != nil {
+		t.Fatalf("SkipWorkflowStep: %v", err)
+	}
+	if err := c.ForceCompleteWorkflowStep(context.Background(), "wfr-1", "build"); err != nil {
+		t.Fatalf("ForceCompleteWorkflowStep: %v", err)
+	}
+}
+
+func TestRescheduleRun(t *testing.T) {
+	t.Parallel()
+
+	at := time.Date(2026, 6, 1, 12, 0, 0, 0, time.UTC)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodPost)
+		assertPath(t, r, "/v1/runs/run-1/reschedule")
+		var body RescheduleRunRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if !body.ScheduledAt.Equal(at) {
+			t.Fatalf("expected %v, got %v", at, body.ScheduledAt)
+		}
+		respondJSON(t, w, http.StatusOK, types.JobRun{ID: "run-1", Status: "delayed"})
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	run, err := c.RescheduleRun(context.Background(), "run-1", at)
+	if err != nil {
+		t.Fatalf("RescheduleRun: %v", err)
+	}
+	if run.ID != "run-1" {
+		t.Fatalf("unexpected: %+v", run)
+	}
+}
+
+func TestDLQListAndReplay(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/runs/dlq":
+			if r.URL.Query().Get("project_id") != "proj-1" {
+				t.Fatalf("expected project_id query, got %q", r.URL.RawQuery)
+			}
+			respondPaginated(t, w, http.StatusOK, []types.DLQRun{{ID: "dlq-1", JobID: "job-1", Reason: "max attempts"}})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/dlq/dlq-1/replay":
+			respondJSON(t, w, http.StatusOK, types.JobRun{ID: "run-2", Status: "queued"})
+		default:
+			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	items, err := c.ListDLQ(context.Background(), "proj-1")
+	if err != nil {
+		t.Fatalf("ListDLQ: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("unexpected items: %+v", items)
+	}
+	run, err := c.ReplayDLQ(context.Background(), "dlq-1")
+	if err != nil {
+		t.Fatalf("ReplayDLQ: %v", err)
+	}
+	if run.ID != "run-2" {
+		t.Fatalf("unexpected replay: %+v", run)
+	}
+}
+
+func TestRunTelemetryEndpoints(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/runs/run-1/outputs":
+			respondPaginated(t, w, http.StatusOK, []types.RunOutput{{ID: "out-1", RunID: "run-1", Key: "result"}})
+		case "/v1/runs/run-1/tool-calls":
+			respondPaginated(t, w, http.StatusOK, []types.RunToolCall{{ID: "tc-1", RunID: "run-1", Tool: "fetch"}})
+		case "/v1/runs/run-1/usage":
+			respondJSON(t, w, http.StatusOK, types.RunUsage{RunID: "run-1", DurationMS: 4200, CostUSD: 0.12})
+		case "/v1/runs/run-1/checkpoints":
+			respondPaginated(t, w, http.StatusOK, []types.RunCheckpoint{{ID: "cp-1", RunID: "run-1", Name: "phase-1"}})
+		default:
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	if outputs, err := c.ListRunOutputs(context.Background(), "run-1"); err != nil || len(outputs) != 1 {
+		t.Fatalf("ListRunOutputs: %v len=%d", err, len(outputs))
+	}
+	if calls, err := c.ListRunToolCalls(context.Background(), "run-1"); err != nil || len(calls) != 1 {
+		t.Fatalf("ListRunToolCalls: %v len=%d", err, len(calls))
+	}
+	usage, err := c.GetRunUsage(context.Background(), "run-1")
+	if err != nil || usage.DurationMS != 4200 {
+		t.Fatalf("GetRunUsage: %v %+v", err, usage)
+	}
+	if cps, err := c.ListRunCheckpoints(context.Background(), "run-1"); err != nil || len(cps) != 1 {
+		t.Fatalf("ListRunCheckpoints: %v len=%d", err, len(cps))
+	}
+}
+
+func TestUsageEndpoints(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/billing/usage":
+			assertMethod(t, r, http.MethodGet)
+			respondJSON(t, w, http.StatusOK, types.UsagePeriod{Runs: 42, CostUSD: 12.34})
+		case "/v1/billing/usage/history":
+			assertMethod(t, r, http.MethodGet)
+			respondPaginated(t, w, http.StatusOK, []types.UsagePeriod{{Runs: 10}, {Runs: 20}})
+		case "/v1/billing/usage/forecast":
+			assertMethod(t, r, http.MethodGet)
+			respondJSON(t, w, http.StatusOK, types.UsagePeriod{Runs: 99, CostUSD: 50})
+		default:
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	cur, err := c.GetCurrentUsage(context.Background())
+	if err != nil || cur.Runs != 42 {
+		t.Fatalf("GetCurrentUsage: %v %+v", err, cur)
+	}
+	hist, err := c.GetUsageHistory(context.Background())
+	if err != nil || len(hist) != 2 {
+		t.Fatalf("GetUsageHistory: %v len=%d", err, len(hist))
+	}
+	fc, err := c.GetUsageForecast(context.Background())
+	if err != nil || fc.Runs != 99 {
+		t.Fatalf("GetUsageForecast: %v %+v", err, fc)
+	}
+}
+
+func TestAnalyticsEndpoints(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/analytics/costs":
+			assertMethod(t, r, http.MethodGet)
+			if got := r.URL.Query().Get("project_id"); got != "proj-1" {
+				t.Fatalf("project_id: %q", got)
+			}
+			if got := r.URL.Query().Get("period_hours"); got != "168" {
+				t.Fatalf("period_hours: %q", got)
+			}
+			respondJSON(t, w, http.StatusOK, types.CostsAnalytics{TotalUSD: 99.95, PeriodHours: 168})
+		case "/v1/analytics/reliability":
+			assertMethod(t, r, http.MethodGet)
+			respondJSON(t, w, http.StatusOK, types.ReliabilityAnalytics{SuccessRate: 0.97, PeriodHours: 168})
+		case "/v1/analytics/top-failing":
+			assertMethod(t, r, http.MethodGet)
+			if got := r.URL.Query().Get("limit"); got != "5" {
+				t.Fatalf("limit: %q", got)
+			}
+			respondPaginated(t, w, http.StatusOK, []types.TopFailingJob{{JobSlug: "x", FailureRate: 0.5}})
+		default:
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	costs, err := c.GetCostsAnalytics(context.Background(), "proj-1", 168)
+	if err != nil || costs.TotalUSD != 99.95 {
+		t.Fatalf("GetCostsAnalytics: %v %+v", err, costs)
+	}
+	rel, err := c.GetReliabilityAnalytics(context.Background(), "proj-1", 168)
+	if err != nil || rel.SuccessRate < 0.96 {
+		t.Fatalf("GetReliabilityAnalytics: %v %+v", err, rel)
+	}
+	top, err := c.ListTopFailingJobs(context.Background(), "proj-1", 168, 5)
+	if err != nil || len(top) != 1 {
+		t.Fatalf("ListTopFailingJobs: %v len=%d", err, len(top))
+	}
+}
+
+func TestTeamPolicyEndpoints(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/team/policies" && r.Method == http.MethodGet:
+			respondPaginated(t, w, http.StatusOK, []types.TeamPolicy{{ID: "pol-1", Name: "default"}})
+		case r.URL.Path == "/v1/team/policies" && r.Method == http.MethodPost:
+			var req CreateTeamPolicyRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if req.Name != "default" || len(req.Permissions) != 1 {
+				t.Fatalf("body: %+v", req)
+			}
+			respondJSON(t, w, http.StatusOK, types.TeamPolicy{ID: "pol-2", Name: req.Name, Permissions: req.Permissions})
+		case r.URL.Path == "/v1/team/policies/pol-2" && r.Method == http.MethodDelete:
+			respondJSON(t, w, http.StatusOK, map[string]string{"ok": "true"})
+		default:
+			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	policies, err := c.ListTeamPolicies(context.Background())
+	if err != nil || len(policies) != 1 {
+		t.Fatalf("ListTeamPolicies: %v len=%d", err, len(policies))
+	}
+	pol, err := c.CreateTeamPolicy(context.Background(), CreateTeamPolicyRequest{Name: "default", Permissions: []string{"jobs:read"}})
+	if err != nil || pol.ID != "pol-2" {
+		t.Fatalf("CreateTeamPolicy: %v %+v", err, pol)
+	}
+	if err := c.DeleteTeamPolicy(context.Background(), "pol-2"); err != nil {
+		t.Fatalf("DeleteTeamPolicy: %v", err)
 	}
 }

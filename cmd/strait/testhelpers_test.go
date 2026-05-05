@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -33,7 +34,8 @@ func newTestServer(t *testing.T, handler http.Handler) *httptest.Server {
 
 // newTestState creates an appState pointing at the given test server.
 // CI mode is enabled and output format is JSON so tests never block on
-// TTY prompts or styled output.
+// TTY prompts or styled output. Tests that need writer-injected output should
+// call captureStateOutput, which installs a fresh *bytes.Buffer when needed.
 func newTestState(t *testing.T, srv *httptest.Server) *appState {
 	t.Helper()
 	return &appState{
@@ -49,13 +51,21 @@ func newTestState(t *testing.T, srv *httptest.Server) *appState {
 	}
 }
 
+// The helpers below run inside HTTP handler goroutines, not the test
+// goroutine. Per testing.T docs, FailNow / Fatal must be called from the test
+// goroutine. Calling t.Fatal from a server-side goroutine only kills that
+// goroutine, leaves the request hanging, and surfaces as an opaque client
+// timeout instead of the real assertion. So these helpers use t.Errorf and
+// then write a 5xx via http.Error so the failure surfaces synchronously
+// through the client.
+
 // respondJSON writes v as JSON with the given status code.
 func respondJSON(t *testing.T, w http.ResponseWriter, status int, v any) {
 	t.Helper()
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(v); err != nil {
-		t.Fatalf("respondJSON: %v", err)
+		t.Errorf("respondJSON: %v", err)
 	}
 }
 
@@ -77,18 +87,20 @@ func respondError(t *testing.T, w http.ResponseWriter, status int, msg string) {
 }
 
 // assertMethod fails the test if the request method does not match want.
-func assertMethod(t *testing.T, r *http.Request, want string) {
+func assertMethod(t *testing.T, r *http.Request, w http.ResponseWriter, want string) {
 	t.Helper()
 	if r.Method != want {
-		t.Fatalf("method: got %s, want %s", r.Method, want)
+		t.Errorf("method: got %s, want %s", r.Method, want)
+		http.Error(w, "method assertion failed", http.StatusInternalServerError)
 	}
 }
 
 // assertPath fails the test if the request path does not match want.
-func assertPath(t *testing.T, r *http.Request, want string) {
+func assertPath(t *testing.T, r *http.Request, w http.ResponseWriter, want string) {
 	t.Helper()
 	if r.URL.Path != want {
-		t.Fatalf("path: got %q, want %q", r.URL.Path, want)
+		t.Errorf("path: got %q, want %q", r.URL.Path, want)
+		http.Error(w, "path assertion failed", http.StatusInternalServerError)
 	}
 }
 
@@ -98,7 +110,7 @@ func assertAuth(t *testing.T, r *http.Request, key string) {
 	want := "Bearer " + key
 	got := r.Header.Get("Authorization")
 	if got != want {
-		t.Fatalf("auth: got %q, want %q", got, want)
+		t.Errorf("auth: got %q, want %q", got, want)
 	}
 }
 
@@ -107,20 +119,40 @@ func assertQuery(t *testing.T, r *http.Request, key, want string) {
 	t.Helper()
 	got := r.URL.Query().Get(key)
 	if got != want {
-		t.Fatalf("query %s: got %q, want %q", key, got, want)
+		t.Errorf("query %s: got %q, want %q", key, got, want)
 	}
 }
 
-// readJSONBody reads and unmarshals the request body into dest.
+// readJSONBody reads and unmarshals the request body into dest. Errors are
+// recorded with t.Errorf rather than t.Fatal because this helper runs inside
+// the HTTP server goroutine.
 func readJSONBody(t *testing.T, r *http.Request, dest any) {
 	t.Helper()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		t.Fatalf("read body: %v", err)
+		t.Errorf("read body: %v", err)
+		return
 	}
 	if err := json.Unmarshal(body, dest); err != nil {
-		t.Fatalf("unmarshal body: %v (body: %s)", err, string(body))
+		t.Errorf("unmarshal body: %v (body: %s)", err, string(body))
 	}
+}
+
+// captureStateOutput runs fn and returns whatever was written to state's
+// in-memory stdout buffer. The buffer is reset before fn runs so callers can
+// invoke captureStateOutput repeatedly within a single test.
+func captureStateOutput(t *testing.T, state *appState, fn func()) string {
+	t.Helper()
+	if state.stdout == nil {
+		state.stdout = &bytes.Buffer{}
+	}
+	buf, ok := state.stdout.(*bytes.Buffer)
+	if !ok {
+		t.Fatalf("captureStateOutput: state.stdout is %T, want *bytes.Buffer", state.stdout)
+	}
+	buf.Reset()
+	fn()
+	return buf.String()
 }
 
 func captureCommandOutput(t *testing.T, fn func()) string {
@@ -158,18 +190,18 @@ func captureCommandStreams(t *testing.T, fn func()) (string, string) {
 
 	fn()
 
-	_ = stdoutW.Close()
-	_ = stderrW.Close()
 	os.Stdout = origStdout
 	os.Stderr = origStderr
+	_ = stdoutW.Close()
+	_ = stderrW.Close()
 
 	stdoutData, err := io.ReadAll(stdoutR)
 	if err != nil {
-		t.Fatalf("read pipe: %v", err)
+		t.Fatalf("read stdout pipe: %v", err)
 	}
 	stderrData, err := io.ReadAll(stderrR)
 	if err != nil {
-		t.Fatalf("read pipe: %v", err)
+		t.Fatalf("read stderr pipe: %v", err)
 	}
 	_ = stdoutR.Close()
 	_ = stderrR.Close()

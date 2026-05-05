@@ -284,7 +284,7 @@ func printLogRows(state *appState, rows []map[string]any, group bool, outputFmt 
 		return printGroupedLogs(state, rows)
 	}
 	if outputFmt == "ndjson" {
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(state.out())
 		for _, row := range rows {
 			if err := enc.Encode(row); err != nil {
 				return err
@@ -400,7 +400,7 @@ func runStreamRow(runID string, msg client.RunStreamMessage) (map[string]any, bo
 
 func renderFollowLogRow(state *appState, outputFmt string, row map[string]any) error {
 	if outputFmt == "ndjson" || state.opts.outputFormat == "json" {
-		return json.NewEncoder(os.Stdout).Encode(row)
+		return json.NewEncoder(state.out()).Encode(row)
 	}
 
 	ts := logRowTimestamp(row)
@@ -409,10 +409,10 @@ func renderFollowLogRow(state *appState, outputFmt string, row map[string]any) e
 	message, _ := row["message"].(string)
 
 	if isTTYRich(state) {
-		_, err := fmt.Fprintf(os.Stdout, "%s\t%s\t%s\t%s\n", styles.Timestamp(ts), styles.LogLevel(level), eventType, message)
+		_, err := fmt.Fprintf(state.out(), "%s\t%s\t%s\t%s\n", styles.Timestamp(ts), styles.LogLevel(level), eventType, message)
 		return err
 	}
 
-	_, err := fmt.Fprintf(os.Stdout, "%s\t%s\t%s\t%s\n", ts.Format(time.RFC3339), level, eventType, message)
+	_, err := fmt.Fprintf(state.out(), "%s\t%s\t%s\t%s\n", ts.Format(time.RFC3339), level, eventType, message)
 	return err
 }

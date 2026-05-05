@@ -39,7 +39,7 @@ func newRunCommand(state *appState) *cobra.Command {
 			c := exec.Command(args[0], args[1:]...) //nolint:gosec // args are positional CLI arguments from the user
 			c.Env = env
 			c.Stdin = os.Stdin
-			c.Stdout = os.Stdout
+			c.Stdout = os.Stdout // printdata-ok: subprocess inherits the terminal stdout
 			c.Stderr = os.Stderr
 			return c.Run()
 		},

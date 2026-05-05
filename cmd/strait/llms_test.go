@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -16,17 +17,23 @@ func TestLLMSFlag_RegisteredOnRoot(t *testing.T) {
 	}
 }
 
+// renderLLMSManifest builds a fresh root command tree and writes its manifest
+// into a buffer. Calling printLLMSManifest directly avoids any dependence on
+// os.Stdout — the source of pre-refactor parallel-test flakes.
+func renderLLMSManifest(t *testing.T) string {
+	t.Helper()
+	root := newRootCommand()
+	var buf bytes.Buffer
+	if err := printLLMSManifest(&buf, root); err != nil {
+		t.Fatalf("printLLMSManifest: %v", err)
+	}
+	return buf.String()
+}
+
 func TestLLMSManifest_IsValidJSON(t *testing.T) {
 	t.Parallel()
 
-	root := newRootCommand()
-	root.SetArgs([]string{"--llms"})
-
-	out := captureCommandOutput(t, func() {
-		if err := root.Execute(); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	out := renderLLMSManifest(t)
 
 	var manifest llmsManifest
 	if err := json.Unmarshal([]byte(out), &manifest); err != nil {
@@ -37,14 +44,7 @@ func TestLLMSManifest_IsValidJSON(t *testing.T) {
 func TestLLMSManifest_ContainsTopLevelCommands(t *testing.T) {
 	t.Parallel()
 
-	root := newRootCommand()
-	root.SetArgs([]string{"--llms"})
-
-	out := captureCommandOutput(t, func() {
-		if err := root.Execute(); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	out := renderLLMSManifest(t)
 
 	for _, want := range []string{"jobs", "runs", "deploy", "schema", "agent", "doctor"} {
 		if !strings.Contains(out, want) {
@@ -56,14 +56,7 @@ func TestLLMSManifest_ContainsTopLevelCommands(t *testing.T) {
 func TestLLMSManifest_HasVersionAndCLIName(t *testing.T) {
 	t.Parallel()
 
-	root := newRootCommand()
-	root.SetArgs([]string{"--llms"})
-
-	out := captureCommandOutput(t, func() {
-		if err := root.Execute(); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	out := renderLLMSManifest(t)
 
 	var manifest llmsManifest
 	if err := json.Unmarshal([]byte(out), &manifest); err != nil {
@@ -84,21 +77,13 @@ func TestLLMSManifest_HasVersionAndCLIName(t *testing.T) {
 func TestLLMSManifest_FlagsHaveTypes(t *testing.T) {
 	t.Parallel()
 
-	root := newRootCommand()
-	root.SetArgs([]string{"--llms"})
-
-	out := captureCommandOutput(t, func() {
-		if err := root.Execute(); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
+	out := renderLLMSManifest(t)
 
 	var manifest llmsManifest
 	if err := json.Unmarshal([]byte(out), &manifest); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 
-	// Find jobs command and check it has subcommands.
 	var jobsCmd *llmsCommand
 	for i, cmd := range manifest.Commands {
 		if cmd.Name == "jobs" {
@@ -117,18 +102,8 @@ func TestLLMSManifest_FlagsHaveTypes(t *testing.T) {
 func TestLLMSManifest_DoesNotContainHiddenCommands(t *testing.T) {
 	t.Parallel()
 
-	root := newRootCommand()
-	root.SetArgs([]string{"--llms"})
+	out := renderLLMSManifest(t)
 
-	out := captureCommandOutput(t, func() {
-		if err := root.Execute(); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	// "completion" is a registered but hidden-ish command that should be excluded
-	// from the LLM manifest (it was filtered by name in buildCommandTree).
-	// "help" is always excluded.
 	if strings.Contains(out, `"name":"help"`) {
 		t.Error("manifest should not contain 'help' command")
 	}

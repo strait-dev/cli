@@ -117,7 +117,7 @@ visual timeline format.`,
 				b.WriteString("  (no events recorded)\n")
 			}
 
-			fmt.Print(b.String())
+			fmt.Fprint(state.out(), b.String())
 			return nil
 		},
 	}

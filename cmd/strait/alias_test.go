@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
+// TestExpandAliasArgs_IgnoresLocalConfig is not parallel: os.Chdir is process-global.
 func TestExpandAliasArgs_IgnoresLocalConfig(t *testing.T) {
-	// Not parallel: os.Chdir mutates process-global state.
 	// Create a temp dir with a local .strait.yaml containing an alias
 	dir := t.TempDir()
 	localConfig := filepath.Join(dir, ".strait.yaml")
@@ -47,8 +47,8 @@ func TestExpandAliasArgs_HonorsExplicitConfig(t *testing.T) {
 	}
 }
 
+// TestAliasSet_AlwaysWritesToHomeConfig is not parallel: os.Chdir is process-global.
 func TestAliasSet_AlwaysWritesToHomeConfig(t *testing.T) {
-	// Not parallel: os.Chdir mutates process-global state.
 	// Create a temp dir with a local .strait.yaml
 	dir := t.TempDir()
 	localConfig := filepath.Join(dir, ".strait.yaml")

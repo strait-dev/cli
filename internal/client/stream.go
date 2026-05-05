@@ -15,6 +15,9 @@ import (
 
 // StreamRunEvents opens an SSE connection and calls handle for each event.
 func (c *Client) StreamRunEvents(ctx context.Context, runID string, handle func(RunStreamMessage) error) error {
+	if err := validatePathSegment(runID); err != nil {
+		return fmt.Errorf("invalid run id: %w", err)
+	}
 	fullURL, err := url.Parse(c.baseURL)
 	if err != nil {
 		return err

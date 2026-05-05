@@ -111,6 +111,37 @@ func TestSlugOrID_Invalid(t *testing.T) {
 	}
 }
 
+func TestIsUUID(t *testing.T) {
+	t.Parallel()
+
+	uuids := []string{
+		"123e4567-e89b-12d3-a456-426614174000",
+		"00000000-0000-0000-0000-000000000000",
+		"FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF",
+		"  123e4567-e89b-12d3-a456-426614174000  ", // whitespace trimmed
+	}
+	for _, s := range uuids {
+		if !validate.IsUUID(s) {
+			t.Errorf("IsUUID(%q) = false, want true", s)
+		}
+	}
+
+	notUUIDs := []string{
+		"",
+		"job-1",
+		"deploy",
+		"123e4567-e89b-12d3-a456-42661417400",   // too short
+		"123e4567-e89b-12d3-a456-4266141740000", // too long
+		"zzzzzzzz-e89b-12d3-a456-426614174000",  // non-hex
+		"not a uuid",
+	}
+	for _, s := range notUUIDs {
+		if validate.IsUUID(s) {
+			t.Errorf("IsUUID(%q) = true, want false", s)
+		}
+	}
+}
+
 func TestSlugOrID_StartsOrEndsWithHyphen(t *testing.T) {
 	t.Parallel()
 

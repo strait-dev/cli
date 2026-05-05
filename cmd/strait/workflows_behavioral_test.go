@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -73,7 +74,7 @@ func TestWorkflowsList_Success(t *testing.T) {
 	cmd := newWorkflowsListCommand(state)
 	cmd.SetArgs([]string{"--project", "proj-test"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -98,7 +99,7 @@ func TestWorkflowsGet_Success(t *testing.T) {
 	cmd := newWorkflowsGetCommand(state)
 	cmd.SetArgs([]string{"wf-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -130,7 +131,7 @@ func TestWorkflowsCreate_Success(t *testing.T) {
 		"--description", "A test workflow",
 	})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -186,7 +187,7 @@ func TestWorkflowsUpdate_Success(t *testing.T) {
 	cmd := newWorkflowsUpdateCommand(state)
 	cmd.SetArgs([]string{"wf-1", "--name", "Updated Name"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -235,7 +236,7 @@ func TestWorkflowsDelete_WithYes(t *testing.T) {
 	cmd := newWorkflowsDeleteCommand(state)
 	cmd.SetArgs([]string{"wf-1", "--yes"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -273,7 +274,7 @@ func TestWorkflowsTrigger_Success(t *testing.T) {
 	cmd := newWorkflowsTriggerCommand(state)
 	cmd.SetArgs([]string{"wf-1", "--project", "proj-test"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -294,10 +295,11 @@ func TestWorkflowsVisualizeCommand(t *testing.T) {
 	})
 
 	state := newTestState(t, srv)
+	state.opts.outputFormat = "" // exercise the rendered ASCII path
 	cmd := newWorkflowsVisualizeCommand(state)
 	cmd.SetArgs([]string{"wf-1"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -305,5 +307,37 @@ func TestWorkflowsVisualizeCommand(t *testing.T) {
 
 	if !strings.Contains(out, "step-a") {
 		t.Fatalf("expected step-a in visualize output, got: %s", out)
+	}
+}
+
+func TestWorkflowsVisualizeCommand_FormatJSON(t *testing.T) {
+	t.Parallel()
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/workflows/wf-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, workflowResponseJSON())
+		},
+	})
+
+	state := newTestState(t, srv) // outputFormat already "json"
+	cmd := newWorkflowsVisualizeCommand(state)
+	cmd.SetArgs([]string{"wf-1"})
+
+	out := captureStateOutput(t, state, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	var got map[string]any
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("expected JSON DAG output, got %q (err=%v)", out, err)
+	}
+	if got["workflow_id"] != "wf-1" {
+		t.Fatalf("expected workflow_id=wf-1, got: %v", got["workflow_id"])
+	}
+	nodes, ok := got["nodes"].([]any)
+	if !ok || len(nodes) == 0 {
+		t.Fatalf("expected nodes in JSON output, got: %v", got)
 	}
 }

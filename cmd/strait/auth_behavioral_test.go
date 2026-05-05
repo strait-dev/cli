@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -15,7 +14,7 @@ import (
 	cliconfig "github.com/strait-dev/cli/internal/config"
 )
 
-func forceAuthIsTerminal(t *testing.T, fn func(int) bool) {
+func forceAuthIsTerminal(t *testing.T, fn func() bool) {
 	t.Helper()
 	prev := authIsTerminal
 	authIsTerminal = fn
@@ -24,7 +23,7 @@ func forceAuthIsTerminal(t *testing.T, fn func(int) bool) {
 	})
 }
 
-func forceAuthReadSecret(t *testing.T, fn func(int) ([]byte, error)) {
+func forceAuthReadSecret(t *testing.T, fn func() ([]byte, error)) {
 	t.Helper()
 	prev := authReadSecret
 	authReadSecret = fn
@@ -162,7 +161,7 @@ func TestLoginCommand_DefaultsAndNonInteractiveError(t *testing.T) {
 	t.Parallel()
 
 	state := &appState{opts: &rootOptions{serverURL: "https://api.example.com", timeout: time.Second}}
-	forceAuthIsTerminal(t, func(int) bool { return false })
+	forceAuthIsTerminal(t, func() bool { return false })
 
 	cmd := newLoginCommand(state)
 	err := cmd.Execute()
@@ -176,7 +175,7 @@ func TestLoginCommand_DeviceFlowSelection(t *testing.T) {
 
 	t.Run("success returns immediately", func(t *testing.T) {
 		state := &appState{opts: &rootOptions{serverURL: "https://api.example.com", timeout: time.Second}}
-		forceAuthIsTerminal(t, func(int) bool { return true })
+		forceAuthIsTerminal(t, func() bool { return true })
 
 		deviceCalled := false
 		apiKeyCalled := false
@@ -203,7 +202,7 @@ func TestLoginCommand_DeviceFlowSelection(t *testing.T) {
 
 	t.Run("failure falls back to api key entry", func(t *testing.T) {
 		state := &appState{opts: &rootOptions{serverURL: "https://api.example.com", timeout: time.Second}}
-		forceAuthIsTerminal(t, func(int) bool { return true })
+		forceAuthIsTerminal(t, func() bool { return true })
 
 		apiKeyCalled := false
 		forceAuthLoginWithDeviceCode(t, func(_ *cobra.Command, _ *appState, _, _ string) error {
@@ -233,7 +232,7 @@ func TestLoginCommand_DeviceFlowSelection(t *testing.T) {
 
 	t.Run("browser flag returns device error", func(t *testing.T) {
 		state := &appState{opts: &rootOptions{serverURL: "https://api.example.com", timeout: time.Second}}
-		forceAuthIsTerminal(t, func(int) bool { return true })
+		forceAuthIsTerminal(t, func() bool { return true })
 
 		forceAuthLoginWithDeviceCode(t, func(_ *cobra.Command, _ *appState, _, _ string) error {
 			return errors.New("device unavailable")
@@ -689,10 +688,7 @@ func TestResolveAPIKeyInput_Behaviors(t *testing.T) {
 	})
 
 	t.Run("prompt success", func(t *testing.T) {
-		forceAuthReadSecret(t, func(fd int) ([]byte, error) {
-			if fd != syscall.Stdin {
-				t.Fatalf("unexpected fd: %d", fd)
-			}
+		forceAuthReadSecret(t, func() ([]byte, error) {
 			return []byte("  sk-prompt  "), nil
 		})
 		stderr := captureCommandErrorOutput(t, func() {
@@ -707,7 +703,7 @@ func TestResolveAPIKeyInput_Behaviors(t *testing.T) {
 	})
 
 	t.Run("prompt error", func(t *testing.T) {
-		forceAuthReadSecret(t, func(int) ([]byte, error) {
+		forceAuthReadSecret(t, func() ([]byte, error) {
 			return nil, errors.New("read failed")
 		})
 		_, err := resolveAPIKeyInput("", false)
@@ -717,7 +713,7 @@ func TestResolveAPIKeyInput_Behaviors(t *testing.T) {
 	})
 
 	t.Run("prompt empty requires key", func(t *testing.T) {
-		forceAuthReadSecret(t, func(int) ([]byte, error) {
+		forceAuthReadSecret(t, func() ([]byte, error) {
 			return []byte("   "), nil
 		})
 		_, err := resolveAPIKeyInput("", false)

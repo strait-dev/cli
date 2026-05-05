@@ -58,7 +58,7 @@ func TestValidate_Success(t *testing.T) {
 	cmd := newValidateCommand(state)
 	cmd.SetArgs([]string{"-f", path})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -131,7 +131,7 @@ func TestApply_DryRun(t *testing.T) {
 	cmd := newApplyCommand(state)
 	cmd.SetArgs([]string{"-f", path, "--dry-run"})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -164,7 +164,7 @@ func TestApply_CreatesJob(t *testing.T) {
 	cmd := newApplyCommand(state)
 	cmd.SetArgs([]string{"-f", path})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -200,7 +200,7 @@ func TestApply_UpdatesExistingJob(t *testing.T) {
 	cmd := newApplyCommand(state)
 	cmd.SetArgs([]string{"-f", path})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -230,7 +230,7 @@ func TestDiff_NewResource(t *testing.T) {
 	cmd := newDiffCommand(state)
 	cmd.SetArgs([]string{"-f", path})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -257,7 +257,7 @@ func TestDiff_ExistingResource(t *testing.T) {
 	cmd := newDiffCommand(state)
 	cmd.SetArgs([]string{"-f", path})
 
-	out := captureCommandOutput(t, func() {
+	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

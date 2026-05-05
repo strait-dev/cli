@@ -54,7 +54,7 @@ Use --debug on the root command to also log timing and status code.`,
 				return err
 			}
 
-			return cli.RawRequest(cmd.Context(), method, urlPath, body, os.Stdout)
+			return cli.RawRequest(cmd.Context(), method, urlPath, body, state.out())
 		},
 	}
 

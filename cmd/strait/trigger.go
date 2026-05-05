@@ -101,8 +101,15 @@ func resolveJobIdentifier(ctx context.Context, cli *client.Client, state *appSta
 	if err := validate.SlugOrID(idOrSlug); err != nil {
 		return "", fmt.Errorf("invalid job identifier: %w", err)
 	}
-	if _, err := cli.GetJob(ctx, idOrSlug); err == nil {
+	if validate.IsUUID(idOrSlug) {
 		return idOrSlug, nil
+	}
+	_, err := cli.GetJob(ctx, idOrSlug)
+	if err == nil {
+		return idOrSlug, nil
+	}
+	if !client.IsNotFound(err) {
+		return "", fmt.Errorf("resolving job %q: %w", idOrSlug, err)
 	}
 
 	projectID := state.opts.projectID
@@ -110,9 +117,9 @@ func resolveJobIdentifier(ctx context.Context, cli *client.Client, state *appSta
 		return "", fmt.Errorf("project is required to resolve slug %q", idOrSlug)
 	}
 
-	jobs, err := cli.ListJobs(ctx, projectID)
-	if err != nil {
-		return "", fmt.Errorf("resolving job %q: %w", idOrSlug, err)
+	jobs, lerr := cli.ListJobs(ctx, projectID)
+	if lerr != nil {
+		return "", fmt.Errorf("resolving job %q: %w", idOrSlug, lerr)
 	}
 	for _, job := range jobs {
 		if job.Slug == idOrSlug {
