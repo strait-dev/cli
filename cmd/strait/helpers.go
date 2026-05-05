@@ -13,6 +13,14 @@ import (
 	cliconfig "github.com/strait-dev/cli/internal/config"
 )
 
+var stdoutIsTTYFunc = func() bool {
+	fi, err := os.Stdout.Stat() // printdata-ok: TTY detection on the actual fd, not a writer
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
+}
+
 // mustMarkFlagRequired panics if MarkFlagRequired returns an error — which
 // only happens when the flag name doesn't exist on the command. That is a
 // programmer error caught at command construction (i.e. process startup),
@@ -80,11 +88,7 @@ func loadConfigForWrite(state *appState) (*cliconfig.File, string, error) {
 }
 
 func stdoutIsTTY() bool {
-	fi, err := os.Stdout.Stat() // printdata-ok: TTY detection on the actual fd, not a writer
-	if err != nil {
-		return false
-	}
-	return (fi.Mode() & os.ModeCharDevice) != 0
+	return stdoutIsTTYFunc()
 }
 
 // isTTYRich returns true when styled/rich output should be used.

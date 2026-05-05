@@ -75,7 +75,9 @@ func TestAliasSet_AlwaysWritesToHomeConfig(t *testing.T) {
 	// loadHomeConfigForWrite will use HomePath() which points to ~/.config/strait/config.yaml
 	// In tests, this may not exist, so the command might error, which is fine -
 	// the important thing is that it does NOT write to the local config.
-	_ = cmd.Execute()
+	captureCommandOutput(t, func() {
+		_ = cmd.Execute()
+	})
 
 	// Read the local config and verify no alias was written there
 	content, err := os.ReadFile(localConfig)

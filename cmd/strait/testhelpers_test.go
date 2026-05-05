@@ -4,12 +4,25 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"flag"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"sync"
 	"testing"
 	"time"
 )
+
+var stdioCaptureMu sync.Mutex
+
+func TestMain(m *testing.M) {
+	// Command tests still exercise process-global stdout and cwd paths.
+	// Keep package-level test parallelism at 1 so race and mutation runs are stable
+	// until the command output layer is fully writer-injected.
+	_ = flag.Set("test.parallel", "1")
+	os.Exit(m.Run())
+}
 
 // newTestServer creates an httptest.Server and registers cleanup.
 func newTestServer(t *testing.T, handler http.Handler) *httptest.Server {
@@ -21,9 +34,8 @@ func newTestServer(t *testing.T, handler http.Handler) *httptest.Server {
 
 // newTestState creates an appState pointing at the given test server.
 // CI mode is enabled and output format is JSON so tests never block on
-// TTY prompts or styled output. The state's stdout is a fresh *bytes.Buffer
-// so captureStateOutput can read command output without swapping the global
-// os.Stdout under a process-wide mutex.
+// TTY prompts or styled output. Tests that need writer-injected output should
+// call captureStateOutput, which installs a fresh *bytes.Buffer when needed.
 func newTestState(t *testing.T, srv *httptest.Server) *appState {
 	t.Helper()
 	return &appState{
@@ -36,13 +48,12 @@ func newTestState(t *testing.T, srv *httptest.Server) *appState {
 			ciMode:       true,
 			noColor:      true,
 		},
-		stdout: &bytes.Buffer{},
 	}
 }
 
 // The helpers below run inside HTTP handler goroutines, not the test
 // goroutine. Per testing.T docs, FailNow / Fatal must be called from the test
-// goroutine — calling t.Fatal from a server-side goroutine only kills that
+// goroutine. Calling t.Fatal from a server-side goroutine only kills that
 // goroutine, leaves the request hanging, and surfaces as an opaque client
 // timeout instead of the real assertion. So these helpers use t.Errorf and
 // then write a 5xx via http.Error so the failure surfaces synchronously
@@ -130,17 +141,6 @@ func readJSONBody(t *testing.T, r *http.Request, dest any) {
 // captureStateOutput runs fn and returns whatever was written to state's
 // in-memory stdout buffer. The buffer is reset before fn runs so callers can
 // invoke captureStateOutput repeatedly within a single test.
-//
-// Each appState owns its own buffer, so parallel tests do not contend on a
-// shared global the way the previous os.Stdout pipe-swap helper did. That
-// swap lived under a process-wide mutex which serialized every t.Parallel()
-// test that captured output and occasionally leaked goroutines between
-// siblings, producing intermittent CI flakes.
-//
-// If state.stdout is nil, a fresh buffer is installed. If state.stdout is
-// already set to something other than *bytes.Buffer, the helper fails the
-// test rather than silently replacing it — callers who inject custom writers
-// should not have them swapped out from under them.
 func captureStateOutput(t *testing.T, state *appState, fn func()) string {
 	t.Helper()
 	if state.stdout == nil {
@@ -153,6 +153,132 @@ func captureStateOutput(t *testing.T, state *appState, fn func()) string {
 	buf.Reset()
 	fn()
 	return buf.String()
+}
+
+func captureCommandOutput(t *testing.T, fn func()) string {
+	t.Helper()
+	stdout, _ := captureCommandStreams(t, fn)
+	return stdout
+}
+
+func captureCommandErrorOutput(t *testing.T, fn func()) string {
+	t.Helper()
+	_, stderr := captureCommandStreams(t, fn)
+	return stderr
+}
+
+// captureCommandStreams captures everything written to os.Stdout and os.Stderr
+// during fn and restores both streams before releasing the shared lock.
+func captureCommandStreams(t *testing.T, fn func()) (string, string) {
+	t.Helper()
+	stdioCaptureMu.Lock()
+	defer stdioCaptureMu.Unlock()
+
+	origStdout := os.Stdout
+	origStderr := os.Stderr
+
+	stdoutR, stdoutW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	stderrR, stderrW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	os.Stdout = stdoutW
+	os.Stderr = stderrW
+
+	fn()
+
+	os.Stdout = origStdout
+	os.Stderr = origStderr
+	_ = stdoutW.Close()
+	_ = stderrW.Close()
+
+	stdoutData, err := io.ReadAll(stdoutR)
+	if err != nil {
+		t.Fatalf("read stdout pipe: %v", err)
+	}
+	stderrData, err := io.ReadAll(stderrR)
+	if err != nil {
+		t.Fatalf("read stderr pipe: %v", err)
+	}
+	_ = stdoutR.Close()
+	_ = stderrR.Close()
+	return string(stdoutData), string(stderrData)
+}
+
+func forceStdoutTTY(t *testing.T, tty bool) {
+	t.Helper()
+	prev := stdoutIsTTYFunc
+	stdoutIsTTYFunc = func() bool { return tty }
+	t.Cleanup(func() {
+		stdoutIsTTYFunc = prev
+	})
+}
+
+func forceRunsTimeNow(t *testing.T, fn func() time.Time) {
+	t.Helper()
+	prev := runsTimeNow
+	runsTimeNow = fn
+	t.Cleanup(func() {
+		runsTimeNow = prev
+	})
+}
+
+func forceRunsAfter(t *testing.T, fn func(time.Duration) <-chan time.Time) {
+	t.Helper()
+	prev := runsAfter
+	runsAfter = fn
+	t.Cleanup(func() {
+		runsAfter = prev
+	})
+}
+
+func forceLogsTimeNow(t *testing.T, fn func() time.Time) {
+	t.Helper()
+	prev := logsTimeNow
+	logsTimeNow = fn
+	t.Cleanup(func() {
+		logsTimeNow = prev
+	})
+}
+
+func forceTopTimeNow(t *testing.T, fn func() time.Time) {
+	t.Helper()
+	prev := topTimeNow
+	topTimeNow = fn
+	t.Cleanup(func() {
+		topTimeNow = prev
+	})
+}
+
+func forceTopAfter(t *testing.T, fn func(time.Duration) <-chan time.Time) {
+	t.Helper()
+	prev := topAfter
+	topAfter = fn
+	t.Cleanup(func() {
+		topAfter = prev
+	})
+}
+
+func withMockStdin(t *testing.T, input string, fn func()) {
+	t.Helper()
+	orig := os.Stdin
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	if _, err := io.WriteString(w, input); err != nil {
+		t.Fatalf("write stdin: %v", err)
+	}
+	_ = w.Close()
+	os.Stdin = r
+	t.Cleanup(func() {
+		os.Stdin = orig
+		_ = r.Close()
+	})
+	fn()
 }
 
 // newRouterServer creates an httptest server that routes requests to handler

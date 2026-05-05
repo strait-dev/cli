@@ -10,6 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var openBrowserFunc = openBrowser
+
 func newOpenCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "open [resource-id]",
@@ -37,7 +39,7 @@ Optionally pass a run ID or job slug to open a specific page.`,
 				}
 			}
 
-			return openBrowser(target)
+			return openBrowserFunc(target)
 		},
 	}
 

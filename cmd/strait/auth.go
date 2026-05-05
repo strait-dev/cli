@@ -18,6 +18,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	authIsTerminal          = stdinIsTerminal
+	authReadSecret          = readStdinPassword
+	authValidateAPIKey      = cliauth.ValidateAPIKey
+	authSaveAPIKey          = cliauth.SaveAPIKey
+	authLoadAPIKey          = cliauth.LoadAPIKey
+	authDeleteAPIKey        = cliauth.DeleteAPIKey
+	authLoginWithDeviceCode = loginWithDeviceCode
+	authLoginWithAPIKey     = loginWithAPIKey
+)
+
 func newLoginCommand(state *appState) *cobra.Command {
 	var apiKey string
 	var withToken bool
@@ -55,18 +66,18 @@ an API key directly, or --with-token to read one from stdin.`,
 
 			// Direct token mode: --token or --api-key or --with-token provided.
 			if apiKey != "" || withToken {
-				return loginWithAPIKey(cmd, state, apiKey, withToken, targetContext, targetServer)
+				return authLoginWithAPIKey(cmd, state, apiKey, withToken, targetContext, targetServer)
 			}
 
 			// Non-interactive or non-TTY without explicit token: error with guidance.
-			if state.opts.nonInteractive || !stdinIsTerminal() {
+			if state.opts.nonInteractive || !authIsTerminal() {
 				return fmt.Errorf("non-interactive mode: use --token <api-key> or STRAIT_API_KEY env var to authenticate")
 			}
 
 			// Browser-based device code flow (default for interactive terminals).
 			useDeviceFlow := !noBrowser
 			if useDeviceFlow {
-				err := loginWithDeviceCode(cmd, state, targetContext, targetServer)
+				err := authLoginWithDeviceCode(cmd, state, targetContext, targetServer)
 				if err == nil {
 					return nil
 				}
@@ -79,21 +90,7 @@ an API key directly, or --with-token to read one from stdin.`,
 				fmt.Fprintln(os.Stderr, "Falling back to manual API key entry.")
 			}
 
-			// Legacy browser-open flow or manual entry fallback.
-			useLegacyBrowser := browser && !noBrowser
-			if useLegacyBrowser {
-				dashURL := cliauth.DashboardURL(targetServer)
-				if dashURL != "" {
-					keysURL := dashURL + "/settings/api-keys"
-					fmt.Fprintf(os.Stderr, "Opening %s in your browser...\n", keysURL)
-					if err := openBrowser(keysURL); err != nil {
-						fmt.Fprintf(os.Stderr, "Could not open browser. Visit %s manually.\n", keysURL)
-					}
-					fmt.Fprintln(os.Stderr, "Create an API key, then paste it below.")
-				}
-			}
-
-			return loginWithAPIKey(cmd, state, "", false, targetContext, targetServer)
+			return authLoginWithAPIKey(cmd, state, "", false, targetContext, targetServer)
 		},
 	}
 
@@ -139,7 +136,7 @@ func loginWithDeviceCode(cmd *cobra.Command, state *appState, targetContext, tar
 	fmt.Fprintln(os.Stderr, "")
 
 	// Try to open the browser automatically.
-	if err := openBrowser(resp.VerificationURL); err != nil {
+	if err := openBrowserFunc(resp.VerificationURL); err != nil {
 		fmt.Fprintf(os.Stderr, "Could not open browser automatically. Visit the URL above.\n")
 	} else {
 		fmt.Fprintln(os.Stderr, "Waiting for browser authorization...")
@@ -183,7 +180,7 @@ func loginWithDeviceCode(cmd *cobra.Command, state *appState, targetContext, tar
 		return fmt.Errorf("device code authorization: %w", err)
 	}
 
-	if err := cliauth.SaveAPIKey(targetContext, tokenResp.APIKey); err != nil {
+	if err := authSaveAPIKey(targetContext, tokenResp.APIKey); err != nil {
 		return fmt.Errorf("save api key: %w", err)
 	}
 
@@ -226,11 +223,11 @@ func loginWithAPIKey(cmd *cobra.Command, state *appState, apiKey string, withTok
 		return err
 	}
 
-	if err := cliauth.ValidateAPIKey(cmd.Context(), targetServer, resolvedKey, state.opts.timeout); err != nil {
+	if err := authValidateAPIKey(cmd.Context(), targetServer, resolvedKey, state.opts.timeout); err != nil {
 		return err
 	}
 
-	if err := cliauth.SaveAPIKey(targetContext, resolvedKey); err != nil {
+	if err := authSaveAPIKey(targetContext, resolvedKey); err != nil {
 		return fmt.Errorf("save api key: %w", err)
 	}
 
@@ -278,7 +275,7 @@ func newLogoutCommand(state *appState) *cobra.Command {
 				targetContext = "default"
 			}
 
-			if err := cliauth.DeleteAPIKey(targetContext); err != nil {
+			if err := authDeleteAPIKey(targetContext); err != nil {
 				return fmt.Errorf("delete api key: %w", err)
 			}
 
@@ -313,7 +310,7 @@ func newAuthCommand(state *appState) *cobra.Command {
 				targetContext = "default"
 			}
 
-			_, err := cliauth.LoadAPIKey(targetContext)
+			_, err := authLoadAPIKey(targetContext)
 			authed := err == nil
 
 			if isTTYRich(state) {
@@ -358,7 +355,7 @@ func resolveAPIKeyInput(flagValue string, withToken bool) (string, error) {
 	}
 
 	fmt.Fprint(os.Stderr, "API key: ")
-	secret, err := readStdinPassword()
+	secret, err := authReadSecret()
 	fmt.Fprintln(os.Stderr)
 	if err != nil {
 		return "", err
