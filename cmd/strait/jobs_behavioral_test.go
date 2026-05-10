@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/types"
 )
 
@@ -889,74 +888,5 @@ func TestJobSourceDisplay(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("jobSourceDisplay(%q) = %q, want %q", tc.input, got, tc.want)
 		}
-	}
-}
-
-func TestDeploymentWatch_ExitsImmediatelyIfReady(t *testing.T) {
-	t.Parallel()
-
-	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
-			respondPaginated(t, w, http.StatusOK, []types.Job{
-				{ID: "job-1", Slug: "my-job", ProjectID: "proj-test"},
-			})
-		},
-		"GET /v1/jobs/job-1/deployments/dep-ready": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, client.CodeDeployment{
-				ID: "dep-ready", Status: "ready", Version: 3, Runtime: "go",
-				BuiltImageURI: "registry.io/app:abc123",
-			})
-		},
-	})
-
-	state := newTestState(t, srv)
-	watchCmd, _ := newCodeDeploymentWatchCommand(state)
-	watchCmd.SetArgs([]string{"dep-ready", "--job", "my-job"})
-
-	if err := watchCmd.Execute(); err != nil {
-		t.Fatalf("watch should exit 0 when deployment is ready, got: %v", err)
-	}
-}
-
-func TestDeploymentWatch_ExitsOneWhenFailed(t *testing.T) {
-	t.Parallel()
-
-	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
-			respondPaginated(t, w, http.StatusOK, []types.Job{
-				{ID: "job-1", Slug: "my-job", ProjectID: "proj-test"},
-			})
-		},
-		"GET /v1/jobs/job-1/deployments/dep-fail": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, client.CodeDeployment{
-				ID: "dep-fail", Status: "failed", Version: 1, Runtime: "go",
-				ErrorMessage: "compilation failed",
-			})
-		},
-	})
-
-	state := newTestState(t, srv)
-	watchCmd, _ := newCodeDeploymentWatchCommand(state)
-	watchCmd.SetArgs([]string{"dep-fail", "--job", "my-job"})
-
-	err := watchCmd.Execute()
-	if err == nil {
-		t.Fatal("watch should exit non-zero when deployment has failed")
-	}
-	if !strings.Contains(err.Error(), "failed") {
-		t.Fatalf("expected 'failed' in error message, got: %v", err)
-	}
-}
-
-func TestDeploymentWatch_RequiresJobFlag(t *testing.T) {
-	t.Parallel()
-
-	state := &appState{opts: &rootOptions{}}
-	watchCmd, _ := newCodeDeploymentWatchCommand(state)
-	watchCmd.SetArgs([]string{"dep-1"})
-
-	err := watchCmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "--job") {
-		t.Fatalf("expected --job required error, got: %v", err)
 	}
 }

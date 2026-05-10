@@ -138,6 +138,30 @@ func requireConfirmation(state *appState, msg string, yes bool) error {
 	return nil
 }
 
+// healthDetail returns a human-readable detail for a HealthStatus check.
+func healthDetail(status *client.HealthStatus, err error) string {
+	if err != nil {
+		return err.Error()
+	}
+	return status.Status
+}
+
+// statsDetail returns a human-readable detail for a QueueStats check.
+func statsDetail(stats *client.QueueStats, err error) string {
+	if err != nil {
+		return err.Error()
+	}
+	return fmt.Sprintf("queued=%d executing=%d delayed=%d", stats.Queued, stats.Executing, stats.Delayed)
+}
+
+// errDetail formats an error result, returning "ok" when err is nil.
+func errDetail(err error) string {
+	if err == nil {
+		return "ok"
+	}
+	return err.Error()
+}
+
 // requireProjectID resolves the project ID from the flag value or appState default.
 func requireProjectID(state *appState, flagValue string) (string, error) {
 	if flagValue != "" {

@@ -211,7 +211,6 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newDocsCommand(cmd))
 	cmd.AddCommand(newLogsCommand(state))
 	cmd.AddCommand(newEventsCommand(state))
-	cmd.AddCommand(newVerifyCommand(state))
 	cmd.AddCommand(newDiagnoseCommand(state))
 	cmd.AddCommand(newCheckCommand(state))
 	cmd.AddCommand(newCleanupCommand(state))
@@ -233,10 +232,7 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newUpgradeCommand(state))
 	cmd.AddCommand(newBackupCommand(state))
 	cmd.AddCommand(newProfileCommand(state))
-	cmd.AddCommand(newDeployCommand(state))
-	cmd.AddCommand(newCodeDeploymentsCommand(state))
 	cmd.AddCommand(newProjectCommand(state))
-	cmd.AddCommand(newBuildCommand(state))
 	cmd.AddCommand(newDoctorCommand(state))
 	cmd.AddCommand(newOpenCommand(state))
 	cmd.AddCommand(newStatusCommand(state))
@@ -319,7 +315,6 @@ func normalizeLegacyArgs(args []string) []string {
 		"docs":          {},
 		"logs":          {},
 		"events":        {},
-		"verify":        {},
 		"diagnose":      {},
 		"top":           {},
 		"tui":           {},
@@ -341,9 +336,7 @@ func normalizeLegacyArgs(args []string) []string {
 		"upgrade":       {},
 		"backup":        {},
 		"profile":       {},
-		"deploy":        {},
 		"project":       {},
-		"build":         {},
 		"doctor":        {},
 		"open":          {},
 		"status":        {},

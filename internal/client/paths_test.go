@@ -325,15 +325,6 @@ func TestPathTraversalRejected(t *testing.T) {
 		}},
 		{name: "GetEventTrigger", fn: func(id string) error { _, e := c.GetEventTrigger(ctx, id); return e }},
 		{name: "SendEvent", fn: func(id string) error { _, e := c.SendEvent(ctx, id, nil); return e }},
-		{name: "FinalizeDeployment", fn: func(id string) error {
-			return c.FinalizeDeployment(ctx, id, FinalizeDeploymentRequest{})
-		}},
-		{name: "PromoteDeployment", fn: func(id string) error {
-			return c.PromoteDeployment(ctx, id, PromoteDeploymentRequest{})
-		}},
-		{name: "RollbackDeployment", fn: func(id string) error {
-			return c.RollbackDeployment(ctx, id, RollbackDeploymentRequest{})
-		}},
 		{name: "DeleteServerSecret", fn: func(id string) error { return c.DeleteServerSecret(ctx, id) }},
 		{name: "RemoveMember", fn: func(id string) error { return c.RemoveMember(ctx, id) }},
 		{name: "DeleteTeamPolicy", fn: func(id string) error { return c.DeleteTeamPolicy(ctx, id) }},
@@ -407,8 +398,8 @@ func TestPathTraversalRejected_TwoArgWorkflowSteps(t *testing.T) {
 	}
 }
 
-// TestPathTraversalRejected_DeployAndStream covers the streaming methods in
-// stream.go and deploy_logs.go that aren't part of the api.go surface.
+// TestPathTraversalRejected_DeployAndStream covers streaming methods that
+// aren't part of the api.go surface.
 func TestPathTraversalRejected_DeployAndStream(t *testing.T) {
 	t.Parallel()
 
@@ -421,24 +412,9 @@ func TestPathTraversalRejected_DeployAndStream(t *testing.T) {
 	defer cancel()
 
 	noopRun := func(RunStreamMessage) error { return nil }
-	noopChunk := func(string) error { return nil }
 
 	t.Run("StreamRunEvents poisoned", func(t *testing.T) {
 		err := c.StreamRunEvents(ctx, "../jobs", noopRun)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-	})
-
-	t.Run("StreamDeploymentLogs poisoned job id", func(t *testing.T) {
-		err := c.StreamDeploymentLogs(ctx, "../foo", "dep-1", noopChunk)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-	})
-
-	t.Run("StreamDeploymentLogs poisoned deployment id", func(t *testing.T) {
-		err := c.StreamDeploymentLogs(ctx, "job-1", "../bar", noopChunk)
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}

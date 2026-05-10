@@ -23,19 +23,16 @@ type CreateJobRequest struct {
 
 // UpdateJobRequest is the request body for updating a job.
 type UpdateJobRequest struct {
-	Name          *string          `json:"name,omitempty"`
-	Slug          *string          `json:"slug,omitempty"`
-	Description   *string          `json:"description,omitempty"`
-	Cron          *string          `json:"cron,omitempty"`
-	EndpointURL   *string          `json:"endpoint_url,omitempty"`
-	MaxAttempts   *int             `json:"max_attempts,omitempty"`
-	TimeoutSecs   *int             `json:"timeout_secs,omitempty"`
-	RunTTLSecs    *int             `json:"run_ttl_secs,omitempty"`
-	Enabled       *bool            `json:"enabled,omitempty"`
-	Schema        *json.RawMessage `json:"payload_schema,omitempty"`
-	ImageURI      *string          `json:"image_uri,omitempty"`
-	MachinePreset *string          `json:"machine_preset,omitempty"`
-	Region        *string          `json:"region,omitempty"`
+	Name        *string          `json:"name,omitempty"`
+	Slug        *string          `json:"slug,omitempty"`
+	Description *string          `json:"description,omitempty"`
+	Cron        *string          `json:"cron,omitempty"`
+	EndpointURL *string          `json:"endpoint_url,omitempty"`
+	MaxAttempts *int             `json:"max_attempts,omitempty"`
+	TimeoutSecs *int             `json:"timeout_secs,omitempty"`
+	RunTTLSecs  *int             `json:"run_ttl_secs,omitempty"`
+	Enabled     *bool            `json:"enabled,omitempty"`
+	Schema      *json.RawMessage `json:"payload_schema,omitempty"`
 }
 
 // TriggerJobRequest is the request body for triggering a job.
@@ -194,47 +191,6 @@ type QueueStats struct {
 	Delayed   int `json:"delayed"`
 }
 
-// CreateDeploymentVersionRequest is the request body for creating a deployment.
-type CreateDeploymentVersionRequest struct {
-	ProjectID      string `json:"project_id"`
-	Environment    string `json:"environment"`
-	Runtime        string `json:"runtime"`
-	Manifest       any    `json:"manifest,omitempty"`
-	Checksum       string `json:"checksum,omitempty"`
-	ArtifactURI    string `json:"artifact_uri"`
-	Strategy       string `json:"strategy,omitempty"`
-	CanaryPercent  int    `json:"canary_percent,omitempty"`
-	CanaryDuration string `json:"canary_duration,omitempty"`
-}
-
-// DeploymentVersion represents a deployment version.
-type DeploymentVersion struct {
-	ID          string    `json:"id"`
-	ProjectID   string    `json:"project_id"`
-	Environment string    `json:"environment"`
-	Status      string    `json:"status"`
-	Checksum    string    `json:"checksum,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-}
-
-// FinalizeDeploymentRequest is the request body for finalizing a deployment.
-type FinalizeDeploymentRequest struct {
-	ProjectID   string `json:"project_id"`
-	Environment string `json:"environment"`
-}
-
-// PromoteDeploymentRequest is the request body for promoting a deployment.
-type PromoteDeploymentRequest struct {
-	ProjectID   string `json:"project_id"`
-	Environment string `json:"environment"`
-}
-
-// RollbackDeploymentRequest is the request body for rolling back a deployment.
-type RollbackDeploymentRequest struct {
-	ProjectID   string `json:"project_id"`
-	Environment string `json:"environment"`
-}
-
 // ServerSecret represents a server-side secret.
 type ServerSecret struct {
 	ID          string    `json:"id"`
@@ -334,53 +290,6 @@ type AuditChainVerification struct {
 type VerifyAuditChainParams struct {
 	ProjectID string
 	Since     *time.Time
-}
-
-// CodeDeployment represents a code-first job deployment as returned by the API.
-type CodeDeployment struct {
-	ID               string     `json:"id"`
-	JobID            string     `json:"job_id"`
-	ProjectID        string     `json:"project_id"`
-	Version          int        `json:"version"`
-	Status           string     `json:"status"`
-	Runtime          string     `json:"runtime"`
-	SourceHash       string     `json:"source_hash"`
-	SourceSizeBytes  int64      `json:"source_size_bytes"`
-	SourceURI        string     `json:"source_uri"`
-	BuiltImageURI    string     `json:"built_image_uri,omitempty"`
-	BuiltImageDigest string     `json:"built_image_digest,omitempty"`
-	BuildLogs        string     `json:"build_logs,omitempty"`
-	ErrorMessage     string     `json:"error_message,omitempty"`
-	CreatedBy        string     `json:"created_by,omitempty"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
-	FinishedAt       *time.Time `json:"finished_at,omitempty"`
-}
-
-// CreateCodeDeploymentRequest is the request body for creating a code deployment.
-type CreateCodeDeploymentRequest struct {
-	ProjectID       string `json:"project_id"`
-	JobID           string `json:"job_id"`
-	Runtime         string `json:"runtime"`
-	SourceHash      string `json:"source_hash"`
-	SourceSizeBytes int64  `json:"source_size_bytes"`
-}
-
-// CreateCodeDeploymentResponse is returned when creating a code deployment.
-type CreateCodeDeploymentResponse struct {
-	Deployment *CodeDeployment `json:"deployment"`
-	UploadURL  string          `json:"upload_url"`
-}
-
-// ConfirmCodeDeploymentRequest is the request body for confirming a code deployment.
-type ConfirmCodeDeploymentRequest struct {
-	ProjectID string `json:"project_id"`
-}
-
-// DeploymentLogChunk is a single chunk published on the build log SSE stream.
-type DeploymentLogChunk struct {
-	Chunk string `json:"chunk,omitempty"`
-	Done  bool   `json:"done,omitempty"`
 }
 
 // DeviceCodeResponse is returned by the device authorization endpoint.

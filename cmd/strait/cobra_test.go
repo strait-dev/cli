@@ -16,12 +16,12 @@ func TestRootCommand_HasExpectedSubcommands(t *testing.T) {
 		"context", "alias", "login", "logout", "auth",
 		"jobs", "runs", "trigger", "health",
 		"workflows", "workflow-runs", "api-keys", "stats", "api",
-		"wait", "docs", "logs", "events", "verify", "diagnose",
+		"wait", "docs", "logs", "events", "diagnose",
 		"top", "tui", "validate", "apply", "diff", "export",
 		"run", "send", "secrets", "fixtures",
 		"check", "cleanup", "extension", "listen", "drain",
 		"trace", "upgrade", "backup", "profile",
-		"deploy", "project", "build", "doctor", "open",
+		"project", "doctor", "open",
 		"status", "debug", "create", "ci", "perf", "team", "audit",
 		"whoami", "config",
 	}
@@ -182,29 +182,6 @@ func TestCIMode_Flag(t *testing.T) {
 	}
 	if ci.DefValue != "false" {
 		t.Errorf("--ci default: got %q, want false", ci.DefValue)
-	}
-}
-
-func TestDeployCommand_HasSubcommands(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	deploy := findSubcommand(t, cmd, "deploy")
-
-	expected := []string{"create", "finalize", "promote", "rollback", "list", "preview"}
-	assertSubcommands(t, deploy, expected)
-}
-
-func TestBuildCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	build := findSubcommand(t, cmd, "build")
-
-	for _, name := range []string{"config", "out-dir", "dry-run", "json"} {
-		if build.Flags().Lookup(name) == nil {
-			t.Errorf("build missing --%s flag", name)
-		}
 	}
 }
 
@@ -378,63 +355,6 @@ func assertSubcommands(t *testing.T, parent interface{ Commands() []*cobra.Comma
 	for _, name := range expected {
 		if !subs[name] {
 			t.Errorf("missing subcommand: %s", name)
-		}
-	}
-}
-
-func TestDeploymentsCommand_HasSubcommands(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	deps := findSubcommand(t, cmd, "deployments")
-
-	expected := []string{"list", "get", "logs", "rollback", "watch"}
-	assertSubcommands(t, deps, expected)
-}
-
-func TestDeploymentsWatchCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	deps := findSubcommand(t, cmd, "deployments")
-	watch := findSubcommand(t, deps, "watch")
-
-	for _, name := range []string{"job", "project", "timeout"} {
-		if watch.Flags().Lookup(name) == nil {
-			t.Errorf("deployments watch missing --%s flag", name)
-		}
-	}
-
-	// Default timeout should be 30m.
-	if f := watch.Flags().Lookup("timeout"); f.DefValue != "30m0s" {
-		t.Errorf("watch --timeout default: got %q, want 30m0s", f.DefValue)
-	}
-}
-
-func TestDeploymentsGetCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	deps := findSubcommand(t, cmd, "deployments")
-	get := findSubcommand(t, deps, "get")
-
-	for _, name := range []string{"job", "project"} {
-		if get.Flags().Lookup(name) == nil {
-			t.Errorf("deployments get missing --%s flag", name)
-		}
-	}
-}
-
-func TestDeploymentsLogsCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	deps := findSubcommand(t, cmd, "deployments")
-	logs := findSubcommand(t, deps, "logs")
-
-	for _, name := range []string{"job", "project", "stream"} {
-		if logs.Flags().Lookup(name) == nil {
-			t.Errorf("deployments logs missing --%s flag", name)
 		}
 	}
 }
