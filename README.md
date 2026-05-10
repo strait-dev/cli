@@ -17,7 +17,7 @@
 
 ---
 
-The official CLI for [Strait](https://strait.dev) — an open-source job execution and workflow orchestration platform. A single Go binary with 70+ top-level commands covering job and workflow management, deployment, environments and webhooks, declarative GitOps, billing and analytics, RBAC, local development, and real-time monitoring.
+The official CLI for [Strait](https://strait.dev) — an open-source orchestration platform. Customer code runs on customer infrastructure (Vercel, Cloudflare Workers, AWS Lambda, Netlify, Express, Kubernetes, Go) and Strait orchestrates execution via signed HTTPS push (`strait.serve`) or a long-lived gRPC worker stream (`strait.worker`).
 
 [Website](https://strait.dev) | [Platform Repo](https://github.com/strait-dev/strait) | [Documentation](https://docs.strait.dev) | [Releases](https://github.com/strait-dev/cli/releases)
 
@@ -36,45 +36,58 @@ Pre-built binaries available on [GitHub Releases](https://github.com/strait-dev/
 ## Quick start
 
 ```bash
-strait init                                        # Initialize a project
-strait login                                       # Authenticate (opens browser)
-strait create job                                  # Create a job
-strait trigger my-job --payload '{"id": "123"}'    # Trigger it
-strait runs watch <run-id>                         # Watch the run
-strait tui                                         # Open the dashboard
+strait init --template vercel --name my-app   # Scaffold a starter project
+strait auth login                              # Authenticate (opens browser)
+strait deploy push                             # Upsert SDK-defined jobs
+strait endpoint set hello https://my-app.vercel.app/api/strait
+strait endpoint verify hello                   # Round-trip a signed canary
+strait runs watch <run-id>                     # Stream a run's logs
+```
+
+To run a long-lived worker (gRPC) instead of a serve endpoint:
+
+```bash
+strait init --template go-worker --name my-worker
+strait deploy push
+strait worker start --queue default
 ```
 
 ## Commands
 
-| Category | Commands | Docs |
-|---|---|---|
-| Jobs | `create job`, `trigger`, `jobs list/get/describe/edit/delete/pause/resume/clone/health/dependencies/add-dependency/batch` | [jobs](docs/cli-reference/jobs.mdx) |
-| Runs | `runs list/get/watch/cancel/replay/diff/reschedule/dlq/dlq-replay/outputs/tool-calls/usage/checkpoints`, `wait run` | [runs](docs/cli-reference/runs.mdx) |
-| Workflows | `create workflow`, `workflows list/describe/visualize/trigger/clone/dry-run/plan/simulate/versions/diff/policy` | [workflows](docs/cli-reference/workflows.mdx) |
-| Workflow runs | `workflow-runs list/get/pause/resume/retry/approve-step/retry-step/skip-step/force-complete-step` | [workflow-runs](docs/cli-reference/workflow-runs.mdx) |
-| Deployment | `deploy`, `deploy create/finalize/promote/rollback/list`, `deployments create-from-source/get/logs/rollback/watch`, `verify` | [deployment](docs/guides/deployment.mdx) |
-| Environments | `environments list/get/create/update/delete/variables` | [environments](docs/cli-reference/environments.mdx) |
-| Webhooks | `webhooks list/get/create/delete/deliveries/retry/test` | [webhooks](docs/cli-reference/webhooks.mdx) |
-| Event sources | `event-sources list/get/create/update/delete` | [event-sources](docs/cli-reference/event-sources.mdx) |
-| Job groups | `job-groups list/get/create/update/delete/jobs/pause/resume/stats` | [job-groups](docs/cli-reference/job-groups.mdx) |
-| Notifications | `notifications list/get/create/update/delete` | [notifications](docs/cli-reference/notifications.mdx) |
-| Log drains | `log-drains list/get/create/update/delete` | [log-drains](docs/cli-reference/log-drains.mdx) |
-| Logs | `logs`, `events`, `send` | [logs](docs/cli-reference/logs.mdx) |
-| GitOps | `validate`, `check`, `diff`, `apply`, `export`, `build`, `project` | [gitops](docs/guides/gitops.mdx) |
-| Secrets | `secrets list/create/delete`, `api-keys list/create/rotate/revoke` | [secrets](docs/cli-reference/secrets.mdx) |
-| Team | `team list/add/remove/roles`, `team policies list/create/delete`, `audit` | [team](docs/cli-reference/team.mdx) |
-| Triggers | `triggers list/get/send/purge` | [triggers](docs/cli-reference/triggers.mdx) |
-| Monitoring | `doctor`, `status`, `health`, `listen`, `top`, `trace`, `perf`, `stats`, `analytics costs/reliability/top-failing` | [monitoring](docs/guides/monitoring.mdx) |
-| Billing | `usage current/history/forecast` | [billing](docs/cli-reference/usage.mdx) |
-| Local dev | `dev test`, `dev tunnel`, `dev status`, `run` | [local dev](docs/guides/local-development.mdx) |
-| CI/CD | `ci setup`, `ci check` | [ci-cd](docs/guides/ci-cd.mdx) |
-| Extensions | `extension list/install/run/create/remove` | [extensions](docs/guides/extensions.mdx) |
-| Auth | `login`, `logout`, `whoami`, `context`, `auth` | [authentication](docs/getting-started/authentication.mdx) |
-| Config | `config`, `alias`, `completion` | [configuration](docs/guides/configuration.mdx) |
-| Backup | `backup create`, `backup restore` | [backup](docs/cli-reference/backup.mdx) |
-| Fixtures | `fixtures create/clean` | [fixtures](docs/cli-reference/fixtures.mdx) |
-| Raw API | `api GET/POST/DELETE ...` | [api](docs/cli-reference/api.mdx) |
-| Other | `open`, `cleanup`, `drain`, `diagnose`, `debug`, `profile`, `upgrade` | [utilities](docs/cli-reference/utilities.mdx) |
+Canonical surface (orchestration-only). `strait --help` lists the full tree.
+
+| Category | Commands |
+|---|---|
+| Scaffolding | `init --template <vercel\|cloudflare\|lambda\|netlify\|express\|k8s-worker\|go-chi-serve\|go-worker>` |
+| Migration | `migrate inngest\|trigger\|hatchet --input <path>` |
+| Deploy | `deploy push` |
+| Endpoint | `endpoint set/get/verify` |
+| Worker | `worker start/status/drain/logs` |
+| Dev | `dev` (Cloudflare Tunnel + watch + auto-register) |
+| Jobs | `jobs list/get/create/update/delete/clone/trigger/health/versions/dependencies/batch` |
+| Runs | `runs list/get/logs/cancel/replay/reschedule/dlq-replay/outputs/checkpoints/events/watch` |
+| Workflows | `workflows list/get/create/update/delete/clone/trigger/dry-run/plan/simulate/versions/diff/policy` |
+| Workflow runs | `workflow-runs list/get/pause/resume/retry`, `workflow-runs steps {list\|approve\|retry\|skip\|force-complete}` |
+| Triggers | `triggers list/get/send/stream/purge` |
+| Webhooks | `webhooks list/get/create/delete/deliveries/retry/test` |
+| Event sources | `event-sources list/get/create/update/delete` |
+| Log drains | `log-drains list/get/create/update/delete` |
+| Logs | `logs` |
+| Secrets | `secrets list/create/delete`, `api-keys list/create/rotate/revoke` |
+| Team | `team list/add/remove/roles/policies/audit` |
+| Projects / Env | `projects list/switch/get/create/delete/export/import`, `env list/get/create/update/delete/variables` |
+| Analytics | `analytics costs/reliability/top-failing/performance` |
+| Billing | `usage current/history/forecast` |
+| Auth | `auth login/logout/whoami`, `context`, `alias`, `completion`, `config` |
+| Diagnostics | `debug bundle/profile`, `version`, `upgrade` |
+| Extensions | `extension list/install/run/create/remove` |
+
+Removed in this minor (managed-mode + non-canonical surfaces): `build`,
+`verify`, `deployments`, `code_deploy`, `top`, `tui`, `agent`, `validate`,
+`apply`, `diff`, `doctor`, `health`, `api`, `stats`, `perf`, `profile`,
+`backup`, `fixtures`, `notifications`, `job-groups`, top-level
+`send/listen/drain/events/trigger/login/logout/whoami/audit`. See
+[CHANGELOG.md](CHANGELOG.md) for the full mapping.
 
 ## Development
 
