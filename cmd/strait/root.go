@@ -186,74 +186,40 @@ func newRootCommand() *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&opts.debug, "debug", false, "print HTTP request/response details to stderr")
 	cmd.Flags().BoolVar(&llms, "llms", false, "print full CLI command manifest as JSON for LLM consumption and exit")
 
-	// CLI commands only (no server commands: serve, server, migrate, db)
-	cmd.AddCommand(newDevCommand(state))
-	cmd.AddCommand(newInitCommand(state))
+	// Canonical CLI surface (orchestration-only).
 	cmd.AddCommand(newVersionCommand(state))
 	cmd.AddCommand(newCompletionCommand(state, cmd))
 	cmd.AddCommand(newContextCommand(state))
 	cmd.AddCommand(newAliasCommand(state))
-	cmd.AddCommand(newLoginCommand(state))
-	cmd.AddCommand(newLogoutCommand(state))
 	cmd.AddCommand(newAuthCommand(state))
 	cmd.AddCommand(newJobsCommand(state))
 	cmd.AddCommand(newRunsCommand(state))
-	triggerTopCmd := newTriggerCommand(state)
-	triggerTopCmd.ValidArgsFunction = completeJobSlugs(state)
-	cmd.AddCommand(triggerTopCmd)
-	cmd.AddCommand(newHealthCommand(state))
 	cmd.AddCommand(newWorkflowsCommand(state))
 	cmd.AddCommand(newWorkflowRunsCommand(state))
 	cmd.AddCommand(newAPIKeysCommand(state))
-	cmd.AddCommand(newStatsCommand(state))
-	cmd.AddCommand(newAPICommand(state))
 	cmd.AddCommand(newWaitCommand(state))
-	cmd.AddCommand(newDocsCommand(cmd))
 	cmd.AddCommand(newLogsCommand(state))
-	cmd.AddCommand(newEventsCommand(state))
-	cmd.AddCommand(newDiagnoseCommand(state))
-	cmd.AddCommand(newCheckCommand(state))
-	cmd.AddCommand(newCleanupCommand(state))
-	cmd.AddCommand(newTopCommand(state))
-	cmd.AddCommand(newTUICommand(state))
-	cmd.AddCommand(newValidateCommand(state))
-	cmd.AddCommand(newApplyCommand(state))
-	cmd.AddCommand(newDiffCommand(state))
-	cmd.AddCommand(newExportCommand(state))
-	cmd.AddCommand(newRunCommand(state))
-	cmd.AddCommand(newSendCommand(state))
 	cmd.AddCommand(newTriggersCommand(state))
 	cmd.AddCommand(newSecretsCommand(state))
-	cmd.AddCommand(newFixturesCommand(state))
 	cmd.AddCommand(newExtensionCommand(state))
-	cmd.AddCommand(newListenCommand(state))
-	cmd.AddCommand(newDrainCommand(state))
-	cmd.AddCommand(newTraceCommand(state))
 	cmd.AddCommand(newUpgradeCommand(state))
-	cmd.AddCommand(newBackupCommand(state))
-	cmd.AddCommand(newProfileCommand(state))
 	cmd.AddCommand(newProjectCommand(state))
-	cmd.AddCommand(newDoctorCommand(state))
-	cmd.AddCommand(newOpenCommand(state))
-	cmd.AddCommand(newStatusCommand(state))
 	cmd.AddCommand(newDebugCommand(state))
-	cmd.AddCommand(newCreateCommand(state))
-	cmd.AddCommand(newCICommand(state))
-	cmd.AddCommand(newPerfCommand(state))
 	cmd.AddCommand(newTeamCommand(state))
-	cmd.AddCommand(newAuditCommand(state))
-	cmd.AddCommand(newWhoamiCommand(state))
 	cmd.AddCommand(newConfigCommand(state))
-	cmd.AddCommand(newSchemaCommand(state))
-	cmd.AddCommand(newAgentCommand(state))
 	cmd.AddCommand(newEnvironmentsCommand(state))
 	cmd.AddCommand(newWebhooksCommand(state))
 	cmd.AddCommand(newEventSourcesCommand(state))
-	cmd.AddCommand(newJobGroupsCommand(state))
-	cmd.AddCommand(newNotificationsCommand(state))
 	cmd.AddCommand(newLogDrainsCommand(state))
 	cmd.AddCommand(newUsageCommand(state))
 	cmd.AddCommand(newAnalyticsCommand(state))
+
+	// Migration stubs for high-traffic legacy command names. These exit
+	// with a non-zero status and a styled error pointing the user at the
+	// canonical replacement. Hidden from --help.
+	for _, stub := range legacyMigrationStubs() {
+		cmd.AddCommand(newDeprecatedStubCommand(stub.name, stub.message))
+	}
 
 	rawArgs := os.Args[1:]
 	configPath := extractConfigPath(rawArgs)
@@ -293,77 +259,32 @@ func normalizeLegacyArgs(args []string) []string {
 	}
 
 	subcommands := map[string]struct{}{
-		"dev":           {},
-		"init":          {},
 		"version":       {},
 		"completion":    {},
 		"context":       {},
 		"alias":         {},
 		"auth":          {},
-		"login":         {},
-		"logout":        {},
 		"jobs":          {},
 		"runs":          {},
-		"trigger":       {},
-		"health":        {},
 		"workflows":     {},
 		"workflow-runs": {},
 		"api-keys":      {},
-		"stats":         {},
-		"api":           {},
 		"wait":          {},
-		"docs":          {},
 		"logs":          {},
-		"events":        {},
-		"diagnose":      {},
-		"top":           {},
-		"tui":           {},
-		"validate":      {},
-		"apply":         {},
-		"diff":          {},
-		"export":        {},
-		"run":           {},
-		"send":          {},
 		"secrets":       {},
-		"fixtures":      {},
 		"help":          {},
-		"check":         {},
-		"cleanup":       {},
 		"extension":     {},
-		"listen":        {},
-		"drain":         {},
-		"trace":         {},
 		"upgrade":       {},
-		"backup":        {},
-		"profile":       {},
 		"project":       {},
-		"doctor":        {},
-		"open":          {},
-		"status":        {},
 		"debug":         {},
-		"create":        {},
-		"ci":            {},
-		"perf":          {},
 		"team":          {},
-		"audit":         {},
 		"triggers":      {},
-		"whoami":        {},
 		"config":        {},
-		"schema":        {},
-		"agent":         {},
 		"environments":  {},
-		"environment":   {},
-		"envs":          {},
 		"env":           {},
 		"webhooks":      {},
 		"event-sources": {},
-		"event-source":  {},
-		"job-groups":    {},
-		"job-group":     {},
-		"notifications": {},
-		"notification":  {},
 		"log-drains":    {},
-		"log-drain":     {},
 		"usage":         {},
 		"analytics":     {},
 	}

@@ -185,29 +185,6 @@ func TestCIMode_Flag(t *testing.T) {
 	}
 }
 
-func TestDoctorCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	doctor := findSubcommand(t, cmd, "doctor")
-
-	for _, name := range []string{"verbose", "fix", "check-endpoints", "check-manifests"} {
-		if doctor.Flags().Lookup(name) == nil {
-			t.Errorf("doctor missing --%s flag", name)
-		}
-	}
-}
-
-func TestCreateCommand_HasSubcommands(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	create := findSubcommand(t, cmd, "create")
-
-	expected := []string{"job", "workflow"}
-	assertSubcommands(t, create, expected)
-}
-
 func TestSecretsCommand_HasSubcommands(t *testing.T) {
 	t.Parallel()
 
@@ -228,26 +205,6 @@ func TestTeamCommand_HasSubcommands(t *testing.T) {
 	assertSubcommands(t, team, expected)
 }
 
-func TestCICommand_HasSubcommands(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	ci := findSubcommand(t, cmd, "ci")
-
-	expected := []string{"setup", "check"}
-	assertSubcommands(t, ci, expected)
-}
-
-func TestDevCommand_HasSubcommands(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	dev := findSubcommand(t, cmd, "dev")
-
-	expected := []string{"status", "test", "tunnel"}
-	assertSubcommands(t, dev, expected)
-}
-
 func TestDebugCommand_HasSubcommands(t *testing.T) {
 	t.Parallel()
 
@@ -256,49 +213,6 @@ func TestDebugCommand_HasSubcommands(t *testing.T) {
 
 	expected := []string{"bundle", "request"}
 	assertSubcommands(t, debug, expected)
-}
-
-func TestPerfCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	perf := findSubcommand(t, cmd, "perf")
-
-	for _, name := range []string{"project", "period", "json"} {
-		if perf.Flags().Lookup(name) == nil {
-			t.Errorf("perf missing --%s flag", name)
-		}
-	}
-	if err := perf.Args(perf, []string{"job-slug"}); err == nil {
-		t.Fatal("perf should reject positional job arguments")
-	}
-}
-
-func TestAuditCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	audit := findSubcommand(t, cmd, "audit")
-
-	for _, name := range []string{"project", "actor-id", "resource-type", "resource-id", "limit", "from", "to", "order"} {
-		if audit.Flags().Lookup(name) == nil {
-			t.Errorf("audit missing --%s flag", name)
-		}
-	}
-}
-
-func TestAuditVerifyCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	audit := findSubcommand(t, cmd, "audit")
-	verify := findSubcommand(t, audit, "verify")
-
-	for _, name := range []string{"project", "since", "output"} {
-		if verify.Flags().Lookup(name) == nil {
-			t.Errorf("audit verify missing --%s flag", name)
-		}
-	}
 }
 
 func TestTeamAddCommand_UsesUserAndRoleIDs(t *testing.T) {

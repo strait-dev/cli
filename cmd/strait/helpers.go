@@ -2,15 +2,19 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/strait-dev/cli/internal/client"
 	cliconfig "github.com/strait-dev/cli/internal/config"
+	"github.com/strait-dev/cli/internal/validate"
 )
 
 var stdoutIsTTYFunc = func() bool {
@@ -138,28 +142,89 @@ func requireConfirmation(state *appState, msg string, yes bool) error {
 	return nil
 }
 
-// healthDetail returns a human-readable detail for a HealthStatus check.
-func healthDetail(status *client.HealthStatus, err error) string {
-	if err != nil {
-		return err.Error()
+// resolveJobIdentifier accepts either a UUID or a slug and returns the
+// canonical identifier the API expects (UUIDs pass through; slugs are
+// resolved against the active project).
+func resolveJobIdentifier(ctx context.Context, cli *client.Client, state *appState, idOrSlug string) (string, error) {
+	if err := validate.SlugOrID(idOrSlug); err != nil {
+		return "", fmt.Errorf("invalid job identifier: %w", err)
 	}
-	return status.Status
-}
-
-// statsDetail returns a human-readable detail for a QueueStats check.
-func statsDetail(stats *client.QueueStats, err error) string {
-	if err != nil {
-		return err.Error()
+	if validate.IsUUID(idOrSlug) {
+		return idOrSlug, nil
 	}
-	return fmt.Sprintf("queued=%d executing=%d delayed=%d", stats.Queued, stats.Executing, stats.Delayed)
-}
-
-// errDetail formats an error result, returning "ok" when err is nil.
-func errDetail(err error) string {
+	_, err := cli.GetJob(ctx, idOrSlug)
 	if err == nil {
-		return "ok"
+		return idOrSlug, nil
 	}
-	return err.Error()
+	if !client.IsNotFound(err) {
+		return "", fmt.Errorf("resolving job %q: %w", idOrSlug, err)
+	}
+
+	projectID := state.opts.projectID
+	if projectID == "" {
+		return "", fmt.Errorf("project is required to resolve slug %q", idOrSlug)
+	}
+
+	jobs, lerr := cli.ListJobs(ctx, projectID)
+	if lerr != nil {
+		return "", fmt.Errorf("resolving job %q: %w", idOrSlug, lerr)
+	}
+	for _, job := range jobs {
+		if job.Slug == idOrSlug {
+			return job.ID, nil
+		}
+	}
+
+	return "", fmt.Errorf("job %q not found", idOrSlug)
+}
+
+// parsePerfPeriodHours converts a human-friendly period string to hours for
+// the analytics performance API.
+func parsePerfPeriodHours(raw string) (int, error) {
+	switch strings.TrimSpace(strings.ToLower(raw)) {
+	case "", "24h":
+		return 24, nil
+	case "72h":
+		return 72, nil
+	case "7d":
+		return 24 * 7, nil
+	case "30d":
+		return 24 * 30, nil
+	case "90d":
+		return 24 * 90, nil
+	default:
+		return 0, fmt.Errorf("invalid --period %q: use one of 24h, 72h, 7d, 30d, 90d", raw)
+	}
+}
+
+// openBrowserFunc is a package-level indirection so tests can stub the
+// browser-open behavior without spawning real processes.
+var openBrowserFunc = openBrowser
+
+func openBrowser(url string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url) //nolint:gosec // URL is derived from configured server URL
+	case "linux":
+		cmd = exec.Command("xdg-open", url) //nolint:gosec // URL is derived from configured server URL
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", url) //nolint:gosec // URL is derived from configured server URL
+	default:
+		return fmt.Errorf("unsupported platform for browser open; visit: %s", url)
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				_ = r // swallow panic from detached browser process
+			}
+		}()
+		_ = cmd.Wait()
+	}()
+	return nil
 }
 
 // requireProjectID resolves the project ID from the flag value or appState default.

@@ -140,56 +140,6 @@ func completeEventSourceSlugs(state *appState) func(*cobra.Command, []string, st
 	}
 }
 
-// completeJobGroupSlugs returns a ValidArgsFunction that fetches job group slugs from the API.
-func completeJobGroupSlugs(state *appState) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		if len(args) > 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		if state.opts.apiKey == "" || state.opts.projectID == "" {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		cli, err := newAPIClient(state)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		groups, err := cli.ListJobGroups(context.Background(), state.opts.projectID)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		slugs := make([]string, 0, len(groups))
-		for _, g := range groups {
-			slugs = append(slugs, g.Slug)
-		}
-		return slugs, cobra.ShellCompDirectiveNoFileComp
-	}
-}
-
-// completeNotificationChannelIDs returns a ValidArgsFunction for notification channel IDs.
-func completeNotificationChannelIDs(state *appState) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
-	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
-		if len(args) > 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		if state.opts.apiKey == "" || state.opts.projectID == "" {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		cli, err := newAPIClient(state)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		channels, err := cli.ListNotificationChannels(context.Background(), state.opts.projectID)
-		if err != nil {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		ids := make([]string, 0, len(channels))
-		for _, c := range channels {
-			ids = append(ids, c.ID)
-		}
-		return ids, cobra.ShellCompDirectiveNoFileComp
-	}
-}
-
 // completeLogDrainIDs returns a ValidArgsFunction for log drain IDs.
 func completeLogDrainIDs(state *appState) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {

@@ -301,6 +301,9 @@ func newAuthCommand(state *appState) *cobra.Command {
 		Short: "Authentication helper commands",
 	}
 
+	cmd.AddCommand(newLoginCommand(state))
+	cmd.AddCommand(newLogoutCommand(state))
+
 	cmd.AddCommand(&cobra.Command{
 		Use:   "status",
 		Short: "Show authentication status",
