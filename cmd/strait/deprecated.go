@@ -30,7 +30,6 @@ func legacyMigrationStubs() []legacyStub {
 
 		// Replaced surfaces.
 		{"dev", "the `dev` command is replaced by orchestration mode (`strait dev` from this minor)"},
-		{"init", "the `init` command is replaced by template-based init (`strait init --template <name>`)"},
 
 		// Diagnostics surfaces collapsed.
 		{"doctor", "removed; use `strait debug bundle` for diagnostics"},

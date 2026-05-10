@@ -1,0 +1,54 @@
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+
+	strait "github.com/strait-dev/strait-go"
+	"github.com/strait-dev/strait-go/worker"
+)
+
+var helloJob = strait.DefineJob(strait.JobSpec{
+	Slug: "hello",
+	Run: func(ctx context.Context, in strait.RunInput) (any, error) {
+		name, _ := in.Payload["name"].(string)
+		if name == "" {
+			name = "world"
+		}
+		return map[string]string{"greeting": "hello, " + name}, nil
+	},
+})
+
+func main() {
+	queues := strings.Split(envOr("STRAIT_QUEUES", "default"), ",")
+
+	w, err := worker.New(worker.Options{
+		APIKey:      os.Getenv("STRAIT_API_KEY"),
+		ServerURL:   envOr("STRAIT_SERVER", "https://api.strait.dev"),
+		Queues:      queues,
+		Concurrency: 8,
+		Jobs:        []strait.Job{helloJob},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	log.Println("worker started, queues:", queues)
+	if err := w.Run(ctx); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

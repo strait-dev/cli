@@ -1,0 +1,46 @@
+package main
+
+import (
+	"context"
+	"log"
+	"net/http"
+	"os"
+
+	"github.com/go-chi/chi/v5"
+	strait "github.com/strait-dev/strait-go"
+	"github.com/strait-dev/strait-go/serve"
+)
+
+var helloJob = strait.DefineJob(strait.JobSpec{
+	Slug: "hello",
+	Run: func(ctx context.Context, in strait.RunInput) (any, error) {
+		name, _ := in.Payload["name"].(string)
+		if name == "" {
+			name = "world"
+		}
+		return map[string]string{"greeting": "hello, " + name}, nil
+	},
+})
+
+func main() {
+	handler := serve.Handler(serve.Options{
+		Jobs:          []strait.Job{helloJob},
+		SigningSecret: os.Getenv("STRAIT_SIGNING_SECRET"),
+	})
+
+	r := chi.NewRouter()
+	r.Mount("/api/strait", handler)
+
+	addr := ":" + envOr("PORT", "3000")
+	log.Println("listening on", addr)
+	if err := http.ListenAndServe(addr, r); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

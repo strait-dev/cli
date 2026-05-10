@@ -1,0 +1,6 @@
+name = "STRAIT_TEMPLATE_PROJECT_NAME"
+main = "src/index.ts"
+compatibility_date = "2024-09-01"
+
+# Set STRAIT_SIGNING_SECRET via:
+#   wrangler secret put STRAIT_SIGNING_SECRET

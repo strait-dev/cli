@@ -213,6 +213,7 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newLogDrainsCommand(state))
 	cmd.AddCommand(newUsageCommand(state))
 	cmd.AddCommand(newAnalyticsCommand(state))
+	cmd.AddCommand(newInitCommand(state))
 
 	// Migration stubs for high-traffic legacy command names. These exit
 	// with a non-zero status and a styled error pointing the user at the
@@ -286,6 +287,7 @@ func normalizeLegacyArgs(args []string) []string {
 		"log-drains":    {},
 		"usage":         {},
 		"analytics":     {},
+		"init":          {},
 	}
 
 	first := args[0]
