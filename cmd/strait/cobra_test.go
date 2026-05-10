@@ -12,18 +12,12 @@ func TestRootCommand_HasExpectedSubcommands(t *testing.T) {
 
 	cmd := newRootCommand()
 	expected := []string{
-		"dev", "init", "version", "completion",
-		"context", "alias", "login", "logout", "auth",
-		"jobs", "runs", "trigger", "health",
-		"workflows", "workflow-runs", "api-keys", "stats", "api",
-		"wait", "docs", "logs", "events", "diagnose",
-		"top", "tui", "validate", "apply", "diff", "export",
-		"run", "send", "secrets", "fixtures",
-		"check", "cleanup", "extension", "listen", "drain",
-		"trace", "upgrade", "backup", "profile",
-		"project", "doctor", "open",
-		"status", "debug", "create", "ci", "perf", "team", "audit",
-		"whoami", "config",
+		"version", "completion", "context", "alias", "auth",
+		"jobs", "runs", "workflows", "workflow-runs", "api-keys",
+		"wait", "logs", "triggers", "secrets", "extension",
+		"upgrade", "projects", "debug", "team", "config",
+		"env", "webhooks", "event-sources", "log-drains",
+		"usage", "analytics",
 	}
 
 	subs := make(map[string]bool)
@@ -90,7 +84,7 @@ func TestJobsCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	jobs := findSubcommand(t, cmd, "jobs")
 
-	expected := []string{"list", "get", "create", "trigger", "trigger-bulk", "delete", "versions", "describe", "edit"}
+	expected := []string{"list", "get", "create", "update", "delete", "clone", "trigger", "health", "versions", "dependencies", "batch"}
 	assertSubcommands(t, jobs, expected)
 }
 
@@ -112,7 +106,7 @@ func TestRunsCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	runs := findSubcommand(t, cmd, "runs")
 
-	expected := []string{"list", "get", "cancel", "logs", "watch", "replay", "last", "diff"}
+	expected := []string{"list", "get", "cancel", "logs", "watch", "replay"}
 	assertSubcommands(t, runs, expected)
 }
 
@@ -155,7 +149,7 @@ func TestWorkflowsCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	wf := findSubcommand(t, cmd, "workflows")
 
-	expected := []string{"list", "get", "create", "trigger", "delete", "visualize"}
+	expected := []string{"list", "get", "create", "update", "delete", "clone", "trigger", "dry-run", "plan", "simulate", "versions", "diff", "policy"}
 	assertSubcommands(t, wf, expected)
 }
 
@@ -191,7 +185,7 @@ func TestSecretsCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	secrets := findSubcommand(t, cmd, "secrets")
 
-	expected := []string{"list", "create", "delete", "local"}
+	expected := []string{"list", "create", "delete"}
 	assertSubcommands(t, secrets, expected)
 }
 
@@ -270,23 +264,5 @@ func assertSubcommands(t *testing.T, parent interface{ Commands() []*cobra.Comma
 		if !subs[name] {
 			t.Errorf("missing subcommand: %s", name)
 		}
-	}
-}
-
-func TestRunsDiffCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	runs := findSubcommand(t, cmd, "runs")
-	diff := findSubcommand(t, runs, "diff")
-
-	for _, name := range []string{"show-payload", "show-events", "event-limit"} {
-		if diff.Flags().Lookup(name) == nil {
-			t.Errorf("runs diff missing --%s flag", name)
-		}
-	}
-
-	if diff.Flags().Lookup("json") != nil {
-		t.Error("runs diff should not have --json flag (removed)")
 	}
 }

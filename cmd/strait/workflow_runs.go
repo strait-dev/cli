@@ -24,10 +24,6 @@ func newWorkflowRunsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newWorkflowRunsPauseCommand(state))
 	cmd.AddCommand(newWorkflowRunsResumeCommand(state))
 	cmd.AddCommand(newWorkflowRunsRetryCommand(state))
-	cmd.AddCommand(newWorkflowRunsApproveStepCommand(state))
-	cmd.AddCommand(newWorkflowRunsRetryStepCommand(state))
-	cmd.AddCommand(newWorkflowRunsSkipStepCommand(state))
-	cmd.AddCommand(newWorkflowRunsForceCompleteStepCommand(state))
 
 	return cmd
 }
@@ -214,7 +210,22 @@ func newWorkflowRunsCancelCommand(state *appState) *cobra.Command {
 
 func newWorkflowRunsStepsCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "steps <workflow-run-id>",
+		Use:   "steps",
+		Short: "Manage workflow step runs",
+	}
+
+	cmd.AddCommand(newWorkflowRunsStepsListCommand(state))
+	cmd.AddCommand(newWorkflowRunsApproveStepCommand(state))
+	cmd.AddCommand(newWorkflowRunsRetryStepCommand(state))
+	cmd.AddCommand(newWorkflowRunsSkipStepCommand(state))
+	cmd.AddCommand(newWorkflowRunsForceCompleteStepCommand(state))
+
+	return cmd
+}
+
+func newWorkflowRunsStepsListCommand(state *appState) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list <workflow-run-id>",
 		Short: "List workflow step runs",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

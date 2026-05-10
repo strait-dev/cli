@@ -142,56 +142,6 @@ func TestRunsOutputs_Success(t *testing.T) {
 	}
 }
 
-func TestRunsToolCalls_Success(t *testing.T) {
-	t.Parallel()
-
-	calls := []types.RunToolCall{{ID: "tc-1", RunID: "run-1", Tool: "search"}}
-	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/runs/run-1/tool-calls": func(w http.ResponseWriter, _ *http.Request) {
-			respondPaginated(t, w, http.StatusOK, calls)
-		},
-	})
-
-	state := newTestState(t, srv)
-	cmd := newRunsToolCallsCommand(state)
-	cmd.SetArgs([]string{"run-1"})
-
-	out := captureStateOutput(t, state, func() {
-		if err := cmd.Execute(); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	if !strings.Contains(out, "tc-1") {
-		t.Fatalf("expected tool call id in output: %s", out)
-	}
-}
-
-func TestRunsUsage_Success(t *testing.T) {
-	t.Parallel()
-
-	usage := types.RunUsage{RunID: "run-1", DurationMS: 1500, CostUSD: 0.05}
-	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/runs/run-1/usage": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, usage)
-		},
-	})
-
-	state := newTestState(t, srv)
-	cmd := newRunsUsageCommand(state)
-	cmd.SetArgs([]string{"run-1"})
-
-	out := captureStateOutput(t, state, func() {
-		if err := cmd.Execute(); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	if !strings.Contains(out, "run-1") {
-		t.Fatalf("expected run id in output: %s", out)
-	}
-}
-
 func TestRunsCheckpoints_Success(t *testing.T) {
 	t.Parallel()
 

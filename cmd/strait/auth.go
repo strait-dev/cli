@@ -305,7 +305,7 @@ func newAuthCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newLogoutCommand(state))
 
 	cmd.AddCommand(&cobra.Command{
-		Use:   "status",
+		Use:   "whoami",
 		Short: "Show authentication status",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			targetContext := state.opts.contextName

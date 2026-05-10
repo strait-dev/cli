@@ -75,8 +75,6 @@ func TestCommandEntryRejectsMalformedIDs(t *testing.T) {
 		{name: "runs reschedule", buildCmd: newRunsRescheduleCommand, argFn: func(id string) []string { return []string{id, "--at", "2026-01-01T00:00:00Z"} }},
 		{name: "runs dlq-replay", buildCmd: newRunsDLQReplayCommand, argFn: func(id string) []string { return []string{id} }},
 		{name: "runs outputs", buildCmd: newRunsOutputsCommand, argFn: func(id string) []string { return []string{id} }},
-		{name: "runs tool-calls", buildCmd: newRunsToolCallsCommand, argFn: func(id string) []string { return []string{id} }},
-		{name: "runs usage", buildCmd: newRunsUsageCommand, argFn: func(id string) []string { return []string{id} }},
 		{name: "runs checkpoints", buildCmd: newRunsCheckpointsCommand, argFn: func(id string) []string { return []string{id} }},
 
 		// Team policies

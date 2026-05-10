@@ -203,11 +203,11 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newSecretsCommand(state))
 	cmd.AddCommand(newExtensionCommand(state))
 	cmd.AddCommand(newUpgradeCommand(state))
-	cmd.AddCommand(newProjectCommand(state))
+	cmd.AddCommand(newProjectsCommand(state))
 	cmd.AddCommand(newDebugCommand(state))
 	cmd.AddCommand(newTeamCommand(state))
 	cmd.AddCommand(newConfigCommand(state))
-	cmd.AddCommand(newEnvironmentsCommand(state))
+	cmd.AddCommand(newEnvCommand(state))
 	cmd.AddCommand(newWebhooksCommand(state))
 	cmd.AddCommand(newEventSourcesCommand(state))
 	cmd.AddCommand(newLogDrainsCommand(state))
@@ -275,12 +275,11 @@ func normalizeLegacyArgs(args []string) []string {
 		"help":          {},
 		"extension":     {},
 		"upgrade":       {},
-		"project":       {},
+		"projects":      {},
 		"debug":         {},
 		"team":          {},
 		"triggers":      {},
 		"config":        {},
-		"environments":  {},
 		"env":           {},
 		"webhooks":      {},
 		"event-sources": {},

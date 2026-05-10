@@ -121,7 +121,7 @@ func TestWorkflowRunsSteps_Success(t *testing.T) {
 		},
 	})
 	state := newTestState(t, srv)
-	cmd := newWorkflowRunsStepsCommand(state)
+	cmd := newWorkflowRunsStepsListCommand(state)
 	cmd.SetArgs([]string{"wfr-1"})
 	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
