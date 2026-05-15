@@ -17,7 +17,7 @@ func TestRootCommand_HasExpectedSubcommands(t *testing.T) {
 		"wait", "logs", "triggers", "secrets", "extension",
 		"upgrade", "projects", "debug", "team", "config",
 		"env", "webhooks", "event-sources", "log-drains",
-		"usage", "analytics",
+		"usage", "analytics", "init", "migrate", "tui",
 	}
 
 	subs := make(map[string]bool)
@@ -195,8 +195,50 @@ func TestTeamCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	team := findSubcommand(t, cmd, "team")
 
-	expected := []string{"list", "add", "remove", "roles"}
+	expected := []string{"list", "add", "remove", "roles", "audit"}
 	assertSubcommands(t, team, expected)
+}
+
+func TestTriggersCommand_HasStreamAndSendRaw(t *testing.T) {
+	t.Parallel()
+	cmd := newRootCommand()
+	triggers := findSubcommand(t, cmd, "triggers")
+	assertSubcommands(t, triggers, []string{"list", "get", "send", "stream", "purge"})
+
+	send := findSubcommand(t, triggers, "send")
+	if send.Flags().Lookup("raw") == nil {
+		t.Error("triggers send missing --raw flag")
+	}
+	if send.Flags().Lookup("project") == nil {
+		t.Error("triggers send missing --project flag")
+	}
+}
+
+func TestAnalyticsCommand_HasPerformance(t *testing.T) {
+	t.Parallel()
+	cmd := newRootCommand()
+	analytics := findSubcommand(t, cmd, "analytics")
+	assertSubcommands(t, analytics, []string{"costs", "reliability", "top-failing", "performance"})
+}
+
+func TestMigrateCommand_HasSubcommands(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCommand()
+	migrate := findSubcommand(t, cmd, "migrate")
+	assertSubcommands(t, migrate, []string{"inngest", "trigger", "hatchet"})
+}
+
+func TestInitCommand_HasFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCommand()
+	initCmd := findSubcommand(t, cmd, "init")
+	for _, name := range []string{"template", "name", "force", "list"} {
+		if initCmd.Flags().Lookup(name) == nil {
+			t.Errorf("init missing --%s flag", name)
+		}
+	}
 }
 
 func TestDebugCommand_HasSubcommands(t *testing.T) {

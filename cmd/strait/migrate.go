@@ -45,6 +45,7 @@ type migratedJob struct {
 func newMigrateInngestCommand(state *appState) *cobra.Command {
 	var input string
 	var outDir string
+	var force bool
 	cmd := &cobra.Command{
 		Use:   "inngest",
 		Short: "Convert an Inngest functions export into Strait sources",
@@ -58,11 +59,12 @@ func newMigrateInngestCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return emitMigratedJobs(cmd, state, "inngest", outDir, jobs)
+			return emitMigratedJobs(cmd, state, "inngest", outDir, jobs, force)
 		},
 	}
 	cmd.Flags().StringVar(&input, "input", "", "path to the Inngest export JSON file")
 	cmd.Flags().StringVar(&outDir, "out", "strait", "destination directory for emitted sources")
+	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing job sources in the output directory")
 	_ = cmd.MarkFlagRequired("input")
 	return cmd
 }
@@ -70,6 +72,7 @@ func newMigrateInngestCommand(state *appState) *cobra.Command {
 func newMigrateTriggerCommand(state *appState) *cobra.Command {
 	var input string
 	var outDir string
+	var force bool
 	cmd := &cobra.Command{
 		Use:   "trigger",
 		Short: "Convert a Trigger.dev jobs export into Strait sources",
@@ -78,11 +81,12 @@ func newMigrateTriggerCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return emitMigratedJobs(cmd, state, "trigger.dev", outDir, jobs)
+			return emitMigratedJobs(cmd, state, "trigger.dev", outDir, jobs, force)
 		},
 	}
 	cmd.Flags().StringVar(&input, "input", "", "path to the Trigger.dev jobs JSON export")
 	cmd.Flags().StringVar(&outDir, "out", "strait", "destination directory for emitted sources")
+	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing job sources in the output directory")
 	_ = cmd.MarkFlagRequired("input")
 	return cmd
 }
@@ -90,6 +94,7 @@ func newMigrateTriggerCommand(state *appState) *cobra.Command {
 func newMigrateHatchetCommand(state *appState) *cobra.Command {
 	var input string
 	var outDir string
+	var force bool
 	cmd := &cobra.Command{
 		Use:   "hatchet",
 		Short: "Convert a Hatchet workflow YAML into Strait sources",
@@ -98,11 +103,12 @@ func newMigrateHatchetCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return emitMigratedJobs(cmd, state, "hatchet", outDir, jobs)
+			return emitMigratedJobs(cmd, state, "hatchet", outDir, jobs, force)
 		},
 	}
 	cmd.Flags().StringVar(&input, "input", "", "path to the Hatchet workflow YAML file")
 	cmd.Flags().StringVar(&outDir, "out", "strait", "destination directory for emitted sources")
+	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing job sources in the output directory")
 	_ = cmd.MarkFlagRequired("input")
 	return cmd
 }
@@ -252,7 +258,7 @@ func loadHatchetJobs(path string) ([]migratedJob, error) {
 // outDir/jobs/<slug>.ts plus a strait.deploy.json manifest at outDir/. The
 // caller's platform name is included in the file header comments so users can
 // trace where each block came from.
-func emitMigratedJobs(cmd *cobra.Command, state *appState, platform, outDir string, jobs []migratedJob) error {
+func emitMigratedJobs(cmd *cobra.Command, state *appState, platform, outDir string, jobs []migratedJob, force bool) error {
 	if len(jobs) == 0 {
 		return fmt.Errorf("no jobs found in input")
 	}
@@ -270,10 +276,28 @@ func emitMigratedJobs(cmd *cobra.Command, state *appState, platform, outDir stri
 		Jobs     []manifestEntry `json:"jobs"`
 	}{Platform: platform}
 
+	// Pre-flight: collect any pre-existing destination files. The migrate
+	// emitter would silently clobber them otherwise, which destroys user edits
+	// to previously generated sources. --force opts back in to overwrite.
+	var conflicts []string
 	for _, job := range jobs {
 		if err := wizard.ValidateSlug(job.Slug); err != nil {
 			return fmt.Errorf("invalid slug %q (derived from %q): %w", job.Slug, job.Name, err)
 		}
+		path := filepath.Join(jobsDir, job.Slug+".ts")
+		if _, err := os.Stat(path); err == nil {
+			conflicts = append(conflicts, path)
+		}
+	}
+	manifestPath := filepath.Join(abs, "strait.deploy.json")
+	if _, err := os.Stat(manifestPath); err == nil {
+		conflicts = append(conflicts, manifestPath)
+	}
+	if len(conflicts) > 0 && !force {
+		return fmt.Errorf("refusing to overwrite existing files (pass --force to replace): %s", strings.Join(conflicts, ", "))
+	}
+
+	for _, job := range jobs {
 		path := filepath.Join(jobsDir, job.Slug+".ts")
 		if err := os.WriteFile(path, []byte(renderJobTS(platform, job)), 0o600); err != nil {
 			return fmt.Errorf("write %s: %w", path, err)
@@ -285,7 +309,6 @@ func emitMigratedJobs(cmd *cobra.Command, state *appState, platform, outDir stri
 		})
 	}
 
-	manifestPath := filepath.Join(abs, "strait.deploy.json")
 	manifestBytes, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {
 		return fmt.Errorf("encode manifest: %w", err)

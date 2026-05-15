@@ -472,6 +472,26 @@ func (c *Client) SendEvent(ctx context.Context, eventKey string, payload map[str
 	return &out, nil
 }
 
+// SendRawEvent posts a raw event to the project's event-ingest endpoint.
+// Unlike SendEvent, which targets a waiting typed trigger keyed by event_key,
+// this fans out to any subscribers attached to the raw event stream.
+func (c *Client) SendRawEvent(ctx context.Context, projectID, eventKey string, payload map[string]any) error {
+	if strings.TrimSpace(projectID) == "" {
+		return fmt.Errorf("project id is required")
+	}
+	if strings.TrimSpace(eventKey) == "" {
+		return fmt.Errorf("event key is required")
+	}
+	body := map[string]any{
+		"project_id": projectID,
+		"event_key":  eventKey,
+	}
+	if payload != nil {
+		body["payload"] = payload
+	}
+	return c.doJSON(ctx, http.MethodPost, "/v1/events", nil, body, nil)
+}
+
 // PurgeEventTriggers purges old event triggers.
 func (c *Client) PurgeEventTriggers(ctx context.Context, olderThanDays int, dryRun bool) (int64, error) {
 	body := map[string]any{

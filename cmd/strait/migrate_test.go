@@ -210,6 +210,71 @@ func TestMigrate_RejectsMissingInput(t *testing.T) {
 	}
 }
 
+func TestMigrate_RefusesOverwriteWithoutForce(t *testing.T) {
+	tmp := t.TempDir()
+	t.Chdir(tmp)
+
+	input := filepath.Join(tmp, "inngest.json")
+	writeFile(t, input, `{"functions":[{"id":"send-welcome","triggers":[{"event":"user/signup"}]}]}`)
+
+	// First run: writes the sources.
+	state := &appState{opts: &rootOptions{}}
+	state.stdout = &bytes.Buffer{}
+	cmd := newMigrateCommand(state)
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"inngest", "--input", input, "--out", "out"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("first execute: %v", err)
+	}
+
+	// Hand-edit to verify --force is required.
+	jobPath := filepath.Join(tmp, "out", "jobs", "send-welcome.ts")
+	if err := os.WriteFile(jobPath, []byte("// user edit\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Second run without --force: must refuse + leave the user edit untouched.
+	state2 := &appState{opts: &rootOptions{}}
+	state2.stdout = &bytes.Buffer{}
+	cmd2 := newMigrateCommand(state2)
+	cmd2.SetOut(&bytes.Buffer{})
+	cmd2.SetErr(&bytes.Buffer{})
+	cmd2.SetArgs([]string{"inngest", "--input", input, "--out", "out"})
+	err := cmd2.Execute()
+	if err == nil {
+		t.Fatal("expected error refusing to overwrite")
+	}
+	if !strings.Contains(err.Error(), "--force") {
+		t.Fatalf("expected --force hint, got: %v", err)
+	}
+	body, err := os.ReadFile(jobPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "// user edit") {
+		t.Fatalf("user edit was clobbered: %s", body)
+	}
+
+	// Third run with --force: should overwrite.
+	state3 := &appState{opts: &rootOptions{}}
+	state3.stdout = &bytes.Buffer{}
+	cmd3 := newMigrateCommand(state3)
+	cmd3.SetOut(&bytes.Buffer{})
+	cmd3.SetErr(&bytes.Buffer{})
+	cmd3.SetArgs([]string{"inngest", "--input", input, "--out", "out", "--force"})
+	if err := cmd3.Execute(); err != nil {
+		t.Fatalf("force execute: %v", err)
+	}
+	body, err = os.ReadFile(jobPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(body), "// user edit") {
+		t.Fatalf("--force did not overwrite: %s", body)
+	}
+}
+
 func TestMigrate_RejectsEmptyInput(t *testing.T) {
 	tmp := t.TempDir()
 	t.Chdir(tmp)

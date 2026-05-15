@@ -79,7 +79,8 @@ Canonical surface (orchestration-only). `strait --help` lists the full tree.
 | Analytics | `analytics costs/reliability/top-failing/performance` |
 | Billing | `usage current/history/forecast` |
 | Auth | `auth login/logout/whoami`, `context`, `alias`, `completion`, `config` |
-| Diagnostics | `debug bundle/profile`, `version`, `upgrade` |
+| Dashboard | `tui` (interactive jobs/runs/workflows pane switcher) |
+| Diagnostics | `debug bundle/profile/request`, `version`, `upgrade` |
 | Extensions | `extension list/install/run/create/remove` |
 
 Removed in this minor (managed-mode + non-canonical surfaces): `build`,

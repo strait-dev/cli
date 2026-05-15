@@ -107,6 +107,53 @@ func TestTeamRemove_WithYes(t *testing.T) {
 	}
 }
 
+func TestTeamAudit_Success(t *testing.T) {
+	t.Parallel()
+	event := types.AuditEvent{
+		ID:           "ae-1",
+		ProjectID:    "proj-test",
+		ActorID:      "user-admin",
+		ActorType:    "user",
+		Action:       "jobs.update",
+		ResourceType: "job",
+		ResourceID:   "job-42",
+		CreatedAt:    time.Date(2026, 5, 1, 12, 0, 0, 0, time.UTC),
+	}
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/audit-events": func(w http.ResponseWriter, r *http.Request) {
+			assertAuth(t, r, "test-key")
+			assertQuery(t, r, "project_id", "proj-test")
+			assertQuery(t, r, "limit", "25")
+			respondPaginated(t, w, http.StatusOK, []types.AuditEvent{event})
+		},
+	})
+	state := newTestState(t, srv)
+	cmd := newTeamAuditCommand(state)
+	cmd.SetArgs([]string{"--project", "proj-test", "--limit", "25"})
+	out := captureStateOutput(t, state, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if !strings.Contains(out, "jobs.update") || !strings.Contains(out, "job-42") {
+		t.Fatalf("expected audit event in output, got: %s", out)
+	}
+}
+
+func TestTeamAudit_RejectsInvalidSince(t *testing.T) {
+	t.Parallel()
+	srv := newTestServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		t.Fatal("should not reach the server")
+	}))
+	state := newTestState(t, srv)
+	cmd := newTeamAuditCommand(state)
+	cmd.SetArgs([]string{"--project", "proj-test", "--since", "not-a-date"})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "invalid --since") {
+		t.Fatalf("expected since-parse error, got: %v", err)
+	}
+}
+
 func TestTeamRoles_Success(t *testing.T) {
 	t.Parallel()
 	srv := newRouterServer(t, map[string]http.HandlerFunc{

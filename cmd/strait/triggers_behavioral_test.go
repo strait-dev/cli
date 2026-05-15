@@ -115,6 +115,106 @@ func TestTriggersPurge_Success(t *testing.T) {
 	}
 }
 
+func TestTriggersSend_Raw(t *testing.T) {
+	t.Parallel()
+	var receivedBody map[string]any
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"POST /v1/events": func(w http.ResponseWriter, r *http.Request) {
+			readJSONBody(t, r, &receivedBody)
+			w.WriteHeader(http.StatusAccepted)
+		},
+	})
+	state := newTestState(t, srv)
+	cmd := newTriggersSendCommand(state)
+	cmd.SetArgs([]string{"orders.created", "--raw", "--project", "proj-test", "--payload", `{"order_id":"abc"}`})
+	out := captureStateOutput(t, state, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+	if receivedBody["event_key"] != "orders.created" {
+		t.Fatalf("expected event_key=orders.created, got: %v", receivedBody)
+	}
+	if receivedBody["project_id"] != "proj-test" {
+		t.Fatalf("expected project_id=proj-test, got: %v", receivedBody)
+	}
+	payload, _ := receivedBody["payload"].(map[string]any)
+	if payload == nil || payload["order_id"] != "abc" {
+		t.Fatalf("expected payload.order_id=abc, got: %v", receivedBody["payload"])
+	}
+	if !strings.Contains(out, "orders.created") {
+		t.Fatalf("expected event key in output: %s", out)
+	}
+}
+
+func TestTriggersSend_RawRequiresProject(t *testing.T) {
+	t.Parallel()
+	srv := newTestServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	state := newTestState(t, srv)
+	state.opts.projectID = ""
+	cmd := newTriggersSendCommand(state)
+	cmd.SetArgs([]string{"orders.created", "--raw"})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "--project is required") {
+		t.Fatalf("expected project-required error, got: %v", err)
+	}
+}
+
+func TestTriggersStream_EmitsNewTriggers(t *testing.T) {
+	t.Parallel()
+
+	second := testTrigger
+	second.ID = "trig-2"
+	second.EventKey = "next-event"
+
+	calls := 0
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/events": func(w http.ResponseWriter, r *http.Request) {
+			assertQuery(t, r, "project_id", "proj-test")
+			calls++
+			switch calls {
+			case 1:
+				respondPaginated(t, w, http.StatusOK, []types.EventTrigger{testTrigger})
+			default:
+				respondPaginated(t, w, http.StatusOK, []types.EventTrigger{testTrigger, second})
+			}
+		},
+	})
+
+	// Replace the blocking sleep with a cancel on the second poll so we exit
+	// the stream loop after observing the new trigger.
+	state := newTestState(t, srv)
+	cmd := newTriggersStreamCommand(state)
+	cmd.SetArgs([]string{"--project", "proj-test", "--interval", "1ms"})
+
+	origSleep := triggersStreamSleep
+	t.Cleanup(func() { triggersStreamSleep = origSleep })
+
+	sleepCalls := 0
+	triggersStreamSleep = func(_ time.Duration) {
+		sleepCalls++
+		if sleepCalls >= 2 {
+			panic("stream-done") // unwind out of the infinite loop
+		}
+	}
+
+	out := captureStateOutput(t, state, func() {
+		defer func() {
+			if r := recover(); r != nil && r != "stream-done" {
+				panic(r)
+			}
+		}()
+		_ = cmd.Execute()
+	})
+
+	if !strings.Contains(out, "trig-2") || !strings.Contains(out, "next-event") {
+		t.Fatalf("expected new trigger in output: %s", out)
+	}
+	if strings.Contains(out, "trig-1") {
+		t.Fatalf("did not expect seeded trigger in output: %s", out)
+	}
+}
+
 func TestTriggersPurge_InvalidOlderThan(t *testing.T) {
 	t.Parallel()
 	srv := newTestServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))

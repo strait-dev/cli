@@ -28,8 +28,10 @@ func legacyMigrationStubs() []legacyStub {
 		{"verify", "managed-mode `verify` was removed; use `strait endpoint verify <slug>` to verify a serve endpoint"},
 		{"deployments", "managed-mode `deployments` was removed; use `strait deploy push` to upsert jobs"},
 
-		// Replaced surfaces.
-		{"dev", "the `dev` command is replaced by orchestration mode (`strait dev` from this minor)"},
+		// Replaced surfaces. The orchestration-mode `strait dev` lands once
+		// strait-go v0.2.0 is published; until then the stub points users at
+		// the template scaffolds + `deploy push` instead.
+		{"dev", "the legacy `dev` (managed-compute) command was removed; orchestration mode is in flight — scaffold with `strait init --template <name>` and use `strait deploy push` for now"},
 
 		// Diagnostics surfaces collapsed.
 		{"doctor", "removed; use `strait debug bundle` for diagnostics"},
@@ -39,10 +41,9 @@ func legacyMigrationStubs() []legacyStub {
 		{"health", "removed; use `strait debug bundle` for diagnostics"},
 		{"api", "removed; use the appropriate canonical subcommand (jobs, runs, workflows, …)"},
 
-		// Dashboard-only surfaces.
-		{"top", "removed; use the dashboard"},
-		{"tui", "removed; use the dashboard"},
-		{"agent", "removed; use the dashboard"},
+		// Dashboard-only surfaces. The canonical dashboard is `strait tui`.
+		{"top", "removed; use `strait tui` for the dashboard"},
+		{"agent", "removed; use `strait tui` for the dashboard"},
 
 		// Declarative was rolled into dry-run/--dry-run.
 		{"validate", "removed; use `strait workflows dry-run` / `strait jobs update --dry-run`"},

@@ -10,6 +10,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	workflowRunsTimeNow = time.Now
+	workflowRunsAfter   = time.After
+)
+
 func newWorkflowRunsCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "workflow-runs",
@@ -44,7 +49,7 @@ func newWorkflowRunsWatchCommand(state *appState) *cobra.Command {
 			ctx := cmd.Context()
 
 			ttyMode := isTTYRich(state)
-			deadline := time.Now().Add(timeout)
+			deadline := workflowRunsTimeNow().Add(timeout)
 			for {
 				run, err := cli.GetWorkflowRun(ctx, args[0])
 				if err != nil {
@@ -84,14 +89,14 @@ func newWorkflowRunsWatchCommand(state *appState) *cobra.Command {
 					return fmt.Errorf("workflow run terminal status %s", run.Status)
 				}
 
-				if timeout > 0 && time.Now().After(deadline) {
+				if timeout > 0 && workflowRunsTimeNow().After(deadline) {
 					return fmt.Errorf("workflow watch timeout reached")
 				}
 
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
-				case <-time.After(interval):
+				case <-workflowRunsAfter(interval):
 				}
 			}
 		},

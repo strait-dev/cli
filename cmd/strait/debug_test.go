@@ -18,7 +18,7 @@ func TestDebugCommand_HasRequestSubcommand(t *testing.T) {
 	for _, sub := range cmd.Commands() {
 		names[sub.Name()] = true
 	}
-	for _, want := range []string{"bundle", "request"} {
+	for _, want := range []string{"bundle", "request", "profile"} {
 		if !names[want] {
 			t.Errorf("expected subcommand %q on debug command", want)
 		}
@@ -157,6 +157,71 @@ func TestRootCommand_HasDebugFlag(t *testing.T) {
 	cmd := newRootCommand()
 	if cmd.PersistentFlags().Lookup("debug") == nil {
 		t.Error("expected --debug persistent flag on root command")
+	}
+}
+
+func TestDebugProfileCommand_RunsHealthProbe(t *testing.T) {
+	t.Parallel()
+
+	healthCalls := 0
+	jobsCalls := 0
+	perfCalls := 0
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /health": func(w http.ResponseWriter, _ *http.Request) {
+			healthCalls++
+			respondJSON(t, w, http.StatusOK, map[string]any{"status": "ok"})
+		},
+		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
+			jobsCalls++
+			respondJSON(t, w, http.StatusOK, map[string]any{"data": []any{}})
+		},
+		"GET /v1/analytics/performance": func(w http.ResponseWriter, _ *http.Request) {
+			perfCalls++
+			respondJSON(t, w, http.StatusOK, map[string]any{
+				"slowest_jobs": []any{},
+				"throughput":   map[string]any{"period_hours": 24},
+				"health_summary": map[string]any{
+					"total_jobs":   3,
+					"success_rate": 0.99,
+					"queue_depth":  0,
+				},
+			})
+		},
+	})
+
+	state := newTestState(t, srv)
+	cmd := newDebugProfileCommand(state)
+	cmd.SetArgs([]string{"--project", "proj-test", "--iterations", "2"})
+
+	out := captureStateOutput(t, state, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if healthCalls != 2 {
+		t.Errorf("expected 2 health probe calls, got %d", healthCalls)
+	}
+	if jobsCalls != 2 {
+		t.Errorf("expected 2 jobs.list probe calls, got %d", jobsCalls)
+	}
+	if perfCalls != 1 {
+		t.Errorf("expected 1 perf-snapshot call, got %d", perfCalls)
+	}
+	if !strings.Contains(out, "health") || !strings.Contains(out, "jobs.list") {
+		t.Errorf("expected probe names in output: %s", out)
+	}
+}
+
+func TestDebugProfileCommand_RejectsInvalidIterations(t *testing.T) {
+	t.Parallel()
+	srv := newRouterServer(t, map[string]http.HandlerFunc{})
+	state := newTestState(t, srv)
+	cmd := newDebugProfileCommand(state)
+	cmd.SetArgs([]string{"--iterations", "0"})
+	err := cmd.Execute()
+	if err == nil || !strings.Contains(err.Error(), "--iterations") {
+		t.Fatalf("expected iterations error, got: %v", err)
 	}
 }
 

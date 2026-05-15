@@ -215,6 +215,7 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newAnalyticsCommand(state))
 	cmd.AddCommand(newInitCommand(state))
 	cmd.AddCommand(newMigrateCommand(state))
+	cmd.AddCommand(newTUICommand(state))
 
 	// Migration stubs for high-traffic legacy command names. These exit
 	// with a non-zero status and a styled error pointing the user at the
@@ -226,7 +227,7 @@ func newRootCommand() *cobra.Command {
 	rawArgs := os.Args[1:]
 	configPath := extractConfigPath(rawArgs)
 	rawArgs = expandAliasArgs(rawArgs, configPath)
-	cmd.SetArgs(normalizeLegacyArgs(rawArgs))
+	cmd.SetArgs(rawArgs)
 
 	registerRootCompletions(cmd)
 
@@ -253,51 +254,6 @@ func registerRootCompletions(cmd *cobra.Command) {
 		}
 		return results, cobra.ShellCompDirectiveNoFileComp
 	})
-}
-
-func normalizeLegacyArgs(args []string) []string {
-	if len(args) == 0 {
-		return args
-	}
-
-	subcommands := map[string]struct{}{
-		"version":       {},
-		"completion":    {},
-		"context":       {},
-		"alias":         {},
-		"auth":          {},
-		"jobs":          {},
-		"runs":          {},
-		"workflows":     {},
-		"workflow-runs": {},
-		"api-keys":      {},
-		"wait":          {},
-		"logs":          {},
-		"secrets":       {},
-		"help":          {},
-		"extension":     {},
-		"upgrade":       {},
-		"projects":      {},
-		"debug":         {},
-		"team":          {},
-		"triggers":      {},
-		"config":        {},
-		"env":           {},
-		"webhooks":      {},
-		"event-sources": {},
-		"log-drains":    {},
-		"usage":         {},
-		"analytics":     {},
-		"init":          {},
-		"migrate":       {},
-	}
-
-	first := args[0]
-	if _, ok := subcommands[first]; ok {
-		return args
-	}
-
-	return args
 }
 
 func extractConfigPath(args []string) string {
