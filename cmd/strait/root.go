@@ -216,6 +216,10 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newInitCommand(state))
 	cmd.AddCommand(newMigrateCommand(state))
 	cmd.AddCommand(newTUICommand(state))
+	cmd.AddCommand(newEndpointCommand(state))
+	cmd.AddCommand(newWorkerCommand(state))
+	cmd.AddCommand(newDeployCommand(state))
+	cmd.AddCommand(newDevCommand(state))
 
 	rawArgs := os.Args[1:]
 	configPath := extractConfigPath(rawArgs)

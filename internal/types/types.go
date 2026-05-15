@@ -835,3 +835,18 @@ type TeamPolicy struct {
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
+
+// WorkerInfo describes a connected worker, returned by the workers endpoint.
+type WorkerInfo struct {
+	ID            string    `json:"id"`
+	Name          string    `json:"name,omitempty"`
+	ProjectID     string    `json:"project_id,omitempty"`
+	Queues        []string  `json:"queues,omitempty"`
+	Concurrency   int       `json:"concurrency,omitempty"`
+	Status        string    `json:"status"`
+	Version       string    `json:"version,omitempty"`
+	RemoteAddr    string    `json:"remote_addr,omitempty"`
+	ConnectedAt   time.Time `json:"connected_at"`
+	LastHeartbeat time.Time `json:"last_heartbeat,omitzero"`
+	ActiveTasks   int       `json:"active_tasks"`
+}

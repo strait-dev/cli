@@ -16,6 +16,25 @@ via signed HTTPS push (`strait.serve`) or a long-lived gRPC worker stream
 
 ### Added
 
+- `strait endpoint set|get|verify` — manage the registered HTTPS push endpoint
+  for an SDK-defined job. `verify` posts an HMAC-signed canary payload
+  (`X-Strait-Verify: 1`) to the registered URL and asserts the receiver
+  returns a recognisable `serve()` response. Useful for confirming a
+  freshly-deployed serve adapter is wired up correctly.
+- `strait worker status|drain` — list active gRPC workers for a project and
+  graceful-disconnect a specific worker. `worker start` and `worker logs`
+  are stubbed with a clean SDK-required error pending `strait-go v0.2.0`
+  (they will boot an in-process worker and tail gRPC logs respectively).
+- `strait deploy push` — manifest-driven upsert of jobs and workflows
+  defined in `strait.deploy.json`. Supports `--dry-run`, `--prune` (with
+  `--yes` for non-interactive sessions), and produces a structured
+  `{created, updated, skipped, failed, results}` summary. SDK-side
+  introspection of TS/Go projects lands once `strait-go v0.2.0` ships;
+  until then the manifest is the canonical input.
+- `strait dev` — replaces the legacy local-server `dev` command. Launches a
+  Cloudflare Quick Tunnel, patches each manifest job's `endpoint_url` to
+  `<tunnel-url>/<slug>`, and restores the previous endpoints on shutdown
+  (pass `--keep-endpoint` to keep the tunnel URLs in place).
 - `strait init --template <name>` — template-driven scaffolder backed by
   embedded starter projects. Templates: `vercel`, `cloudflare`, `lambda`,
   `netlify`, `express`, `k8s-worker`, `go-chi-serve`, `go-worker`. Use

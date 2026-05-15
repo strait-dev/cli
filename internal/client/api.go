@@ -1504,3 +1504,27 @@ func (c *Client) DeleteTeamPolicy(ctx context.Context, id string) error {
 	}
 	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/team/policies", id), nil, nil, &map[string]string{})
 }
+
+// ListWorkers returns the connected workers for the given project. The server
+// reports the workers it currently observes via the WorkerService gRPC
+// connection.
+func (c *Client) ListWorkers(ctx context.Context, projectID string) ([]types.WorkerInfo, error) {
+	query := url.Values{}
+	if projectID != "" {
+		query.Set("project_id", projectID)
+	}
+	var out []types.WorkerInfo
+	if err := c.doListJSON(ctx, "/v1/workers", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DisconnectWorker asks the server to gracefully drain and disconnect the
+// worker with the given ID.
+func (c *Client) DisconnectWorker(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid worker id: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/workers", id, "disconnect"), nil, nil, &map[string]string{})
+}
