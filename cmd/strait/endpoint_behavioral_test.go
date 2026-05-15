@@ -1,9 +1,6 @@
 package main
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -14,6 +11,7 @@ import (
 
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/types"
+	"github.com/strait-dev/strait-go/serve"
 )
 
 func testJobForEndpoint() types.Job {
@@ -138,34 +136,30 @@ func TestEndpointVerify_Success(t *testing.T) {
 
 	const secret = "test-secret"
 
-	// Endpoint server that validates the HMAC and responds completed.
+	// Stand in for github.com/strait-dev/strait-go/serve: validate the HMAC
+	// the same way the SDK does and return 404 for the canary slug because
+	// no handler is registered for it. That 404 is what `endpoint verify`
+	// interprets as a successful round-trip.
 	endpointSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		timestamp := r.Header.Get("X-Strait-Timestamp")
-		sig := r.Header.Get("X-Strait-Signature")
-		mac := hmac.New(sha256.New, []byte(secret))
-		mac.Write([]byte(timestamp))
-		mac.Write([]byte("."))
-		mac.Write(body)
-		expected := "sha256=" + hex.EncodeToString(mac.Sum(nil))
-		if sig != expected {
-			http.Error(w, "bad signature", http.StatusUnauthorized)
-			return
-		}
-		if r.Header.Get("X-Strait-Verify") != "1" {
-			http.Error(w, "missing verify header", http.StatusBadRequest)
+		expected := serve.Sign([]byte(secret), timestamp, body)
+		if r.Header.Get("X-Strait-Signature") != expected {
+			http.Error(w, "signature verification failed", http.StatusUnauthorized)
 			return
 		}
 		var payload struct {
 			JobSlug string `json:"job_slug"`
-			RunID   string `json:"run_id"`
 		}
 		_ = json.Unmarshal(body, &payload)
-		if payload.JobSlug != "process" {
-			http.Error(w, "wrong slug", http.StatusBadRequest)
+		if payload.JobSlug != "__strait_verify__" {
+			http.Error(w, "unexpected slug", http.StatusBadRequest)
 			return
 		}
-		respondJSON(t, w, http.StatusOK, map[string]string{"status": "completed", "run_id": payload.RunID})
+		respondJSON(t, w, http.StatusNotFound, map[string]any{
+			"success": false,
+			"error":   "no handler for job slug \"__strait_verify__\"",
+		})
 	}))
 	t.Cleanup(endpointSrv.Close)
 
@@ -187,16 +181,16 @@ func TestEndpointVerify_Success(t *testing.T) {
 		}
 	})
 
-	if !strings.Contains(out, "completed") {
-		t.Fatalf("expected completed status, got: %s", out)
+	if !strings.Contains(out, "verified") {
+		t.Fatalf("expected verified status, got: %s", out)
 	}
 }
 
-func TestEndpointVerify_FailedStatusReturnsError(t *testing.T) {
+func TestEndpointVerify_BadSecretReturnsError(t *testing.T) {
 	t.Parallel()
 
 	endpointSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		respondJSON(t, w, http.StatusOK, map[string]string{"status": "failed", "error": "handler exploded"})
+		http.Error(w, "signature verification failed", http.StatusUnauthorized)
 	}))
 	t.Cleanup(endpointSrv.Close)
 
@@ -210,12 +204,12 @@ func TestEndpointVerify_FailedStatusReturnsError(t *testing.T) {
 
 	state := newTestState(t, apiSrv)
 	cmd := newEndpointVerifyCommand(state)
-	cmd.SetArgs([]string{"process", "--secret", "any"})
+	cmd.SetArgs([]string{"process", "--secret", "wrong"})
 
 	captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err == nil {
-			t.Fatal("expected error for failed status")
-		} else if !strings.Contains(err.Error(), "did not return completed") {
+			t.Fatal("expected error for HMAC mismatch")
+		} else if !strings.Contains(err.Error(), "verification failed") {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})

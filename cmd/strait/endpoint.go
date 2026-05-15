@@ -3,9 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -18,6 +16,7 @@ import (
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
 	"github.com/strait-dev/cli/internal/wizard"
+	"github.com/strait-dev/strait-go/serve"
 
 	"github.com/spf13/cobra"
 )
@@ -119,9 +118,9 @@ func newEndpointVerifyCommand(state *appState) *cobra.Command {
 and report whether the handler responded correctly.
 
 The signing secret must be supplied via --secret or the STRAIT_SIGNING_SECRET
-environment variable. The payload is signed using HMAC-SHA256 over
-"<timestamp>.<body>"; the signature is sent as X-Strait-Signature and the
-timestamp as X-Strait-Timestamp.`,
+environment variable. Signatures are produced by github.com/strait-dev/strait-go/serve
+("v1=<hex>" HMAC-SHA256 over "<timestamp>.<body>") so any endpoint built with
+the official serve adapter will accept the canary.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			signingSecret := strings.TrimSpace(secret)
@@ -159,8 +158,8 @@ timestamp as X-Strait-Timestamp.`,
 				if verr != nil {
 					return verr
 				}
-				if result.Status != "completed" {
-					return fmt.Errorf("endpoint verification did not return completed (status=%q)", result.Status)
+				if result.Status != "verified" {
+					return fmt.Errorf("endpoint verification failed (status=%q)", result.Status)
 				}
 				fmt.Fprintln(os.Stderr, styles.Success("Endpoint verified"))
 				return nil
@@ -171,8 +170,8 @@ timestamp as X-Strait-Timestamp.`,
 			if verr != nil {
 				return verr
 			}
-			if result.Status != "completed" {
-				return fmt.Errorf("endpoint verification did not return completed (status=%q)", result.Status)
+			if result.Status != "verified" {
+				return fmt.Errorf("endpoint verification failed (status=%q)", result.Status)
 			}
 			return nil
 		},
@@ -180,6 +179,11 @@ timestamp as X-Strait-Timestamp.`,
 	cmd.Flags().StringVar(&secret, "secret", "", "HMAC signing secret (or set STRAIT_SIGNING_SECRET)")
 	return cmd
 }
+
+// verifyCanarySlug is sent as the canary's job_slug. A correctly-wired
+// serve handler returns 404 ("no handler for job slug") which proves the
+// HMAC layer accepted the request without running any user job code.
+const verifyCanarySlug = "__strait_verify__"
 
 // verifyResult is the parsed outcome of a canary POST.
 type verifyResult struct {
@@ -189,39 +193,44 @@ type verifyResult struct {
 	RunID      string `json:"run_id,omitempty"`
 }
 
-// postCanary signs and POSTs a canary payload to endpointURL. It returns a
-// structured result describing the outcome plus a non-nil error when the
-// transport failed (HTTP-level non-2xx responses are reported through the
-// result, not through err, so the caller can still print the body).
+// postCanary signs and POSTs a canary payload to endpointURL using the same
+// HMAC scheme as github.com/strait-dev/strait-go/serve. The canary uses the
+// reserved slug "__strait_verify__" so a correctly-wired endpoint reaches
+// the registry lookup (HMAC verified) and returns 404 without running any
+// user job code. That 404 path is what we report as "verified".
+//
+// Outcomes:
+//   - 404 ("no handler for job slug") + jobSlug echoed in error: verified
+//   - 401 ("signature verification failed"): bad secret
+//   - 2xx: a handler was registered for the canary slug and ran successfully
+//     (also reported as verified, since the HMAC layer accepted the request)
+//   - Anything else: failed, with the body surfaced in result.Error.
+//
+// A non-nil error indicates a transport-level failure (build, dial, read).
 func postCanary(ctx context.Context, hc *http.Client, endpointURL, jobSlug, secret string) (verifyResult, error) {
 	runID, err := newVerifyRunID()
 	if err != nil {
 		return verifyResult{Status: "failed", Error: err.Error()}, fmt.Errorf("generate run id: %w", err)
 	}
 	body, err := json.Marshal(map[string]any{
-		"job_slug": jobSlug,
+		"job_slug": verifyCanarySlug,
 		"run_id":   runID,
-		"payload":  map[string]any{"__verify": true},
+		"payload":  map[string]any{"__verify": true, "for_slug": jobSlug},
 	})
 	if err != nil {
 		return verifyResult{Status: "failed", Error: err.Error()}, fmt.Errorf("marshal payload: %w", err)
 	}
 
 	timestamp := fmt.Sprintf("%d", time.Now().Unix())
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(timestamp))
-	mac.Write([]byte("."))
-	mac.Write(body)
-	sig := hex.EncodeToString(mac.Sum(nil))
+	signature := serve.Sign([]byte(secret), timestamp, body)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpointURL, bytes.NewReader(body))
 	if err != nil {
 		return verifyResult{Status: "failed", Error: err.Error(), RunID: runID}, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Strait-Signature", "sha256="+sig)
+	req.Header.Set("X-Strait-Signature", signature)
 	req.Header.Set("X-Strait-Timestamp", timestamp)
-	req.Header.Set("X-Strait-Verify", "1")
 
 	resp, err := hc.Do(req)
 	if err != nil {
@@ -231,29 +240,41 @@ func postCanary(ctx context.Context, hc *http.Client, endpointURL, jobSlug, secr
 
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
 	result := verifyResult{HTTPStatus: resp.StatusCode, RunID: runID}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+
+	switch {
+	case resp.StatusCode == http.StatusNotFound:
+		// HMAC verified, no handler registered for the canary slug — exactly
+		// what we want.
+		result.Status = "verified"
+		return result, nil
+	case resp.StatusCode == http.StatusUnauthorized:
+		result.Status = "failed"
+		result.Error = "HMAC verification failed at the receiver (check signing secret)"
+		return result, nil
+	case resp.StatusCode >= 200 && resp.StatusCode < 300:
+		// A handler was registered for the canary slug. Treat any successful
+		// dispatch as verified — the user opted into accepting the canary.
+		var parsed struct {
+			Success bool   `json:"success"`
+			Error   string `json:"error,omitempty"`
+		}
+		if err := json.Unmarshal(respBody, &parsed); err != nil {
+			result.Status = "failed"
+			result.Error = fmt.Sprintf("malformed response: %v", err)
+			return result, nil
+		}
+		if !parsed.Success {
+			result.Status = "failed"
+			result.Error = parsed.Error
+			return result, nil
+		}
+		result.Status = "verified"
+		return result, nil
+	default:
 		result.Status = "failed"
 		result.Error = strings.TrimSpace(string(respBody))
 		return result, nil
 	}
-
-	var parsed struct {
-		Status string `json:"status"`
-		Error  string `json:"error,omitempty"`
-	}
-	if err := json.Unmarshal(respBody, &parsed); err != nil {
-		result.Status = "failed"
-		result.Error = fmt.Sprintf("malformed response: %v", err)
-		return result, nil
-	}
-	if parsed.Status == "" {
-		result.Status = "failed"
-		result.Error = "response missing status field"
-		return result, nil
-	}
-	result.Status = parsed.Status
-	result.Error = parsed.Error
-	return result, nil
 }
 
 func newVerifyRunID() (string, error) {
