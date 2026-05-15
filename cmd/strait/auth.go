@@ -30,7 +30,6 @@ var (
 )
 
 func newLoginCommand(state *appState) *cobra.Command {
-	var apiKey string
 	var withToken bool
 	var token string
 	var contextName string
@@ -59,14 +58,9 @@ an API key directly, or --with-token to read one from stdin.`,
 				targetServer = state.opts.serverURL
 			}
 
-			// Merge --token into apiKey for unified handling.
-			if token != "" && apiKey == "" {
-				apiKey = token
-			}
-
-			// Direct token mode: --token or --api-key or --with-token provided.
-			if apiKey != "" || withToken {
-				return authLoginWithAPIKey(cmd, state, apiKey, withToken, targetContext, targetServer)
+			// Direct token mode: --token or --with-token provided.
+			if token != "" || withToken {
+				return authLoginWithAPIKey(cmd, state, token, withToken, targetContext, targetServer)
 			}
 
 			// Non-interactive or non-TTY without explicit token: error with guidance.
@@ -94,7 +88,6 @@ an API key directly, or --with-token to read one from stdin.`,
 		},
 	}
 
-	cmd.Flags().StringVar(&apiKey, "api-key", "", "API key (deprecated, use --token)")
 	cmd.Flags().BoolVar(&withToken, "with-token", false, "read API key from stdin")
 	cmd.Flags().StringVar(&token, "token", "", "API key for direct authentication")
 	cmd.Flags().StringVar(&contextName, "context", "", "context to save API key under")

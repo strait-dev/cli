@@ -65,8 +65,8 @@ via signed HTTPS push (`strait.serve`) or a long-lived gRPC worker stream
 
 #### Non-canonical commands (STR-522)
 
-Hard-cut commands that produce a styled migration error pointing at the
-canonical replacement:
+Hard-cut commands removed from the surface. Running them produces cobra's
+standard "unknown command" error; use the canonical replacement instead:
 
 | Removed | Replacement |
 |---|---|

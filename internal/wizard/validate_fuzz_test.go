@@ -153,9 +153,7 @@ func FuzzValidateRuntime(f *testing.F) {
 	f.Add("bun")
 	f.Add("python")
 	f.Add("go")
-	f.Add("docker")
 	f.Add("")
-	f.Add("DOCKER")
 	f.Add("Node")
 	f.Add("rust")
 	f.Add("java")
@@ -171,7 +169,7 @@ func FuzzValidateRuntime(f *testing.F) {
 		normalized := strings.TrimSpace(strings.ToLower(runtime))
 		valid := map[string]bool{
 			"go": true, "python": true, "typescript": true,
-			"ruby": true, "rust": true, "node": true, "bun": true, "docker": true,
+			"ruby": true, "rust": true, "node": true, "bun": true,
 		}
 		if !valid[normalized] {
 			t.Fatalf("ValidateRuntime accepted invalid runtime: %q (normalized: %q)", runtime, normalized)

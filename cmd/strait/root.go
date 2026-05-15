@@ -217,13 +217,6 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newMigrateCommand(state))
 	cmd.AddCommand(newTUICommand(state))
 
-	// Migration stubs for high-traffic legacy command names. These exit
-	// with a non-zero status and a styled error pointing the user at the
-	// canonical replacement. Hidden from --help.
-	for _, stub := range legacyMigrationStubs() {
-		cmd.AddCommand(newDeprecatedStubCommand(stub.name, stub.message))
-	}
-
 	rawArgs := os.Args[1:]
 	configPath := extractConfigPath(rawArgs)
 	rawArgs = expandAliasArgs(rawArgs, configPath)

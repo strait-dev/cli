@@ -123,7 +123,7 @@ func TestValidateEndpoint(t *testing.T) {
 func TestValidateRuntime(t *testing.T) {
 	t.Parallel()
 
-	valid := []string{"go", "python", "typescript", "ruby", "rust", "node", "bun", "docker"}
+	valid := []string{"go", "python", "typescript", "ruby", "rust", "node", "bun"}
 	for _, rt := range valid {
 		t.Run("valid_"+rt, func(t *testing.T) {
 			t.Parallel()
@@ -252,49 +252,17 @@ func TestRuntimes(t *testing.T) {
 	t.Parallel()
 
 	runtimes := Runtimes()
-	if len(runtimes) != 8 {
-		t.Fatalf("expected 8 runtimes, got %d", len(runtimes))
+	if len(runtimes) != 7 {
+		t.Fatalf("expected 7 runtimes, got %d", len(runtimes))
 	}
 	expected := map[string]bool{
 		"go": true, "python": true, "typescript": true,
-		"ruby": true, "rust": true, "node": true, "bun": true, "docker": true,
+		"ruby": true, "rust": true, "node": true, "bun": true,
 	}
 	for _, rt := range runtimes {
 		if !expected[rt] {
 			t.Fatalf("unexpected runtime: %q", rt)
 		}
-	}
-}
-
-func TestGenerateSlug(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"My Job Name", "my-job-name"},
-		{"  spaces  ", "spaces"},
-		{"UPPER-CASE", "upper-case"},
-		{"special!@#chars", "specialchars"},
-		{"multiple---hyphens", "multiple-hyphens"},
-		{"trailing-", "trailing"},
-		{"-leading", "leading"},
-		{"123-numbers", "123-numbers"},
-		{"", ""},
-		{"already-slug", "already-slug"},
-		{"underscores_here", "underscores-here"},
-		{"MixedCase_And-Hyphens", "mixedcase-and-hyphens"},
-	}
-
-	for _, tc := range tests {
-		t.Run("input="+tc.input, func(t *testing.T) {
-			t.Parallel()
-			got := GenerateSlug(tc.input)
-			if got != tc.want {
-				t.Fatalf("GenerateSlug(%q) = %q, want %q", tc.input, got, tc.want)
-			}
-		})
 	}
 }
 

@@ -11,7 +11,7 @@ func TestLogin_FlagsExist(t *testing.T) {
 	auth := findSubcommand(t, cmd, "auth")
 	login := findSubcommand(t, auth, "login")
 
-	for _, name := range []string{"token", "api-key", "with-token", "context", "server", "browser", "no-browser"} {
+	for _, name := range []string{"token", "with-token", "context", "server", "browser", "no-browser"} {
 		if login.Flags().Lookup(name) == nil {
 			t.Errorf("login missing --%s flag", name)
 		}
