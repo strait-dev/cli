@@ -48,19 +48,18 @@ via signed HTTPS push (`strait.serve`) or a long-lived gRPC worker stream
   v0.2.0 is published; existing commands continue to use `internal/client/`
   until they are individually migrated. See `internal/AGENTS.md`.
 - `runs events` — moved here from the deleted top-level `events` command.
-- `triggers stream` — replaces top-level `listen`.
+- `triggers stream` — long-poll adapter that prints newly-arrived event
+  triggers as JSON lines. Replaces the top-level `listen` command.
 - `triggers send <key>` now accepts `--raw` to dispatch through `/v1/events`
   in addition to the typed event-trigger endpoint.
-- `triggers stream` long-poll adapter prints newly-arrived event triggers as
-  JSON lines (replaces top-level `listen`).
-- `debug profile` runs round-trip probes against the configured server and
-  pairs the timings with the server's performance analytics snapshot.
 - `analytics performance` — replaces `perf`/`profile`.
 - `team audit` — replaces top-level `audit`.
 - `workflow-runs steps {list|approve|retry|skip|force-complete}` — collapses
   the previous flat `approve-step`/`retry-step`/`skip-step`/`force-complete-step`
   set under a single subgroup.
-- `debug bundle` / `debug profile` — diagnostics consolidation.
+- `debug bundle` / `debug profile` / `debug request` — diagnostics
+  consolidation. `debug profile` runs round-trip probes against the configured
+  server and pairs the timings with the server's performance analytics snapshot.
 - `strait tui` — interactive dashboard (k9s-style) with read-only panes for
   jobs, runs, workflows, and workflow runs. Tab/arrows switch panes; `r`
   refreshes the active pane; `?` shows keybindings. Write actions remain in
