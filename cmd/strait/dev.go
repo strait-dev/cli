@@ -1,434 +1,235 @@
 package main
 
 import (
-	"encoding/json"
+	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"os/signal"
-	"sort"
-	"strconv"
+	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
-	"github.com/strait-dev/cli/internal/devtest"
-	climanifest "github.com/strait-dev/cli/internal/manifest"
+	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
 	"github.com/strait-dev/cli/internal/tunnel"
 
 	"github.com/spf13/cobra"
 )
 
+// devStartTunnel is the hook used to launch a tunnel and obtain a public URL.
+// Tests swap it with a stub that yields a deterministic URL and a no-op
+// shutdown function.
+var devStartTunnel = startCloudflaredTunnel
+
 func newDevCommand(state *appState) *cobra.Command {
-	var noDocker bool
 	var port int
-	var seed bool
+	var manifestPath string
+	var dir string
+	var keepEndpoint bool
 
 	cmd := &cobra.Command{
-		Use:     "dev",
-		Short:   "Run local development mode",
-		Long:    "Starts local strait development runtime with optional Docker dependencies and sensible local defaults.",
-		Example: "strait dev\n  strait dev --no-docker --port 9090\n  strait dev --seed",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			if !noDocker {
-				if _, err := exec.LookPath("docker"); err != nil {
-					return fmt.Errorf("docker is required for dev mode; install docker or rerun with --no-docker")
-				}
+		Use:   "dev",
+		Short: "Run a development tunnel and auto-register SDK jobs",
+		Long: `Launches a Cloudflare Quick Tunnel pointing at a local serve handler,
+reads strait.deploy.json, and updates each job's endpoint_url to
+<tunnel-url>/<job-slug>.
 
-				if err := exec.Command("docker", "compose", "version").Run(); err != nil {
-					return fmt.Errorf("docker compose is required for dev mode; ensure docker compose is installed or rerun with --no-docker")
-				}
-
-				fmt.Fprintln(os.Stderr, "starting docker dependencies: postgres, redis")
-				compose := exec.Command("docker", "compose", "up", "-d", "postgres", "redis")
-				compose.Stdout = os.Stdout // printdata-ok: subprocess inherits the terminal
-				compose.Stderr = os.Stderr
-				if err := compose.Run(); err != nil {
-					return fmt.Errorf("start docker dependencies: %w", err)
-				}
-			}
-
-			// Validate required environment variables. Never silently default secrets.
-			required := map[string]string{
-				"DATABASE_URL":    "connection string for PostgreSQL (e.g. postgres://strait:strait@localhost:5432/strait?sslmode=disable)",
-				"INTERNAL_SECRET": "shared secret for internal API auth (at least 16 characters)",
-				"JWT_SIGNING_KEY": "signing key for JWT tokens (at least 32 characters)",
-			}
-			var missing []string
-			for key, desc := range required {
-				if os.Getenv(key) == "" {
-					missing = append(missing, fmt.Sprintf("  %s - %s", key, desc))
-				}
-			}
-			if len(missing) > 0 {
-				sort.Strings(missing)
-				return fmt.Errorf("required environment variables are not set:\n%s\n\nCreate a .env file or export them before running strait dev", strings.Join(missing, "\n"))
-			}
-
-			// Optional: REDIS_URL (degrades gracefully without it)
-			if os.Getenv("REDIS_URL") == "" {
-				fmt.Fprintln(os.Stderr, "note: REDIS_URL not set; rate limiting and pub/sub will be disabled")
-			}
-
-			// Override only non-secret runtime settings for dev mode.
-			_ = os.Setenv("LOG_LEVEL", "debug")
-			_ = os.Setenv("PORT", strconv.Itoa(port))
-
-			if err := printData(state, map[string]any{
-				"mode":       "all",
-				"docker":     !noDocker,
-				"port":       port,
-				"server_url": fmt.Sprintf("http://localhost:%d", port),
-			}); err != nil {
-				return err
-			}
-
-			if seed {
-				fmt.Fprintln(os.Stderr, "seed flag noted: run `strait fixtures create --template full` after server startup")
-			}
-
-			return fmt.Errorf("dev server mode requires the full strait binary (strait-server); this is the standalone CLI")
-		},
-	}
-
-	cmd.AddCommand(newDevStatusCommand(state))
-	cmd.AddCommand(newDevTestCommand(state))
-	cmd.AddCommand(newDevTunnelCommand(state))
-
-	cmd.Flags().BoolVar(&noDocker, "no-docker", false, "skip docker compose startup")
-	cmd.Flags().IntVar(&port, "port", 8080, "API port for dev mode")
-	cmd.Flags().BoolVar(&seed, "seed", false, "attempt to seed example data")
-
-	return cmd
-}
-
-func newDevStatusCommand(state *appState) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "status",
-		Short:   "Show local dev readiness checks",
-		Long:    "Runs local development readiness checks for docker tooling, env vars, and server reachability.",
-		Example: "strait dev status",
+Press Ctrl-C to shut down. On shutdown the previously-registered
+endpoint URLs are restored (pass --keep-endpoint to leave them
+pointing at the tunnel).`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			checks := make([]map[string]any, 0, 8)
-
-			_, dockerErr := exec.LookPath("docker")
-			checks = append(checks, diagnoseCheck("docker binary", dockerErr == nil, errDetail(dockerErr), "install docker desktop or docker engine"))
-
-			composeErr := exec.Command("docker", "compose", "version").Run()
-			checks = append(checks, diagnoseCheck("docker compose", composeErr == nil, errDetail(composeErr), "install docker compose plugin"))
-
-			databaseURL := os.Getenv("DATABASE_URL")
-			checks = append(checks, diagnoseCheck("DATABASE_URL", databaseURL != "", boolString(databaseURL != ""), "set DATABASE_URL or run strait dev"))
-
-			redisURL := os.Getenv("REDIS_URL")
-			checks = append(checks, diagnoseCheck("REDIS_URL", redisURL != "", boolString(redisURL != ""), "set REDIS_URL or run strait dev"))
-
-			internalSecret := os.Getenv("INTERNAL_SECRET")
-			checks = append(checks, diagnoseCheck("INTERNAL_SECRET", internalSecret != "", boolString(internalSecret != ""), "set INTERNAL_SECRET for auth signing"))
-
-			jwtSigningKey := os.Getenv("JWT_SIGNING_KEY")
-			checks = append(checks, diagnoseCheck("JWT_SIGNING_KEY", jwtSigningKey != "", boolString(jwtSigningKey != ""), "set JWT_SIGNING_KEY for auth tokens"))
-
-			cli, err := newAPIClient(state)
-			if err == nil {
-				health, healthErr := cli.Health(cmd.Context())
-				checks = append(checks, diagnoseCheck("server health", healthErr == nil, healthDetail(health, healthErr), "start server with `strait dev`"))
-			} else {
-				checks = append(checks, diagnoseCheck("api client", false, err.Error(), "set valid --server and --api-key for status checks"))
+			projectID := state.opts.projectID
+			if strings.TrimSpace(projectID) == "" {
+				return fmt.Errorf("project is required (set --project, STRAIT_PROJECT, or context)")
 			}
 
-			if isTTYRich(state) {
-				for _, c := range checks {
-					name, _ := c["check"].(string)
-					ok, _ := c["ok"].(bool)
-					detail, _ := c["detail"].(string)
-					if ok {
-						fmt.Fprintf(os.Stderr, "  %s %s: %s\n", styles.StatusBadge("ok"), name, detail)
-					} else {
-						fmt.Fprintf(os.Stderr, "  %s %s: %s\n", styles.StatusBadge("fail"), name, detail)
-					}
+			path := manifestPath
+			if path == "" {
+				root := dir
+				if root == "" {
+					root = "."
 				}
-			} else if err := printData(state, checks); err != nil {
-				return err
+				path = filepath.Join(root, "strait.deploy.json")
 			}
-
-			for _, check := range checks {
-				if ok, _ := check["ok"].(bool); !ok {
-					return fmt.Errorf("dev status found failing checks")
-				}
-			}
-
-			return nil
-		},
-	}
-
-	return cmd
-}
-
-func newDevTestCommand(state *appState) *cobra.Command {
-	var (
-		payload     string
-		payloadFile string
-		endpoint    string
-		configPath  string
-		all         bool
-		timeout     time.Duration
-	)
-
-	cmd := &cobra.Command{
-		Use:   "test [job-slug]",
-		Short: "Test a job locally by calling its endpoint",
-		Long: `Test a job by making a direct HTTP POST to its endpoint URL.
-
-Simulates the Strait job execution request format with proper headers.
-Does not require a running Strait server — just calls the endpoint directly.`,
-		Example: `  strait dev test process-payment --payload '{"id": "123"}'
-  strait dev test process-payment --payload-file test.json
-  strait dev test process-payment --endpoint http://localhost:3000/jobs/payment
-  strait dev test --all --config strait.config.json
-  echo '{"id":"1"}' | strait dev test process-payment`,
-		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var payloadBytes json.RawMessage
-
-			switch {
-			case payload != "":
-				payloadBytes = json.RawMessage(payload)
-			case payloadFile != "":
-				content, err := os.ReadFile(payloadFile) //nolint:gosec // User-provided CLI flag path
-				if err != nil {
-					return fmt.Errorf("read payload file: %w", err)
-				}
-				payloadBytes = content
-			case !stdoutIsTTY():
-				content, err := readStdinIfAvailable()
-				if err == nil && len(content) > 0 {
-					payloadBytes = content
-				}
-			}
-
-			if all {
-				return runAllTests(cmd, state, configPath, payloadBytes, endpoint, timeout)
-			}
-
-			if len(args) == 0 {
-				return fmt.Errorf("job slug is required (or use --all)")
-			}
-
-			jobSlug := args[0]
-			endpointURL := endpoint
-			if endpointURL == "" {
-				endpointURL = resolveEndpointFromConfig(configPath, jobSlug)
-			}
-			if endpointURL == "" {
-				cli, err := newAPIClient(state)
-				if err == nil {
-					projectID, projErr := requireProjectID(state, "")
-					if projErr == nil {
-						jobs, listErr := cli.ListJobs(cmd.Context(), projectID)
-						if listErr == nil {
-							for _, j := range jobs {
-								if j.Slug == jobSlug {
-									endpointURL = j.EndpointURL
-									break
-								}
-							}
-						}
-					}
-				}
-			}
-
-			result, err := devtest.RunTest(cmd.Context(), devtest.TestRequest{
-				JobSlug:     jobSlug,
-				EndpointURL: endpointURL,
-				Payload:     payloadBytes,
-				Timeout:     timeout,
-			})
+			manifest, err := loadDeployManifest(path)
 			if err != nil {
 				return err
 			}
 
-			return printData(state, result)
-		},
-	}
-
-	cmd.Flags().StringVar(&payload, "payload", "", "JSON payload")
-	cmd.Flags().StringVar(&payloadFile, "payload-file", "", "path to JSON payload file")
-	cmd.Flags().StringVar(&endpoint, "endpoint", "", "endpoint URL override")
-	cmd.Flags().StringVar(&configPath, "config", "", "path to strait config file")
-	cmd.Flags().BoolVar(&all, "all", false, "test all jobs from config")
-	cmd.Flags().DurationVar(&timeout, "timeout", 30*time.Second, "HTTP request timeout")
-
-	return cmd
-}
-
-func runAllTests(cmd *cobra.Command, state *appState, configPath string, payload json.RawMessage, endpoint string, timeout time.Duration) error {
-	if configPath == "" {
-		configPath = climanifest.FindConfigFile(".")
-	}
-	if configPath == "" {
-		return fmt.Errorf("--config is required for --all (or have a strait config file in current directory)")
-	}
-
-	cfg, err := climanifest.LoadProjectConfig(configPath)
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
-
-	var results []any
-	for _, job := range cfg.Jobs {
-		endpointURL := endpoint
-		if endpointURL == "" {
-			endpointURL = job.EndpointURL
-		}
-
-		result, testErr := devtest.RunTest(cmd.Context(), devtest.TestRequest{
-			JobSlug:     job.Slug,
-			EndpointURL: endpointURL,
-			Payload:     payload,
-			Timeout:     timeout,
-		})
-		if testErr != nil {
-			return testErr
-		}
-		results = append(results, result)
-	}
-
-	return printData(state, results)
-}
-
-func resolveEndpointFromConfig(configPath, jobSlug string) string {
-	if configPath == "" {
-		configPath = climanifest.FindConfigFile(".")
-	}
-	if configPath == "" {
-		return ""
-	}
-
-	cfg, err := climanifest.LoadProjectConfig(configPath)
-	if err != nil {
-		return ""
-	}
-
-	for _, job := range cfg.Jobs {
-		if job.Slug == jobSlug {
-			return job.EndpointURL
-		}
-	}
-	return ""
-}
-
-func readStdinIfAvailable() ([]byte, error) {
-	fi, err := os.Stdin.Stat()
-	if err != nil {
-		return nil, err
-	}
-	if fi.Mode()&os.ModeNamedPipe == 0 {
-		return nil, nil
-	}
-	const maxStdinPayload = 10 * 1024 * 1024 // 10 MB
-	return io.ReadAll(io.LimitReader(os.Stdin, maxStdinPayload))
-}
-
-func newDevTunnelCommand(state *appState) *cobra.Command {
-	var (
-		port     int
-		job      string
-		noUpdate bool
-	)
-
-	cmd := &cobra.Command{
-		Use:   "tunnel",
-		Short: "Create a Cloudflare Quick Tunnel to expose a local port",
-		Long: `Creates a Cloudflare Quick Tunnel using cloudflared to expose a local port
-to the internet. Useful for testing webhooks and job endpoints during development.
-
-Requires cloudflared to be installed (offers to download if missing).`,
-		Example: `  strait dev tunnel --port 8080
-  strait dev tunnel --port 3000 --job process-payment
-  strait dev tunnel --port 8080 --no-update`,
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Detect cloudflared binary.
-			cfPath := tunnel.DetectCloudflared()
-			if cfPath == "" {
-				cachePath := tunnel.CachePath()
-				// Check cached download location.
-				if info, err := os.Stat(cachePath); err == nil && !info.IsDir() {
-					cfPath = cachePath
-				}
-			}
-
-			if cfPath == "" {
-				downloadURL, urlErr := tunnel.DownloadURL()
-				if urlErr != nil {
-					return fmt.Errorf("cloudflared not found and cannot determine download URL: %w", urlErr)
-				}
-				return fmt.Errorf("cloudflared not found; install it from %s or add it to your PATH", downloadURL)
-			}
-
-			// Start cloudflared quick tunnel.
-			args := []string{"tunnel", "--url", fmt.Sprintf("http://localhost:%d", port)}
-			cfCmd := exec.CommandContext(cmd.Context(), cfPath, args...) //nolint:gosec // cfPath is from LookPath or user-controlled --cloudflared flag
-
-			// Capture stderr where cloudflared prints the tunnel URL.
-			cfCmd.Stdout = os.Stdout // printdata-ok: subprocess inherits the terminal
-			cfCmd.Stderr = os.Stderr
-
-			if err := cfCmd.Start(); err != nil {
-				return fmt.Errorf("start cloudflared: %w", err)
-			}
-
-			fmt.Fprintf(os.Stderr, "cloudflared started, tunneling localhost:%d\n", port)
-
-			if !noUpdate && job != "" {
-				fmt.Fprintf(os.Stderr, "job filter: %s\n", job)
-			}
-
-			// Print helpful output.
-			result := map[string]any{
-				"port":        port,
-				"cloudflared": cfPath,
-				"status":      "running",
-			}
-			if job != "" {
-				result["job_filter"] = job
-			}
-			if noUpdate {
-				result["update_endpoints"] = false
-			}
-
-			if err := printData(state, result); err != nil {
+			cli, err := newAPIClient(state)
+			if err != nil {
 				return err
 			}
 
-			// Wait for interrupt.
-			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-			defer signal.Stop(sigCh)
+			ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+			defer cancel()
 
-			select {
-			case sig := <-sigCh:
-				fmt.Fprintf(os.Stderr, "received %s, stopping tunnel\n", sig)
-			case <-cmd.Context().Done():
-				fmt.Fprintln(os.Stderr, "context cancelled, stopping tunnel")
+			tunnelURL, stopTunnel, err := devStartTunnel(ctx, port)
+			if err != nil {
+				return fmt.Errorf("start tunnel: %w", err)
+			}
+			defer func() { _ = stopTunnel() }()
+
+			if isTTYRich(state) {
+				fmt.Fprintln(os.Stderr, styles.Success("Tunnel ready"))
+				fmt.Fprintln(os.Stderr, styles.KeyValue("URL", tunnelURL))
 			}
 
-			if cfCmd.Process != nil {
-				_ = cfCmd.Process.Signal(syscall.SIGTERM)
-				_ = cfCmd.Wait()
+			previous, err := registerDevEndpoints(ctx, cli, projectID, manifest, tunnelURL)
+			if err != nil {
+				return err
+			}
+			if isTTYRich(state) {
+				for slug, endpoint := range previous {
+					fmt.Fprintln(os.Stderr, styles.KeyValue(slug, endpoint))
+				}
+				fmt.Fprintln(os.Stderr, styles.MutedStyle.Render("Press Ctrl-C to stop"))
+			}
+
+			<-ctx.Done()
+
+			if !keepEndpoint {
+				restoreCtx, cancelRestore := context.WithTimeout(context.Background(), 10*time.Second)
+				defer cancelRestore()
+				restoreDevEndpoints(restoreCtx, cli, manifest, previous)
 			}
 
 			return nil
 		},
 	}
 
-	cmd.Flags().IntVar(&port, "port", 0, "local port to tunnel (required)")
-	cmd.Flags().StringVar(&job, "job", "", "filter to specific job slug")
-	cmd.Flags().BoolVar(&noUpdate, "no-update", false, "create tunnel without updating job endpoints")
-
-	mustMarkFlagRequired(cmd, "port")
-
+	cmd.Flags().IntVar(&port, "port", 3000, "local port that the serve handler is listening on")
+	cmd.Flags().StringVar(&dir, "dir", "", "project root containing strait.deploy.json (default: current dir)")
+	cmd.Flags().StringVar(&manifestPath, "manifest", "", "explicit path to a manifest file (overrides --dir)")
+	cmd.Flags().BoolVar(&keepEndpoint, "keep-endpoint", false, "do not restore previous endpoint URLs on shutdown")
 	return cmd
+}
+
+// startCloudflaredTunnel spawns `cloudflared tunnel --url http://localhost:<port>`,
+// parses its stderr for the public URL, and returns a shutdown function.
+func startCloudflaredTunnel(ctx context.Context, port int) (string, func() error, error) {
+	bin := tunnel.DetectCloudflared()
+	if bin == "" {
+		return "", nil, fmt.Errorf("cloudflared not found")
+	}
+	target := fmt.Sprintf("http://localhost:%d", port)
+	cmd := exec.CommandContext(ctx, bin, "tunnel", "--url", target, "--no-autoupdate") //nolint:gosec // args are CLI-controlled
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return "", nil, fmt.Errorf("attach stderr: %w", err)
+	}
+	if err := cmd.Start(); err != nil {
+		return "", nil, fmt.Errorf("start cloudflared: %w", err)
+	}
+
+	urlCh := make(chan string, 1)
+	var once sync.Once
+	go func() {
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if url, err := tunnel.ParseTunnelURL(line); err == nil {
+				once.Do(func() { urlCh <- url })
+			}
+		}
+	}()
+
+	stop := func() error {
+		if cmd.Process != nil {
+			_ = cmd.Process.Signal(syscall.SIGTERM)
+		}
+		done := make(chan error, 1)
+		go func() { done <- cmd.Wait() }()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			if cmd.Process != nil {
+				_ = cmd.Process.Kill()
+			}
+			<-done
+		}
+		_, _ = io.Copy(io.Discard, stderr)
+		return nil
+	}
+
+	select {
+	case url := <-urlCh:
+		return url, stop, nil
+	case <-ctx.Done():
+		_ = stop()
+		return "", nil, ctx.Err()
+	case <-time.After(60 * time.Second):
+		_ = stop()
+		return "", nil, fmt.Errorf("cloudflared did not report a tunnel URL within 60s")
+	}
+}
+
+// registerDevEndpoints updates each manifest job's endpoint_url to point at
+// the tunnel. It returns a map of slug -> previous endpoint so the caller can
+// restore them on shutdown.
+func registerDevEndpoints(ctx context.Context, cli *client.Client, projectID string, manifest *DeployManifest, tunnelURL string) (map[string]string, error) {
+	existing, err := cli.ListJobs(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("list jobs: %w", err)
+	}
+	bySlug := make(map[string]string, len(existing))
+	previousEndpoint := make(map[string]string, len(existing))
+	for _, j := range existing {
+		bySlug[j.Slug] = j.ID
+		previousEndpoint[j.Slug] = j.EndpointURL
+	}
+
+	base := strings.TrimRight(tunnelURL, "/")
+	for _, job := range manifest.Jobs {
+		endpoint := base + "/" + job.Slug
+		id, ok := bySlug[job.Slug]
+		if !ok {
+			req := jobCreateRequest(projectID, job)
+			req.EndpointURL = endpoint
+			created, err := cli.CreateJob(ctx, req, "")
+			if err != nil {
+				return previousEndpoint, fmt.Errorf("create %s: %w", job.Slug, err)
+			}
+			previousEndpoint[job.Slug] = ""
+			_ = created
+			continue
+		}
+		_, err := cli.UpdateJob(ctx, id, client.UpdateJobRequest{EndpointURL: &endpoint})
+		if err != nil {
+			return previousEndpoint, fmt.Errorf("update %s: %w", job.Slug, err)
+		}
+	}
+	return previousEndpoint, nil
+}
+
+// restoreDevEndpoints reverts each manifest job's endpoint_url to its
+// pre-dev-session value. Failures are logged but not fatal; the caller is in
+// shutdown.
+func restoreDevEndpoints(ctx context.Context, cli *client.Client, manifest *DeployManifest, previous map[string]string) {
+	existing, err := cli.ListJobs(ctx, "")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "restore endpoints: list jobs failed: %v\n", err)
+		return
+	}
+	bySlug := make(map[string]string, len(existing))
+	for _, j := range existing {
+		bySlug[j.Slug] = j.ID
+	}
+	for _, job := range manifest.Jobs {
+		id, ok := bySlug[job.Slug]
+		if !ok {
+			continue
+		}
+		prev := previous[job.Slug]
+		if prev == "" {
+			continue
+		}
+		_, _ = cli.UpdateJob(ctx, id, client.UpdateJobRequest{EndpointURL: &prev})
+	}
 }

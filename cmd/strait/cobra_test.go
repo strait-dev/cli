@@ -12,18 +12,12 @@ func TestRootCommand_HasExpectedSubcommands(t *testing.T) {
 
 	cmd := newRootCommand()
 	expected := []string{
-		"dev", "init", "version", "completion",
-		"context", "alias", "login", "logout", "auth",
-		"jobs", "runs", "trigger", "health",
-		"workflows", "workflow-runs", "api-keys", "stats", "api",
-		"wait", "docs", "logs", "events", "verify", "diagnose",
-		"top", "tui", "validate", "apply", "diff", "export",
-		"run", "send", "secrets", "fixtures",
-		"check", "cleanup", "extension", "listen", "drain",
-		"trace", "upgrade", "backup", "profile",
-		"deploy", "project", "build", "doctor", "open",
-		"status", "debug", "create", "ci", "perf", "team", "audit",
-		"whoami", "config",
+		"version", "completion", "context", "alias", "auth",
+		"jobs", "runs", "workflows", "workflow-runs", "api-keys",
+		"wait", "logs", "triggers", "secrets", "extension",
+		"upgrade", "projects", "debug", "team", "config",
+		"env", "webhooks", "event-sources", "log-drains",
+		"usage", "analytics", "init", "migrate", "tui",
 	}
 
 	subs := make(map[string]bool)
@@ -90,7 +84,7 @@ func TestJobsCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	jobs := findSubcommand(t, cmd, "jobs")
 
-	expected := []string{"list", "get", "create", "trigger", "trigger-bulk", "delete", "versions", "describe", "edit"}
+	expected := []string{"list", "get", "create", "update", "delete", "clone", "trigger", "health", "versions", "dependencies", "batch"}
 	assertSubcommands(t, jobs, expected)
 }
 
@@ -112,7 +106,7 @@ func TestRunsCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	runs := findSubcommand(t, cmd, "runs")
 
-	expected := []string{"list", "get", "cancel", "logs", "watch", "replay", "last", "diff"}
+	expected := []string{"list", "get", "cancel", "logs", "watch", "replay"}
 	assertSubcommands(t, runs, expected)
 }
 
@@ -155,7 +149,7 @@ func TestWorkflowsCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	wf := findSubcommand(t, cmd, "workflows")
 
-	expected := []string{"list", "get", "create", "trigger", "delete", "visualize"}
+	expected := []string{"list", "get", "create", "update", "delete", "clone", "trigger", "dry-run", "plan", "simulate", "versions", "diff", "policy"}
 	assertSubcommands(t, wf, expected)
 }
 
@@ -185,59 +179,13 @@ func TestCIMode_Flag(t *testing.T) {
 	}
 }
 
-func TestDeployCommand_HasSubcommands(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	deploy := findSubcommand(t, cmd, "deploy")
-
-	expected := []string{"create", "finalize", "promote", "rollback", "list", "preview"}
-	assertSubcommands(t, deploy, expected)
-}
-
-func TestBuildCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	build := findSubcommand(t, cmd, "build")
-
-	for _, name := range []string{"config", "out-dir", "dry-run", "json"} {
-		if build.Flags().Lookup(name) == nil {
-			t.Errorf("build missing --%s flag", name)
-		}
-	}
-}
-
-func TestDoctorCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	doctor := findSubcommand(t, cmd, "doctor")
-
-	for _, name := range []string{"verbose", "fix", "check-endpoints", "check-manifests"} {
-		if doctor.Flags().Lookup(name) == nil {
-			t.Errorf("doctor missing --%s flag", name)
-		}
-	}
-}
-
-func TestCreateCommand_HasSubcommands(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	create := findSubcommand(t, cmd, "create")
-
-	expected := []string{"job", "workflow"}
-	assertSubcommands(t, create, expected)
-}
-
 func TestSecretsCommand_HasSubcommands(t *testing.T) {
 	t.Parallel()
 
 	cmd := newRootCommand()
 	secrets := findSubcommand(t, cmd, "secrets")
 
-	expected := []string{"list", "create", "delete", "local"}
+	expected := []string{"list", "create", "delete"}
 	assertSubcommands(t, secrets, expected)
 }
 
@@ -247,28 +195,50 @@ func TestTeamCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	team := findSubcommand(t, cmd, "team")
 
-	expected := []string{"list", "add", "remove", "roles"}
+	expected := []string{"list", "add", "remove", "roles", "audit"}
 	assertSubcommands(t, team, expected)
 }
 
-func TestCICommand_HasSubcommands(t *testing.T) {
+func TestTriggersCommand_HasStreamAndSendRaw(t *testing.T) {
 	t.Parallel()
-
 	cmd := newRootCommand()
-	ci := findSubcommand(t, cmd, "ci")
+	triggers := findSubcommand(t, cmd, "triggers")
+	assertSubcommands(t, triggers, []string{"list", "get", "send", "stream", "purge"})
 
-	expected := []string{"setup", "check"}
-	assertSubcommands(t, ci, expected)
+	send := findSubcommand(t, triggers, "send")
+	if send.Flags().Lookup("raw") == nil {
+		t.Error("triggers send missing --raw flag")
+	}
+	if send.Flags().Lookup("project") == nil {
+		t.Error("triggers send missing --project flag")
+	}
 }
 
-func TestDevCommand_HasSubcommands(t *testing.T) {
+func TestAnalyticsCommand_HasPerformance(t *testing.T) {
+	t.Parallel()
+	cmd := newRootCommand()
+	analytics := findSubcommand(t, cmd, "analytics")
+	assertSubcommands(t, analytics, []string{"costs", "reliability", "top-failing", "performance"})
+}
+
+func TestMigrateCommand_HasSubcommands(t *testing.T) {
 	t.Parallel()
 
 	cmd := newRootCommand()
-	dev := findSubcommand(t, cmd, "dev")
+	migrate := findSubcommand(t, cmd, "migrate")
+	assertSubcommands(t, migrate, []string{"inngest", "trigger", "hatchet"})
+}
 
-	expected := []string{"status", "test", "tunnel"}
-	assertSubcommands(t, dev, expected)
+func TestInitCommand_HasFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCommand()
+	initCmd := findSubcommand(t, cmd, "init")
+	for _, name := range []string{"template", "name", "force", "list"} {
+		if initCmd.Flags().Lookup(name) == nil {
+			t.Errorf("init missing --%s flag", name)
+		}
+	}
 }
 
 func TestDebugCommand_HasSubcommands(t *testing.T) {
@@ -279,49 +249,6 @@ func TestDebugCommand_HasSubcommands(t *testing.T) {
 
 	expected := []string{"bundle", "request"}
 	assertSubcommands(t, debug, expected)
-}
-
-func TestPerfCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	perf := findSubcommand(t, cmd, "perf")
-
-	for _, name := range []string{"project", "period", "json"} {
-		if perf.Flags().Lookup(name) == nil {
-			t.Errorf("perf missing --%s flag", name)
-		}
-	}
-	if err := perf.Args(perf, []string{"job-slug"}); err == nil {
-		t.Fatal("perf should reject positional job arguments")
-	}
-}
-
-func TestAuditCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	audit := findSubcommand(t, cmd, "audit")
-
-	for _, name := range []string{"project", "actor-id", "resource-type", "resource-id", "limit", "from", "to", "order"} {
-		if audit.Flags().Lookup(name) == nil {
-			t.Errorf("audit missing --%s flag", name)
-		}
-	}
-}
-
-func TestAuditVerifyCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	audit := findSubcommand(t, cmd, "audit")
-	verify := findSubcommand(t, audit, "verify")
-
-	for _, name := range []string{"project", "since", "output"} {
-		if verify.Flags().Lookup(name) == nil {
-			t.Errorf("audit verify missing --%s flag", name)
-		}
-	}
 }
 
 func TestTeamAddCommand_UsesUserAndRoleIDs(t *testing.T) {
@@ -379,80 +306,5 @@ func assertSubcommands(t *testing.T, parent interface{ Commands() []*cobra.Comma
 		if !subs[name] {
 			t.Errorf("missing subcommand: %s", name)
 		}
-	}
-}
-
-func TestDeploymentsCommand_HasSubcommands(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	deps := findSubcommand(t, cmd, "deployments")
-
-	expected := []string{"list", "get", "logs", "rollback", "watch"}
-	assertSubcommands(t, deps, expected)
-}
-
-func TestDeploymentsWatchCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	deps := findSubcommand(t, cmd, "deployments")
-	watch := findSubcommand(t, deps, "watch")
-
-	for _, name := range []string{"job", "project", "timeout"} {
-		if watch.Flags().Lookup(name) == nil {
-			t.Errorf("deployments watch missing --%s flag", name)
-		}
-	}
-
-	// Default timeout should be 30m.
-	if f := watch.Flags().Lookup("timeout"); f.DefValue != "30m0s" {
-		t.Errorf("watch --timeout default: got %q, want 30m0s", f.DefValue)
-	}
-}
-
-func TestDeploymentsGetCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	deps := findSubcommand(t, cmd, "deployments")
-	get := findSubcommand(t, deps, "get")
-
-	for _, name := range []string{"job", "project"} {
-		if get.Flags().Lookup(name) == nil {
-			t.Errorf("deployments get missing --%s flag", name)
-		}
-	}
-}
-
-func TestDeploymentsLogsCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	deps := findSubcommand(t, cmd, "deployments")
-	logs := findSubcommand(t, deps, "logs")
-
-	for _, name := range []string{"job", "project", "stream"} {
-		if logs.Flags().Lookup(name) == nil {
-			t.Errorf("deployments logs missing --%s flag", name)
-		}
-	}
-}
-
-func TestRunsDiffCommand_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newRootCommand()
-	runs := findSubcommand(t, cmd, "runs")
-	diff := findSubcommand(t, runs, "diff")
-
-	for _, name := range []string{"show-payload", "show-events", "event-limit"} {
-		if diff.Flags().Lookup(name) == nil {
-			t.Errorf("runs diff missing --%s flag", name)
-		}
-	}
-
-	if diff.Flags().Lookup("json") != nil {
-		t.Error("runs diff should not have --json flag (removed)")
 	}
 }

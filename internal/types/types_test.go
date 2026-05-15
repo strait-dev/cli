@@ -165,61 +165,6 @@ func TestStepRunStatus_IsTerminal(t *testing.T) {
 	}
 }
 
-func TestDeploymentStrategy_IsValid(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		strategy DeploymentStrategy
-		valid    bool
-	}{
-		{DeploymentStrategyDirect, true},
-		{DeploymentStrategyCanary, true},
-		{"blue_green", false},
-		{"", false},
-	}
-
-	for _, tt := range tests {
-		name := string(tt.strategy)
-		if name == "" {
-			name = "empty"
-		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			if got := tt.strategy.IsValid(); got != tt.valid {
-				t.Errorf("DeploymentStrategy(%q).IsValid() = %v, want %v", tt.strategy, got, tt.valid)
-			}
-		})
-	}
-}
-
-func TestDeploymentVersionStatus_IsValid(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		status DeploymentVersionStatus
-		valid  bool
-	}{
-		{DeploymentVersionStatusDraft, true},
-		{DeploymentVersionStatusFinalized, true},
-		{DeploymentVersionStatusPromoted, true},
-		{"archived", false},
-		{"", false},
-	}
-
-	for _, tt := range tests {
-		name := string(tt.status)
-		if name == "" {
-			name = "empty"
-		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			if got := tt.status.IsValid(); got != tt.valid {
-				t.Errorf("DeploymentVersionStatus(%q).IsValid() = %v, want %v", tt.status, got, tt.valid)
-			}
-		})
-	}
-}
-
 func TestVersionPolicy_IsValid(t *testing.T) {
 	t.Parallel()
 
@@ -256,7 +201,7 @@ func TestExecutionMode_IsValid(t *testing.T) {
 		valid bool
 	}{
 		{ExecutionModeHTTP, true},
-		{ExecutionModeManaged, true},
+		{"managed", false},
 		{"serverless", false},
 		{"", false},
 	}
@@ -270,38 +215,6 @@ func TestExecutionMode_IsValid(t *testing.T) {
 			t.Parallel()
 			if got := tt.mode.IsValid(); got != tt.valid {
 				t.Errorf("ExecutionMode(%q).IsValid() = %v, want %v", tt.mode, got, tt.valid)
-			}
-		})
-	}
-}
-
-func TestMachinePreset_IsValid(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		preset MachinePreset
-		valid  bool
-	}{
-		{PresetMicro, true},
-		{PresetSmall1x, true},
-		{PresetSmall2x, true},
-		{PresetMedium1x, true},
-		{PresetMedium2x, true},
-		{PresetLarge1x, true},
-		{PresetLarge2x, true},
-		{"xlarge", false},
-		{"", false},
-	}
-
-	for _, tt := range tests {
-		name := string(tt.preset)
-		if name == "" {
-			name = "empty"
-		}
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			if got := tt.preset.IsValid(); got != tt.valid {
-				t.Errorf("MachinePreset(%q).IsValid() = %v, want %v", tt.preset, got, tt.valid)
 			}
 		})
 	}

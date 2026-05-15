@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <strong>Command-line interface for the Strait platform</strong>
+  <strong>Command-line interface for the Strait orchestration platform</strong>
 </p>
 
 <p align="center">
@@ -15,81 +15,160 @@
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="Platform" />
 </p>
 
+<p align="center">
+  <a href="https://strait.dev">Website</a>
+  ·
+  <a href="https://docs.strait.dev">Documentation</a>
+  ·
+  <a href="https://github.com/strait-dev/strait">Platform repo</a>
+  ·
+  <a href="https://github.com/strait-dev/cli/releases">Releases</a>
+</p>
+
 ---
 
-The official CLI for [Strait](https://strait.dev) — an open-source job execution and workflow orchestration platform. A single Go binary with 70+ top-level commands covering job and workflow management, deployment, environments and webhooks, declarative GitOps, billing and analytics, RBAC, local development, and real-time monitoring.
+## What is Strait?
 
-[Website](https://strait.dev) | [Platform Repo](https://github.com/strait-dev/strait) | [Documentation](https://docs.strait.dev) | [Releases](https://github.com/strait-dev/cli/releases)
+[Strait](https://strait.dev) is an open-source job orchestration platform. **Your code stays on your infrastructure** — Vercel, Cloudflare Workers, AWS Lambda, Netlify, Express, Kubernetes, or a long-lived Go worker. Strait schedules, retries, fans out, and observes — it does not host your code.
+
+Two transports, one mental model:
+
+- **`strait.serve`** — Strait calls a signed HTTPS endpoint you expose (push).
+- **`strait.worker`** — your process holds a long-lived gRPC stream and pulls tasks (pull).
+
+This repo ships the CLI: scaffold projects, register jobs, manage endpoints, run a local tunnel, inspect runs, and operate workers.
 
 ## Installation
 
 ```bash
-# Homebrew
+# Homebrew (macOS / Linux)
 brew install strait-dev/tap/strait
 
-# From source
+# From source (requires Go 1.26+)
 go install github.com/strait-dev/cli/cmd/strait@latest
 ```
 
-Pre-built binaries available on [GitHub Releases](https://github.com/strait-dev/cli/releases).
+Pre-built binaries for darwin/linux/windows on [GitHub Releases](https://github.com/strait-dev/cli/releases).
 
 ## Quick start
 
 ```bash
-strait init                                        # Initialize a project
-strait login                                       # Authenticate (opens browser)
-strait create job                                  # Create a job
-strait trigger my-job --payload '{"id": "123"}'    # Trigger it
-strait runs watch <run-id>                         # Watch the run
-strait tui                                         # Open the dashboard
+# 1. Scaffold a starter project (pick any template — see `strait init --list`)
+strait init --template vercel --name my-app
+
+# 2. Authenticate with the orchestrator (opens a browser)
+strait auth login
+
+# 3. Push your SDK-defined jobs to the orchestrator
+cd my-app && strait deploy push
+
+# 4. Point Strait at your deployed endpoint and round-trip a signed canary
+strait endpoint set hello https://my-app.vercel.app/api/strait
+strait endpoint verify hello
+
+# 5. Watch a run end-to-end
+strait runs watch <run-id>
 ```
+
+### Run a worker instead
+
+Workers are SDK programs, not CLI processes — scaffold one and run it on your own infrastructure:
+
+```bash
+strait init --template go-worker --name my-worker
+cd my-worker && go run .          # opens a gRPC stream to the orchestrator
+strait worker status              # confirm it's connected
+```
+
+### Local development with a tunnel
+
+`strait dev` launches a Cloudflare Quick Tunnel, rewrites each job's `endpoint_url` to point at the tunnel, and restores the original URLs on exit. Drop into any scaffold:
+
+```bash
+strait dev
+```
+
+## Templates
+
+`strait init --template <name>` scaffolds a working starter. Currently:
+
+| Template       | Stack                              |
+|----------------|------------------------------------|
+| `vercel`       | Next.js App Router + `serve()`     |
+| `cloudflare`   | Cloudflare Workers + `serve()`     |
+| `lambda`       | AWS Lambda (Function URL) + `serve()` |
+| `netlify`      | Netlify Functions + `serve()`      |
+| `express`      | Node.js Express + `serve()`        |
+| `go-chi-serve` | Go + chi router + `serve.Serve`    |
+| `go-worker`    | Go worker holding a gRPC stream    |
+| `k8s-worker`   | TypeScript worker for Kubernetes   |
+
+Each scaffold ships a starter `strait.deploy.json` so `strait deploy push` works immediately.
 
 ## Commands
 
-| Category | Commands | Docs |
-|---|---|---|
-| Jobs | `create job`, `trigger`, `jobs list/get/describe/edit/delete/pause/resume/clone/health/dependencies/add-dependency/batch` | [jobs](docs/cli-reference/jobs.mdx) |
-| Runs | `runs list/get/watch/cancel/replay/diff/reschedule/dlq/dlq-replay/outputs/tool-calls/usage/checkpoints`, `wait run` | [runs](docs/cli-reference/runs.mdx) |
-| Workflows | `create workflow`, `workflows list/describe/visualize/trigger/clone/dry-run/plan/simulate/versions/diff/policy` | [workflows](docs/cli-reference/workflows.mdx) |
-| Workflow runs | `workflow-runs list/get/pause/resume/retry/approve-step/retry-step/skip-step/force-complete-step` | [workflow-runs](docs/cli-reference/workflow-runs.mdx) |
-| Deployment | `deploy`, `deploy create/finalize/promote/rollback/list`, `deployments create-from-source/get/logs/rollback/watch`, `verify` | [deployment](docs/guides/deployment.mdx) |
-| Environments | `environments list/get/create/update/delete/variables` | [environments](docs/cli-reference/environments.mdx) |
-| Webhooks | `webhooks list/get/create/delete/deliveries/retry/test` | [webhooks](docs/cli-reference/webhooks.mdx) |
-| Event sources | `event-sources list/get/create/update/delete` | [event-sources](docs/cli-reference/event-sources.mdx) |
-| Job groups | `job-groups list/get/create/update/delete/jobs/pause/resume/stats` | [job-groups](docs/cli-reference/job-groups.mdx) |
-| Notifications | `notifications list/get/create/update/delete` | [notifications](docs/cli-reference/notifications.mdx) |
-| Log drains | `log-drains list/get/create/update/delete` | [log-drains](docs/cli-reference/log-drains.mdx) |
-| Logs | `logs`, `events`, `send` | [logs](docs/cli-reference/logs.mdx) |
-| GitOps | `validate`, `check`, `diff`, `apply`, `export`, `build`, `project` | [gitops](docs/guides/gitops.mdx) |
-| Secrets | `secrets list/create/delete`, `api-keys list/create/rotate/revoke` | [secrets](docs/cli-reference/secrets.mdx) |
-| Team | `team list/add/remove/roles`, `team policies list/create/delete`, `audit` | [team](docs/cli-reference/team.mdx) |
-| Triggers | `triggers list/get/send/purge` | [triggers](docs/cli-reference/triggers.mdx) |
-| Monitoring | `doctor`, `status`, `health`, `listen`, `top`, `trace`, `perf`, `stats`, `analytics costs/reliability/top-failing` | [monitoring](docs/guides/monitoring.mdx) |
-| Billing | `usage current/history/forecast` | [billing](docs/cli-reference/usage.mdx) |
-| Local dev | `dev test`, `dev tunnel`, `dev status`, `run` | [local dev](docs/guides/local-development.mdx) |
-| CI/CD | `ci setup`, `ci check` | [ci-cd](docs/guides/ci-cd.mdx) |
-| Extensions | `extension list/install/run/create/remove` | [extensions](docs/guides/extensions.mdx) |
-| Auth | `login`, `logout`, `whoami`, `context`, `auth` | [authentication](docs/getting-started/authentication.mdx) |
-| Config | `config`, `alias`, `completion` | [configuration](docs/guides/configuration.mdx) |
-| Backup | `backup create`, `backup restore` | [backup](docs/cli-reference/backup.mdx) |
-| Fixtures | `fixtures create/clean` | [fixtures](docs/cli-reference/fixtures.mdx) |
-| Raw API | `api GET/POST/DELETE ...` | [api](docs/cli-reference/api.mdx) |
-| Other | `open`, `cleanup`, `drain`, `diagnose`, `debug`, `profile`, `upgrade` | [utilities](docs/cli-reference/utilities.mdx) |
+`strait --help` shows the full tree. Canonical groups:
+
+| Group           | Commands                                                              |
+|-----------------|-----------------------------------------------------------------------|
+| Scaffolding     | `init --template <name>`                                              |
+| Migration       | `migrate inngest\|trigger\|hatchet --input <path>`                    |
+| Deploy          | `deploy push` (manifest-driven upsert; supports `--dry-run`, `--prune`) |
+| Endpoint        | `endpoint set/get/verify`                                             |
+| Worker          | `worker status/drain` (workers run on customer infra via `strait-go/worker`) |
+| Dev             | `dev` (Cloudflare Tunnel + auto-register)                             |
+| Jobs            | `jobs list/get/create/update/delete/clone/trigger/health/versions/dependencies/batch` |
+| Runs            | `runs list/get/logs/cancel/replay/reschedule/dlq-replay/outputs/checkpoints/events/watch` |
+| Workflows       | `workflows list/get/create/update/delete/clone/trigger/dry-run/plan/simulate/versions/diff/policy` |
+| Workflow runs   | `workflow-runs list/get/pause/resume/retry`, `workflow-runs steps {list\|approve\|retry\|skip\|force-complete}` |
+| Triggers        | `triggers list/get/send/stream/purge`                                 |
+| Webhooks        | `webhooks list/get/create/delete/deliveries/retry/test`               |
+| Event sources   | `event-sources list/get/create/update/delete`                         |
+| Log drains      | `log-drains list/get/create/update/delete`                            |
+| Logs            | `logs`                                                                |
+| Secrets         | `secrets list/create/delete`, `api-keys list/create/rotate/revoke`    |
+| Team            | `team list/add/remove/roles/policies/audit`                           |
+| Projects / Env  | `projects list/switch/get/create/delete/export/import`, `env list/get/create/update/delete/variables` |
+| Analytics       | `analytics costs/reliability/top-failing/performance`                 |
+| Billing         | `usage current/history/forecast`                                      |
+| Auth            | `auth login/logout/whoami`, `context`, `alias`, `completion`, `config` |
+| Dashboard       | `tui` (interactive jobs/runs/workflows pane switcher)                 |
+| Diagnostics     | `debug bundle/profile/request`, `version`, `upgrade`                  |
+| Extensions      | `extension list/install/run/create/remove`                            |
+
+## Configuration
+
+Strait CLI reads configuration from (in order of precedence):
+
+1. Command-line flags (`--server`, `--project`, `--api-key`)
+2. Environment variables (`STRAIT_SERVER`, `STRAIT_PROJECT`, `STRAIT_API_KEY`)
+3. Per-project file: `./.strait.yaml`
+4. User-global file: `~/.config/strait/config.yaml`
+
+Credentials from `strait auth login` are stored in the OS keychain (macOS Keychain, Linux Secret Service, Windows Credential Manager).
+
+Every command supports `--format json|yaml|csv|table|jsonpath|go-template` for machine output and `--quiet` to suppress styling.
 
 ## Development
 
 ```bash
-make build         # Build binary to bin/strait
-make test          # Run tests with race detector
-make lint          # Run golangci-lint
-make mutation-dry  # Run Gremlins coverage analysis without mutating code
-make mutation      # Run Gremlins mutation testing and write bin/gremlins-report.json
+make build         # build binary to bin/strait
+make test          # run tests with race detector
+make lint          # golangci-lint
 make check         # vet + lint + test
-make hooks         # Install lefthook pre-commit hooks
+make hooks         # install lefthook pre-commit hooks
+make mutation-dry  # run Gremlins coverage analysis without mutating code
+make mutation      # run Gremlins mutation testing → bin/gremlins-report.json
 ```
 
-Mutation testing is pinned to `go-gremlins/gremlins` `v0.6.0` and runs through `go run`, so contributors do not need a separate install step. You can scope local runs with `MUTATION_ARGS`, for example `make mutation MUTATION_ARGS="--diff origin/main"` to mutate only changes against `origin/main`.
+Mutation testing is pinned to `go-gremlins/gremlins` `v0.6.0` via `go run`, so no separate install step is needed. Scope local runs with `MUTATION_ARGS`, e.g. `make mutation MUTATION_ARGS="--diff origin/main"`.
+
+See [`AGENTS.md`](AGENTS.md) for the contributor operating guide.
+
+## Reporting security issues
+
+Email **security@strait.dev** — see [`SECURITY.md`](SECURITY.md).
 
 ## License
 
-MIT
+[MIT](LICENSE)

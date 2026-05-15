@@ -1,0 +1,12 @@
+{
+  "version": "1",
+  "jobs": [
+    {
+      "slug": "hello",
+      "name": "Hello",
+      "endpoint_url": "https://example.com/strait",
+      "max_attempts": 3,
+      "timeout_secs": 30
+    }
+  ]
+}

@@ -1,661 +1,193 @@
 package main
 
 import (
-	"encoding/json"
+	"embed"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+
+	"github.com/spf13/cobra"
 
 	"github.com/strait-dev/cli/internal/styles"
 	"github.com/strait-dev/cli/internal/wizard"
-
-	"gopkg.in/yaml.v3"
-
-	"github.com/spf13/cobra"
 )
 
-type straitConfigJSON struct {
-	Project  projectBlock    `json:"project"`
-	Runtime  string          `json:"runtime,omitempty"`
-	Jobs     []jobBlock      `json:"jobs,omitempty"`
-	Workflow []workflowBlock `json:"workflows,omitempty"`
-}
+//go:embed all:templates
+var initTemplates embed.FS
 
-type projectBlock struct {
-	ID   string `json:"id"`
-	Name string `json:"name,omitempty"`
-}
+// projectNamePlaceholder is the literal token replaced with the user-supplied
+// project name in every rendered template file. We use a fixed sentinel rather
+// than text/template syntax so the embedded sources are valid Go/TypeScript on
+// disk and editors can lint them as-is.
+const projectNamePlaceholder = "STRAIT_TEMPLATE_PROJECT_NAME"
 
-type jobBlock struct {
-	Slug        string `json:"slug"`
-	Name        string `json:"name"`
-	EndpointURL string `json:"endpointUrl,omitempty"`
-	Cron        string `json:"cron,omitempty"`
-}
-
-type workflowBlock struct {
-	Slug string `json:"slug"`
-	Name string `json:"name"`
-}
-
-type initConfigFile struct {
-	Server        string `yaml:"server"`
-	Project       string `yaml:"project"`
-	Format        string `yaml:"format"`
-	ActiveContext string `yaml:"active_context"`
-}
-
-type initJobManifest struct {
-	APIVersion string            `yaml:"apiVersion"`
-	Kind       string            `yaml:"kind"`
-	Metadata   map[string]string `yaml:"metadata"`
-	Spec       map[string]any    `yaml:"spec"`
-}
-
-type initWorkflowManifest struct {
-	APIVersion string            `yaml:"apiVersion"`
-	Kind       string            `yaml:"kind"`
-	Metadata   map[string]string `yaml:"metadata"`
-	Spec       map[string]any    `yaml:"spec"`
+// initTemplateNames returns the list of available template directories under
+// cmd/strait/templates, sorted alphabetically. The list is computed at runtime
+// from the embedded FS so adding a new template directory is a single change.
+func initTemplateNames() ([]string, error) {
+	entries, err := fs.ReadDir(initTemplates, "templates")
+	if err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			names = append(names, entry.Name())
+		}
+	}
+	sort.Strings(names)
+	return names, nil
 }
 
 func newInitCommand(state *appState) *cobra.Command {
-	var (
-		yes         bool
-		force       bool
-		template    string
-		name        string
-		runtime     string
-		withJob     bool
-		jobName     string
-		jobEndpoint string
-		jobCron     string
-		fromServer  bool
-	)
+	var template string
+	var projectName string
+	var force bool
+	var listTemplates bool
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Initialize a new strait project",
-		Long: `Initialize a new strait project with configuration files.
-
-In interactive mode (default when TTY), a wizard guides you through setup.
-In non-interactive mode (--yes), all values come from flags.`,
-		Example: `  strait init
-  strait init --yes --name my-api --runtime typescript
-  strait init --yes --name my-api --runtime go --with-job --job-name process-payment --job-endpoint http://localhost:3000/jobs/payment
-  strait init --template full --name demo
-  strait init --from-server --project proj-1`,
+		Short: "Scaffold a new Strait project from a template",
+		Long: "Scaffold a new Strait project from one of the bundled templates. " +
+			"Each template is a working starter project that wires the Strait SDK " +
+			"into a specific runtime (Vercel, Cloudflare Workers, AWS Lambda, etc.).",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// --from-server: scaffold manifests from live server jobs
-			if fromServer {
-				return runInitFromServer(cmd, state, force)
-			}
-
-			// Interactive mode: TTY + no --yes flag
-			if !yes && stdoutIsTTY() {
-				result, err := wizard.RunInitWizard()
-				if err != nil {
-					return err
-				}
-				name = result.ProjectName
-				runtime = result.Runtime
-				withJob = result.WithJob
-				jobName = result.JobName
-				jobEndpoint = result.JobEndpoint
-				jobCron = result.JobCron
-			} else if !yes {
-				if state.opts.nonInteractive {
-					return fmt.Errorf("non-interactive mode: use --yes with flags for non-interactive init")
-				}
-				return fmt.Errorf("interactive mode requires a TTY; use --yes with flags for non-interactive init")
-			}
-
-			// Validate inputs
-			name = strings.TrimSpace(name)
-			if err := wizard.ValidateProjectName(name); err != nil {
-				return err
-			}
-			if runtime != "" {
-				if err := wizard.ValidateRuntime(runtime); err != nil {
-					return err
-				}
-			}
-
-			// Check for existing config (unless --force)
-			configPath := "strait.config.json"
-			if !force {
-				if _, err := os.Stat(configPath); err == nil {
-					return fmt.Errorf("config file %s already exists (use --force to overwrite)", configPath)
-				}
-			}
-
-			// Write strait.config.json
-			cfg := straitConfigJSON{
-				Project: projectBlock{ID: name, Name: name},
-				Runtime: runtime,
-			}
-			if withJob && jobName != "" {
-				slug := wizard.GenerateSlug(jobName)
-				cfg.Jobs = append(cfg.Jobs, jobBlock{
-					Slug:        slug,
-					Name:        jobName,
-					EndpointURL: jobEndpoint,
-					Cron:        jobCron,
-				})
-			}
-
-			encoded, err := json.MarshalIndent(cfg, "", "  ")
+			names, err := initTemplateNames()
 			if err != nil {
-				return fmt.Errorf("encode config: %w", err)
-			}
-			if err := os.WriteFile(configPath, append(encoded, '\n'), 0o600); err != nil {
-				return fmt.Errorf("write config: %w", err)
+				return fmt.Errorf("read embedded templates: %w", err)
 			}
 
-			// Write .strait.yaml (local CLI config)
-			configStatus, err := writeInitConfig(name)
-			if err != nil {
-				return fmt.Errorf("writing CLI config: %w", err)
-			}
-
-			// Update .gitignore
-			gitignoreStatus := updateGitignore()
-
-			// Write .straitignore
-			straitignoreStatus, straitignoreErr := writeStraitIgnore(runtime)
-			if straitignoreErr != nil {
-				return fmt.Errorf("writing .straitignore: %w", straitignoreErr)
-			}
-
-			// Write declarative definitions (legacy template mode)
-			if template == "full" || template == "minimal" {
-				envStatus, envErr := writeInitEnv()
-				if envErr != nil {
-					return fmt.Errorf("writing .env: %w", envErr)
-				}
-				dcStatus, dcErr := writeInitDockerCompose()
-				if dcErr != nil {
-					return fmt.Errorf("writing docker-compose: %w", dcErr)
-				}
-				manifestStatus, mErr := writeInitJobManifest(template, name)
-				if mErr != nil {
-					return fmt.Errorf("writing job manifest: %w", mErr)
-				}
-				wfStatus, wfErr := writeInitWorkflowManifest(template, name)
-				if wfErr != nil {
-					return fmt.Errorf("writing workflow manifest: %w", wfErr)
-				}
-
-				return printData(state, map[string]any{
-					"project":  name,
-					"runtime":  runtime,
-					"template": template,
-					"files": []map[string]any{
-						{"path": configPath, "status": "created"},
-						{"path": ".strait.yaml", "status": configStatus},
-						{"path": ".gitignore", "status": gitignoreStatus},
-						{"path": ".straitignore", "status": straitignoreStatus},
-						{"path": ".env", "status": envStatus},
-						{"path": "docker-compose.yml", "status": dcStatus},
-						{"path": "definitions/jobs.yaml", "status": manifestStatus},
-						{"path": "definitions/workflows.yaml", "status": wfStatus},
-					},
-				})
-			}
-
-			files := []map[string]any{
-				{"path": configPath, "status": "created"},
-				{"path": ".strait.yaml", "status": configStatus},
-				{"path": ".gitignore", "status": gitignoreStatus},
-				{"path": ".straitignore", "status": straitignoreStatus},
-			}
-
-			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Initialized project "+styles.Bold.Render(name)))
-				for _, f := range files {
-					fmt.Fprintln(os.Stderr, styles.KeyValue(f["status"].(string), styles.FilePath(f["path"].(string))))
+			if listTemplates {
+				w := state.out()
+				for _, name := range names {
+					fmt.Fprintln(w, name)
 				}
 				return nil
 			}
 
+			if strings.TrimSpace(template) == "" {
+				return fmt.Errorf("--template is required (one of: %s)", strings.Join(names, ", "))
+			}
+
+			templateDir := filepath.ToSlash(filepath.Join("templates", template))
+			if _, err := fs.Stat(initTemplates, templateDir); err != nil {
+				return fmt.Errorf("unknown template %q (available: %s)", template, strings.Join(names, ", "))
+			}
+
+			if projectName == "" {
+				projectName = template
+			}
+			if err := wizard.ValidateProjectName(projectName); err != nil {
+				return fmt.Errorf("invalid --name: %w", err)
+			}
+
+			destDir, err := filepath.Abs(projectName)
+			if err != nil {
+				return fmt.Errorf("resolve destination: %w", err)
+			}
+
+			if err := scaffoldTemplate(initTemplates, templateDir, destDir, projectName, force); err != nil {
+				return err
+			}
+
+			if isTTYRich(state) {
+				fmt.Fprintln(cmd.ErrOrStderr(), styles.Success("Scaffolded "+styles.Bold.Render(projectName)+" from template "+template))
+				fmt.Fprintln(cmd.ErrOrStderr(), styles.KeyValue("Path", destDir))
+				fmt.Fprintln(cmd.ErrOrStderr(), styles.KeyValue("Next", "see "+filepath.Join(projectName, "README.md")+" for setup steps"))
+				return nil
+			}
 			return printData(state, map[string]any{
-				"project": name,
-				"runtime": runtime,
-				"files":   files,
+				"template": template,
+				"name":     projectName,
+				"path":     destDir,
+				"created":  true,
 			})
 		},
 	}
 
-	cmd.Flags().BoolVar(&yes, "yes", false, "run non-interactive initialization with flags")
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing config files")
-	cmd.Flags().StringVar(&template, "template", "", "template mode (minimal|full) for legacy definitions")
-	cmd.Flags().StringVar(&name, "name", "", "project name")
-	cmd.Flags().StringVar(&runtime, "runtime", "", "project runtime (go, python, typescript, ruby, rust, node, bun, docker)")
-	cmd.Flags().BoolVar(&withJob, "with-job", false, "include a starter job")
-	cmd.Flags().StringVar(&jobName, "job-name", "", "starter job name (requires --with-job)")
-	cmd.Flags().StringVar(&jobEndpoint, "job-endpoint", "", "starter job endpoint URL (requires --with-job)")
-	cmd.Flags().StringVar(&jobCron, "job-cron", "", "starter job cron schedule (optional)")
-	cmd.Flags().BoolVar(&fromServer, "from-server", false, "scaffold manifests by fetching existing jobs and workflows from the server (requires --project or STRAIT_PROJECT)")
+	cmd.Flags().StringVar(&template, "template", "", "template to scaffold (use --list to see available templates)")
+	cmd.Flags().StringVar(&projectName, "name", "", "project name (also used as destination directory; defaults to the template name)")
+	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files in the destination directory")
+	cmd.Flags().BoolVar(&listTemplates, "list", false, "list available templates and exit")
+
+	_ = cmd.RegisterFlagCompletionFunc("template", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		names, err := initTemplateNames()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveError
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	})
 
 	return cmd
 }
 
-func updateGitignore() string {
-	const entry = ".strait/"
-	path := ".gitignore"
-
-	content, err := os.ReadFile(path)
-	if err != nil {
-		// No .gitignore — create one
-		if err := os.WriteFile(path, []byte(entry+"\n"), 0o600); err != nil {
-			return "error"
-		}
-		return "created"
-	}
-
-	// Check if already present
-	for line := range strings.SplitSeq(string(content), "\n") {
-		if strings.TrimSpace(line) == entry {
-			return "skipped"
+// scaffoldTemplate copies every file under sourceRoot in the embedded FS to
+// destRoot, replacing the project-name placeholder in file contents and
+// honoring force-overwrite semantics. Returns an error on the first conflict
+// when force is false; partial extractions on failure are left in place so the
+// user can inspect what landed.
+func scaffoldTemplate(src fs.FS, sourceRoot, destRoot, projectName string, force bool) error {
+	if !force {
+		if _, err := os.Stat(destRoot); err == nil {
+			entries, readErr := os.ReadDir(destRoot)
+			if readErr == nil && len(entries) > 0 {
+				return fmt.Errorf("destination %q already exists and is not empty (pass --force to overwrite)", destRoot)
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("stat destination: %w", err)
 		}
 	}
 
-	// Append
-	if len(content) > 0 && content[len(content)-1] != '\n' {
-		content = append(content, '\n')
-	}
-	content = append(content, []byte(entry+"\n")...)
-	if err := os.WriteFile(path, content, 0o600); err != nil {
-		return "error"
-	}
-	return "updated"
-}
-
-func writeInitConfig(projectName string) (string, error) {
-	path := ".strait.yaml"
-	if _, err := os.Stat(path); err == nil {
-		return "skipped", nil
+	if err := os.MkdirAll(destRoot, 0o750); err != nil {
+		return fmt.Errorf("create destination: %w", err)
 	}
 
-	cfg := initConfigFile{
-		Server:        "http://localhost:8080",
-		Project:       projectName,
-		Format:        "table",
-		ActiveContext: "default",
-	}
+	return fs.WalkDir(src, sourceRoot, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
 
-	encoded, err := yaml.Marshal(cfg)
-	if err != nil {
-		return "", err
-	}
+		rel, err := filepath.Rel(sourceRoot, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
 
-	if err := os.WriteFile(path, encoded, 0o600); err != nil {
-		return "", err
-	}
+		target := filepath.Join(destRoot, rel)
+		// Templates ship `gitignore` files that we rename to `.gitignore` on
+		// extraction — Go's embed directive excludes dotfiles by default.
+		if filepath.Base(target) == "gitignore" {
+			target = filepath.Join(filepath.Dir(target), ".gitignore")
+		}
+		// `.tmpl` suffixes hide embedded Go sources (go.mod, main.go) from the
+		// parent module's `go build ./...` traversal; the scaffolder restores
+		// the canonical name in the user's project.
+		if trimmed, ok := strings.CutSuffix(target, ".tmpl"); ok {
+			target = trimmed
+		}
 
-	return "created", nil
-}
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o750)
+		}
 
-func writeInitEnv() (string, error) {
-	if _, err := os.Stat(".env"); err == nil {
-		return "skipped", nil
-	}
-
-	if _, err := os.Stat(".env.example"); err == nil {
-		content, readErr := os.ReadFile(".env.example")
+		raw, readErr := fs.ReadFile(src, path)
 		if readErr != nil {
-			return "", readErr
+			return fmt.Errorf("read template file %q: %w", path, readErr)
 		}
-		if err := os.WriteFile(".env", content, 0o600); err != nil {
-			return "", err
+		rendered := strings.ReplaceAll(string(raw), projectNamePlaceholder, projectName)
+
+		if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+			return fmt.Errorf("create parent dir for %q: %w", target, err)
 		}
-		return "created", nil
-	}
-
-	defaultEnv := []byte("DATABASE_URL=postgres://strait:strait@localhost:5432/strait?sslmode=disable\nREDIS_URL=redis://localhost:6379\n")
-	if err := os.WriteFile(".env", defaultEnv, 0o600); err != nil {
-		return "", err
-	}
-
-	return "created", nil
-}
-
-func writeInitDockerCompose() (string, error) {
-	path := "docker-compose.yml"
-	if _, err := os.Stat(path); err == nil {
-		return "skipped", nil
-	}
-
-	compose := []byte("services:\n  postgres:\n    image: postgres:16\n    environment:\n      POSTGRES_USER: strait\n      POSTGRES_PASSWORD: strait\n      POSTGRES_DB: strait\n    ports:\n      - \"5432:5432\"\n\n  redis:\n    image: redis:7\n    ports:\n      - \"6379:6379\"\n")
-	if err := os.WriteFile(path, compose, 0o600); err != nil {
-		return "", err
-	}
-
-	return "created", nil
-}
-
-func writeInitJobManifest(template, projectName string) (string, error) {
-	dir := "definitions"
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return "", err
-	}
-
-	target := filepath.Join(dir, "jobs.yaml")
-	if _, err := os.Stat(target); err == nil {
-		return "skipped", nil
-	}
-
-	jobName := "example-job"
-	jobSlug := "example-job"
-	jobDescription := "example job definition"
-	jobCron := ""
-	if template == "full" {
-		jobName = "example-full-job"
-		jobSlug = "example-full-job"
-		jobDescription = "example full template job"
-		jobCron = "*/5 * * * *"
-	}
-
-	m := initJobManifest{
-		APIVersion: "v1",
-		Kind:       "Job",
-		Metadata:   map[string]string{"name": jobName},
-		Spec: map[string]any{
-			"project_id":   projectName,
-			"slug":         jobSlug,
-			"description":  jobDescription,
-			"cron":         jobCron,
-			"endpoint_url": "http://localhost:3000/webhook",
-			"timeout_secs": 60,
-			"max_attempts": 3,
-		},
-	}
-
-	encoded, err := yaml.Marshal(m)
-	if err != nil {
-		return "", err
-	}
-
-	if err := os.WriteFile(target, encoded, 0o600); err != nil {
-		return "", err
-	}
-
-	return "created", nil
-}
-
-func writeInitWorkflowManifest(template, projectName string) (string, error) {
-	if template != "full" {
-		return "not_applicable", nil
-	}
-
-	dir := "definitions"
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return "", err
-	}
-
-	target := filepath.Join(dir, "workflows.yaml")
-	if _, err := os.Stat(target); err == nil {
-		return "skipped", nil
-	}
-
-	m := initWorkflowManifest{
-		APIVersion: "v1",
-		Kind:       "Workflow",
-		Metadata:   map[string]string{"name": "example-full-workflow"},
-		Spec: map[string]any{
-			"project_id":  projectName,
-			"slug":        "example-full-workflow",
-			"description": "example full template workflow",
-			"enabled":     true,
-			"steps": []map[string]any{
-				{
-					"step_ref":   "send_webhook",
-					"job_id":     "example-full-job",
-					"depends_on": []string{},
-					"on_failure": "fail",
-				},
-			},
-		},
-	}
-
-	encoded, err := yaml.Marshal(m)
-	if err != nil {
-		return "", err
-	}
-
-	if err := os.WriteFile(target, encoded, 0o600); err != nil {
-		return "", err
-	}
-
-	return "created", nil
-}
-
-// writeStraitIgnore writes a .straitignore file with common and runtime-specific
-// patterns. Returns "skipped" if the file already exists.
-func writeStraitIgnore(runtime string) (string, error) {
-	path := ".straitignore"
-	if _, err := os.Stat(path); err == nil {
-		return "skipped", nil
-	}
-
-	lines := []string{
-		"# Common — always excluded from source packs",
-		".git/",
-		".DS_Store",
-		"*.log",
-		"*.tmp",
-		".env",
-		".env.*",
-		"",
-		"# Build outputs",
-		"dist/",
-		"build/",
-		"out/",
-		"tmp/",
-		".tmp/",
-		"",
-		"# Secrets and certificates",
-		"*.pem",
-		"*.key",
-		"*.crt",
-		"*.p12",
-	}
-
-	// Normalise aliases to canonical names.
-	normalised := runtime
-	switch runtime {
-	case "node", "bun", "js":
-		normalised = "typescript"
-	}
-
-	switch normalised {
-	case "typescript":
-		lines = append(lines,
-			"",
-			"# Node.js / TypeScript",
-			"node_modules/",
-			".next/",
-			".nuxt/",
-			".turbo/",
-			"coverage/",
-			"*.tsbuildinfo",
-			".cache/",
-		)
-	case "python":
-		lines = append(lines,
-			"",
-			"# Python",
-			"__pycache__/",
-			"*.pyc",
-			"*.pyo",
-			".venv/",
-			"venv/",
-			".pytest_cache/",
-			"*.egg-info/",
-			".mypy_cache/",
-		)
-	case "go":
-		lines = append(lines,
-			"",
-			"# Go",
-			"vendor/",
-			"*.test",
-			"*.prof",
-		)
-	case "rust":
-		lines = append(lines,
-			"",
-			"# Rust",
-			"target/",
-		)
-	case "ruby":
-		lines = append(lines,
-			"",
-			"# Ruby",
-			".bundle/",
-			"vendor/bundle/",
-			"tmp/",
-			"log/",
-			"*.gem",
-		)
-	}
-
-	content := strings.Join(lines, "\n") + "\n"
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		return "", err
-	}
-	return "created", nil
-}
-
-// runInitFromServer fetches jobs and workflows from the server and scaffolds
-// YAML manifest files (definitions/jobs.yaml, definitions/workflows.yaml).
-func runInitFromServer(cmd *cobra.Command, state *appState, force bool) error {
-	projectID := state.opts.projectID
-	if projectID == "" {
-		return fmt.Errorf("--project (or STRAIT_PROJECT) is required for --from-server")
-	}
-
-	cli, err := newAPIClient(state)
-	if err != nil {
-		return err
-	}
-
-	jobs, err := cli.ListJobs(cmd.Context(), projectID)
-	if err != nil {
-		return fmt.Errorf("fetch jobs: %w", err)
-	}
-
-	workflows, err := cli.ListWorkflows(cmd.Context(), projectID)
-	if err != nil {
-		return fmt.Errorf("fetch workflows: %w", err)
-	}
-
-	if len(jobs) == 0 && len(workflows) == 0 {
-		if isTTYRich(state) {
-			fmt.Fprintln(os.Stderr, styles.Warn("no jobs or workflows found in project "+projectID))
-		}
-		return printData(state, map[string]any{
-			"project_id": projectID,
-			"jobs":       0,
-			"workflows":  0,
-			"files":      []string{},
-		})
-	}
-
-	if err := os.MkdirAll("definitions", 0o750); err != nil {
-		return fmt.Errorf("create definitions directory: %w", err)
-	}
-
-	var written []string
-
-	// Scaffold jobs manifest
-	if len(jobs) > 0 {
-		jobsPath := filepath.Join("definitions", "jobs.yaml")
-		if !force {
-			if _, statErr := os.Stat(jobsPath); statErr == nil {
-				return fmt.Errorf("%s already exists (use --force to overwrite)", jobsPath)
-			}
-		}
-
-		var buf strings.Builder
-		for i, job := range jobs {
-			if i > 0 {
-				buf.WriteString("---\n")
-			}
-			m := initJobManifest{
-				APIVersion: "strait.dev/v1",
-				Kind:       "Job",
-				Metadata:   map[string]string{"name": job.Name},
-				Spec: map[string]any{
-					"slug":         job.Slug,
-					"project_id":   projectID,
-					"endpoint_url": job.EndpointURL,
-					"timeout_secs": job.TimeoutSecs,
-					"max_attempts": job.MaxAttempts,
-				},
-			}
-			if job.Cron != "" {
-				m.Spec["cron"] = job.Cron
-			}
-			out, marshalErr := yaml.Marshal(m)
-			if marshalErr != nil {
-				return fmt.Errorf("encode job manifest: %w", marshalErr)
-			}
-			buf.Write(out)
-		}
-		if err := os.WriteFile(jobsPath, []byte(buf.String()), 0o600); err != nil {
-			return fmt.Errorf("write %s: %w", jobsPath, err)
-		}
-		written = append(written, jobsPath)
-	}
-
-	// Scaffold workflows manifest
-	if len(workflows) > 0 {
-		wfPath := filepath.Join("definitions", "workflows.yaml")
-		if !force {
-			if _, statErr := os.Stat(wfPath); statErr == nil {
-				return fmt.Errorf("%s already exists (use --force to overwrite)", wfPath)
-			}
-		}
-
-		var buf strings.Builder
-		for i, wf := range workflows {
-			if i > 0 {
-				buf.WriteString("---\n")
-			}
-			m := initWorkflowManifest{
-				APIVersion: "strait.dev/v1",
-				Kind:       "Workflow",
-				Metadata:   map[string]string{"name": wf.Name},
-				Spec: map[string]any{
-					"slug":       wf.Slug,
-					"project_id": projectID,
-				},
-			}
-			out, marshalErr := yaml.Marshal(m)
-			if marshalErr != nil {
-				return fmt.Errorf("encode workflow manifest: %w", marshalErr)
-			}
-			buf.Write(out)
-		}
-		if err := os.WriteFile(wfPath, []byte(buf.String()), 0o600); err != nil {
-			return fmt.Errorf("write %s: %w", wfPath, err)
-		}
-		written = append(written, wfPath)
-	}
-
-	if isTTYRich(state) {
-		fmt.Fprintln(os.Stderr, styles.Success(fmt.Sprintf("Scaffolded %d job(s), %d workflow(s) from server", len(jobs), len(workflows))))
-		for _, f := range written {
-			fmt.Fprintln(os.Stderr, styles.KeyValue("created", styles.FilePath(f)))
+		if err := os.WriteFile(target, []byte(rendered), 0o600); err != nil {
+			return fmt.Errorf("write %q: %w", target, err)
 		}
 		return nil
-	}
-	return printData(state, map[string]any{
-		"project_id": projectID,
-		"jobs":       len(jobs),
-		"workflows":  len(workflows),
-		"files":      written,
 	})
 }

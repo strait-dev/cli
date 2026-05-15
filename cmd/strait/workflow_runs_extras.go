@@ -90,7 +90,7 @@ func newWorkflowRunsRetryCommand(state *appState) *cobra.Command {
 
 func newWorkflowRunsApproveStepCommand(state *appState) *cobra.Command {
 	return &cobra.Command{
-		Use:   "approve-step <workflow-run-id> <step-ref>",
+		Use:   "approve <workflow-run-id> <step-ref>",
 		Short: "Approve a workflow step pending review",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -118,7 +118,7 @@ func newWorkflowRunsApproveStepCommand(state *appState) *cobra.Command {
 
 func newWorkflowRunsRetryStepCommand(state *appState) *cobra.Command {
 	return &cobra.Command{
-		Use:   "retry-step <workflow-run-id> <step-ref>",
+		Use:   "retry <workflow-run-id> <step-ref>",
 		Short: "Retry an individual workflow step",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -146,7 +146,7 @@ func newWorkflowRunsRetryStepCommand(state *appState) *cobra.Command {
 
 func newWorkflowRunsSkipStepCommand(state *appState) *cobra.Command {
 	return &cobra.Command{
-		Use:   "skip-step <workflow-run-id> <step-ref>",
+		Use:   "skip <workflow-run-id> <step-ref>",
 		Short: "Skip a workflow step",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -175,7 +175,7 @@ func newWorkflowRunsSkipStepCommand(state *appState) *cobra.Command {
 func newWorkflowRunsForceCompleteStepCommand(state *appState) *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
-		Use:   "force-complete-step <workflow-run-id> <step-ref>",
+		Use:   "force-complete <workflow-run-id> <step-ref>",
 		Short: "Force-complete a workflow step regardless of state",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {

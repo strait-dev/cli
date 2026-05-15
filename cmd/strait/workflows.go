@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/strait-dev/cli/internal/client"
-	"github.com/strait-dev/cli/internal/dag"
 	"github.com/strait-dev/cli/internal/styles"
 	"github.com/strait-dev/cli/internal/validate"
 
@@ -24,18 +23,12 @@ func newWorkflowsCommand(state *appState) *cobra.Command {
 
 	getCmd := newWorkflowsGetCommand(state)
 	getCmd.ValidArgsFunction = completeWorkflowSlugs(state)
-	describeCmd := newWorkflowsDescribeCommand(state)
-	describeCmd.ValidArgsFunction = completeWorkflowSlugs(state)
 	updateCmd := newWorkflowsUpdateCommand(state)
 	updateCmd.ValidArgsFunction = completeWorkflowSlugs(state)
 	deleteCmd := newWorkflowsDeleteCommand(state)
 	deleteCmd.ValidArgsFunction = completeWorkflowSlugs(state)
-	runsCmd := newWorkflowsRunsCommand(state)
-	runsCmd.ValidArgsFunction = completeWorkflowSlugs(state)
 	triggerCmd := newWorkflowsTriggerCommand(state)
 	triggerCmd.ValidArgsFunction = completeWorkflowSlugs(state)
-	visualizeCmd := newWorkflowsVisualizeCommand(state)
-	visualizeCmd.ValidArgsFunction = completeWorkflowSlugs(state)
 	cloneCmd := newWorkflowsCloneCommand(state)
 	cloneCmd.ValidArgsFunction = completeWorkflowSlugs(state)
 	dryRunCmd := newWorkflowsDryRunCommand(state)
@@ -53,13 +46,10 @@ func newWorkflowsCommand(state *appState) *cobra.Command {
 
 	cmd.AddCommand(newWorkflowsListCommand(state))
 	cmd.AddCommand(getCmd)
-	cmd.AddCommand(describeCmd)
 	cmd.AddCommand(newWorkflowsCreateCommand(state))
 	cmd.AddCommand(updateCmd)
 	cmd.AddCommand(deleteCmd)
-	cmd.AddCommand(runsCmd)
 	cmd.AddCommand(triggerCmd)
-	cmd.AddCommand(visualizeCmd)
 	cmd.AddCommand(cloneCmd)
 	cmd.AddCommand(dryRunCmd)
 	cmd.AddCommand(planCmd)
@@ -67,88 +57,6 @@ func newWorkflowsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(versionsCmd)
 	cmd.AddCommand(diffCmd)
 	cmd.AddCommand(policyCmd)
-
-	return cmd
-}
-
-func newWorkflowsDescribeCommand(state *appState) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "describe <workflow-id-or-slug>",
-		Short: "Show workflow details and step dependency view",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cli, err := newAPIClient(state)
-			if err != nil {
-				return err
-			}
-
-			workflowID, err := resolveWorkflowIdentifier(cmd.Context(), cli, state, args[0])
-			if err != nil {
-				return err
-			}
-
-			wf, err := cli.GetWorkflow(cmd.Context(), workflowID)
-			if err != nil {
-				return err
-			}
-
-			steps := make([]map[string]any, 0, len(wf.Steps))
-			for _, step := range wf.Steps {
-				deps := "-"
-				if len(step.DependsOn) > 0 {
-					deps = strings.Join(step.DependsOn, ",")
-				}
-				steps = append(steps, map[string]any{
-					"step_ref":   step.StepRef,
-					"job_id":     step.JobID,
-					"depends_on": deps,
-					"on_failure": step.OnFailure,
-				})
-			}
-
-			payload := map[string]any{
-				"workflow": map[string]any{
-					"id":          wf.ID,
-					"project_id":  wf.ProjectID,
-					"name":        wf.Name,
-					"slug":        wf.Slug,
-					"description": wf.Description,
-					"enabled":     wf.Enabled,
-					"version":     wf.Version,
-				},
-				"steps": steps,
-			}
-
-			if isTTYRich(state) {
-				lines := []string{
-					styles.DetailLine("ID", wf.ID),
-					styles.DetailLine("Name", wf.Name),
-					styles.DetailLine("Slug", wf.Slug),
-					styles.DetailLine("Description", wf.Description),
-					styles.DetailLine("Enabled", styles.Enabled(wf.Enabled)),
-					styles.DetailLine("Version", fmt.Sprintf("%d", wf.Version)),
-					styles.DetailLine("Steps", fmt.Sprintf("%d", len(wf.Steps))),
-				}
-				fmt.Fprint(os.Stderr, styles.DetailBox("Workflow Details", lines))
-				if len(steps) > 0 {
-					fmt.Fprintln(os.Stderr)
-					fmt.Fprintln(os.Stderr, styles.SectionHeader("Steps", len(steps)))
-					for _, s := range steps {
-						ref := s["step_ref"]
-						deps := s["depends_on"]
-						onFail := s["on_failure"]
-						fmt.Fprintf(os.Stderr, "  %s  deps=%s  on_failure=%s\n",
-							styles.Bold.Render(fmt.Sprintf("%v", ref)),
-							styles.MutedStyle.Render(fmt.Sprintf("%v", deps)),
-							styles.MutedStyle.Render(fmt.Sprintf("%v", onFail)),
-						)
-					}
-				}
-				return nil
-			}
-			return printData(state, payload)
-		},
-	}
 
 	return cmd
 }
@@ -412,58 +320,6 @@ func newWorkflowsDeleteCommand(state *appState) *cobra.Command {
 	return cmd
 }
 
-func newWorkflowsRunsCommand(state *appState) *cobra.Command {
-	var limit int
-	var offset int
-
-	cmd := &cobra.Command{
-		Use:   "runs <workflow-id-or-slug>",
-		Short: "List runs for a workflow",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if limit < 0 {
-				return fmt.Errorf("limit must be non-negative")
-			}
-			if offset < 0 {
-				return fmt.Errorf("offset must be non-negative")
-			}
-
-			cli, err := newAPIClient(state)
-			if err != nil {
-				return err
-			}
-
-			workflowID, err := resolveWorkflowIdentifier(cmd.Context(), cli, state, args[0])
-			if err != nil {
-				return err
-			}
-
-			runs, err := cli.ListWorkflowRuns(cmd.Context(), workflowID, limit, offset)
-			if err != nil {
-				return err
-			}
-
-			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.SectionHeader("Workflow Runs", len(runs)))
-				for _, r := range runs {
-					fmt.Fprintf(os.Stderr, "  %s  %s  %s\n",
-						styles.StatusBadge(string(r.Status)),
-						r.ID,
-						styles.RelativeTime(r.CreatedAt),
-					)
-				}
-				return nil
-			}
-			return printData(state, runs)
-		},
-	}
-
-	cmd.Flags().IntVar(&limit, "limit", 50, "max runs to return")
-	cmd.Flags().IntVar(&offset, "offset", 0, "pagination offset")
-
-	return cmd
-}
-
 func newWorkflowsTriggerCommand(state *appState) *cobra.Command {
 	var payload string
 	var payloadFile string
@@ -554,88 +410,4 @@ func resolveWorkflowIdentifier(ctx context.Context, cli *client.Client, state *a
 	}
 
 	return "", fmt.Errorf("workflow %q not found", idOrSlug)
-}
-
-func newWorkflowsVisualizeCommand(state *appState) *cobra.Command {
-	var workflowRunID string
-
-	cmd := &cobra.Command{
-		Use:     "visualize <workflow-id-or-slug>",
-		Short:   "Render workflow step DAG as a text diagram",
-		Long:    "Fetches the workflow definition and renders a topologically sorted DAG with box-drawing characters. Optionally colors nodes by step run status.",
-		Example: "  strait workflows visualize my-workflow\n  strait workflows visualize my-workflow --run wfr_123",
-		Args:    cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cli, err := newAPIClient(state)
-			if err != nil {
-				return err
-			}
-
-			workflowID, err := resolveWorkflowIdentifier(cmd.Context(), cli, state, args[0])
-			if err != nil {
-				return err
-			}
-
-			wf, err := cli.GetWorkflow(cmd.Context(), workflowID)
-			if err != nil {
-				return err
-			}
-
-			steps := make([]dag.Step, 0, len(wf.Steps))
-			for _, s := range wf.Steps {
-				steps = append(steps, dag.Step{
-					StepRef:   s.StepRef,
-					DependsOn: s.DependsOn,
-				})
-			}
-
-			// Optionally fetch step run statuses for coloring
-			var statusMap map[string]string
-			if workflowRunID != "" {
-				stepRuns, listErr := cli.ListWorkflowStepRuns(cmd.Context(), workflowRunID)
-				if listErr != nil {
-					return fmt.Errorf("fetching step runs: %w", listErr)
-				}
-				statusMap = make(map[string]string, len(stepRuns))
-				for _, sr := range stepRuns {
-					statusMap[sr.StepRef] = string(sr.Status)
-				}
-			}
-
-			format := state.opts.outputFormat
-			if format != "" && format != "table" && format != "wide" {
-				nodes := make([]map[string]any, 0, len(wf.Steps))
-				for _, s := range wf.Steps {
-					node := map[string]any{
-						"step_ref":   s.StepRef,
-						"depends_on": s.DependsOn,
-					}
-					if statusMap != nil {
-						node["status"] = statusMap[s.StepRef]
-					}
-					nodes = append(nodes, node)
-				}
-				edges := make([]map[string]any, 0)
-				for _, s := range wf.Steps {
-					for _, dep := range s.DependsOn {
-						edges = append(edges, map[string]any{"from": dep, "to": s.StepRef})
-					}
-				}
-				return printData(state, map[string]any{
-					"workflow_id":     workflowID,
-					"workflow_run_id": workflowRunID,
-					"nodes":           nodes,
-					"edges":           edges,
-				})
-			}
-
-			rendered := dag.RenderDAG(steps, statusMap)
-			fmt.Fprint(state.out(), rendered)
-			return nil
-		},
-	}
-
-	cmd.Flags().StringVar(&workflowRunID, "run", "", "workflow run ID to color nodes by step status")
-
-	return cmd
 }

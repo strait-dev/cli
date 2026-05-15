@@ -218,37 +218,13 @@ func (p VersionPolicy) IsValid() bool {
 type ExecutionMode string
 
 const (
-	ExecutionModeHTTP    ExecutionMode = "http"
-	ExecutionModeManaged ExecutionMode = "managed"
+	ExecutionModeHTTP ExecutionMode = "http"
 )
 
 // IsValid returns true if the execution mode is a known value.
 func (m ExecutionMode) IsValid() bool {
 	switch m {
-	case ExecutionModeHTTP, ExecutionModeManaged:
-		return true
-	default:
-		return false
-	}
-}
-
-// MachinePreset defines a compute resource tier for managed execution.
-type MachinePreset string
-
-const (
-	PresetMicro    MachinePreset = "micro"
-	PresetSmall1x  MachinePreset = "small-1x"
-	PresetSmall2x  MachinePreset = "small-2x"
-	PresetMedium1x MachinePreset = "medium-1x"
-	PresetMedium2x MachinePreset = "medium-2x"
-	PresetLarge1x  MachinePreset = "large-1x"
-	PresetLarge2x  MachinePreset = "large-2x"
-)
-
-// IsValid returns true if the machine preset is a known value.
-func (p MachinePreset) IsValid() bool {
-	switch p {
-	case PresetMicro, PresetSmall1x, PresetSmall2x, PresetMedium1x, PresetMedium2x, PresetLarge1x, PresetLarge2x:
+	case ExecutionModeHTTP:
 		return true
 	default:
 		return false
@@ -262,43 +238,6 @@ const (
 	RetryBackoffExponential RetryBackoffPolicy = "exponential"
 	RetryBackoffFixed       RetryBackoffPolicy = "fixed"
 )
-
-// DeploymentStrategy defines the rollout strategy for a deployment version.
-type DeploymentStrategy string
-
-const (
-	DeploymentStrategyDirect DeploymentStrategy = "direct"
-	DeploymentStrategyCanary DeploymentStrategy = "canary"
-)
-
-// IsValid returns true if the deployment strategy is a known value.
-func (s DeploymentStrategy) IsValid() bool {
-	switch s {
-	case DeploymentStrategyDirect, DeploymentStrategyCanary:
-		return true
-	default:
-		return false
-	}
-}
-
-// DeploymentVersionStatus represents the lifecycle state of a deployment version.
-type DeploymentVersionStatus string
-
-const (
-	DeploymentVersionStatusDraft     DeploymentVersionStatus = "draft"
-	DeploymentVersionStatusFinalized DeploymentVersionStatus = "finalized"
-	DeploymentVersionStatusPromoted  DeploymentVersionStatus = "promoted"
-)
-
-// IsValid returns true if the deployment version status is a known value.
-func (s DeploymentVersionStatus) IsValid() bool {
-	switch s {
-	case DeploymentVersionStatusDraft, DeploymentVersionStatusFinalized, DeploymentVersionStatusPromoted:
-		return true
-	default:
-		return false
-	}
-}
 
 // RateLimitKey defines a named rate limit bucket within a job.
 type RateLimitKey struct {
@@ -361,10 +300,6 @@ type Job struct {
 	BatchWindowSecs           int               `json:"batch_window_secs,omitempty"`
 	BatchMaxSize              int               `json:"batch_max_size,omitempty"`
 	ExecutionMode             ExecutionMode     `json:"execution_mode,omitempty"`
-	MachinePreset             MachinePreset     `json:"machine_preset,omitempty"`
-	ImageURI                  string            `json:"image_uri,omitempty"`
-	Region                    string            `json:"region,omitempty"`
-	PreferredRegions          []string          `json:"preferred_regions,omitempty"`
 	OnCompleteTriggerWorkflow string            `json:"on_complete_trigger_workflow,omitempty"`
 	OnCompletePayloadMapping  json.RawMessage   `json:"on_complete_payload_mapping,omitempty"`
 	MaxTokensPerRun           int64             `json:"max_tokens_per_run,omitempty"`
@@ -400,9 +335,6 @@ type JobVersion struct {
 	WebhookURL          string            `json:"webhook_url,omitempty"`
 	WebhookSecret       string            `json:"webhook_secret,omitempty"`
 	RunTTLSecs          int               `json:"run_ttl_secs,omitempty"`
-	MachinePreset       string            `json:"machine_preset,omitempty"`
-	ImageURI            string            `json:"image_uri,omitempty"`
-	Region              string            `json:"region,omitempty"`
 	CreatedAt           time.Time         `json:"created_at"`
 }
 
@@ -445,7 +377,6 @@ type JobRun struct {
 	BatchID               string            `json:"batch_id,omitempty"`
 	ConcurrencyKey        string            `json:"concurrency_key,omitempty"`
 	ExecutionMode         ExecutionMode     `json:"execution_mode,omitempty"`
-	MachineID             string            `json:"machine_id,omitempty"`
 	CreatedAt             time.Time         `json:"created_at"`
 }
 
@@ -903,4 +834,19 @@ type TeamPolicy struct {
 	Permissions     []string  `json:"permissions"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// WorkerInfo describes a connected worker, returned by the workers endpoint.
+type WorkerInfo struct {
+	ID            string    `json:"id"`
+	Name          string    `json:"name,omitempty"`
+	ProjectID     string    `json:"project_id,omitempty"`
+	Queues        []string  `json:"queues,omitempty"`
+	Concurrency   int       `json:"concurrency,omitempty"`
+	Status        string    `json:"status"`
+	Version       string    `json:"version,omitempty"`
+	RemoteAddr    string    `json:"remote_addr,omitempty"`
+	ConnectedAt   time.Time `json:"connected_at"`
+	LastHeartbeat time.Time `json:"last_heartbeat,omitzero"`
+	ActiveTasks   int       `json:"active_tasks"`
 }

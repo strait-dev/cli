@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: STRAIT_TEMPLATE_PROJECT_NAME
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: STRAIT_TEMPLATE_PROJECT_NAME
+  template:
+    metadata:
+      labels:
+        app: STRAIT_TEMPLATE_PROJECT_NAME
+    spec:
+      containers:
+        - name: worker
+          image: STRAIT_TEMPLATE_PROJECT_NAME:latest
+          env:
+            - name: STRAIT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: strait-credentials
+                  key: api-key
+            - name: STRAIT_SERVER
+              value: https://api.strait.dev
+            - name: STRAIT_QUEUES
+              value: default
+            - name: STRAIT_CONCURRENCY
+              value: "8"

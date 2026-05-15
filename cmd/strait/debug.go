@@ -23,7 +23,144 @@ func newDebugCommand(state *appState) *cobra.Command {
 
 	cmd.AddCommand(newDebugBundleCommand(state))
 	cmd.AddCommand(newDebugRequestCommand(state))
+	cmd.AddCommand(newDebugProfileCommand(state))
 
+	return cmd
+}
+
+func newDebugProfileCommand(state *appState) *cobra.Command {
+	var projectID, period string
+	var iterations int
+
+	cmd := &cobra.Command{
+		Use:   "profile",
+		Short: "Probe API performance (round-trip timings + server performance analytics)",
+		Long: `Run a small set of authenticated probes against the configured server, time
+each one, and (if --project is set) include the server's performance analytics
+snapshot.`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if iterations < 1 {
+				return fmt.Errorf("--iterations must be >= 1")
+			}
+
+			cli, err := newAPIClient(state)
+			if err != nil {
+				return err
+			}
+
+			probes := []struct {
+				name string
+				fn   func() error
+			}{
+				{"health", func() error {
+					_, err := cli.Health(cmd.Context())
+					return err
+				}},
+			}
+
+			pid, _ := requireProjectID(state, projectID)
+			if pid != "" {
+				probes = append(probes,
+					struct {
+						name string
+						fn   func() error
+					}{"jobs.list", func() error {
+						_, err := cli.ListJobs(cmd.Context(), pid)
+						return err
+					}},
+				)
+			}
+
+			type probeResult struct {
+				Name     string `json:"name"`
+				AvgMS    int64  `json:"avg_ms"`
+				MinMS    int64  `json:"min_ms"`
+				MaxMS    int64  `json:"max_ms"`
+				Failures int    `json:"failures"`
+			}
+			results := make([]probeResult, 0, len(probes))
+
+			for _, p := range probes {
+				r := probeResult{Name: p.name, MinMS: -1}
+				var totalNS int64
+				for range iterations {
+					start := time.Now()
+					if err := p.fn(); err != nil {
+						r.Failures++
+						continue
+					}
+					d := time.Since(start).Milliseconds()
+					totalNS += d
+					if r.MinMS < 0 || d < r.MinMS {
+						r.MinMS = d
+					}
+					if d > r.MaxMS {
+						r.MaxMS = d
+					}
+				}
+				succeeded := iterations - r.Failures
+				if succeeded > 0 {
+					r.AvgMS = totalNS / int64(succeeded)
+				}
+				if r.MinMS < 0 {
+					r.MinMS = 0
+				}
+				results = append(results, r)
+			}
+
+			var perf *struct {
+				PeriodHours int     `json:"period_hours"`
+				SuccessRate float64 `json:"success_rate"`
+				QueueDepth  int     `json:"queue_depth"`
+			}
+			if pid != "" {
+				hours, err := parsePerfPeriodHours(period)
+				if err != nil {
+					return err
+				}
+				snap, err := cli.GetPerformanceAnalytics(cmd.Context(), pid, hours)
+				if err == nil {
+					perf = &struct {
+						PeriodHours int     `json:"period_hours"`
+						SuccessRate float64 `json:"success_rate"`
+						QueueDepth  int     `json:"queue_depth"`
+					}{
+						PeriodHours: snap.Throughput.PeriodHours,
+						SuccessRate: snap.HealthSummary.SuccessRate,
+						QueueDepth:  snap.HealthSummary.QueueDepth,
+					}
+				}
+			}
+
+			if isTTYRich(state) {
+				fmt.Fprintln(os.Stderr, styles.SectionHeader("API probes", len(results)))
+				for _, r := range results {
+					fmt.Fprintf(os.Stderr, "  %s  avg=%dms  min=%dms  max=%dms  failures=%d\n",
+						styles.Bold.Render(r.Name), r.AvgMS, r.MinMS, r.MaxMS, r.Failures)
+				}
+				if perf != nil {
+					fmt.Fprint(os.Stderr, styles.DetailBox("Server health", []string{
+						styles.DetailLine("Period (hours)", fmt.Sprintf("%d", perf.PeriodHours)),
+						styles.DetailLine("Success rate", fmt.Sprintf("%.2f%%", perf.SuccessRate*100)),
+						styles.DetailLine("Queue depth", fmt.Sprintf("%d", perf.QueueDepth)),
+					}))
+				}
+				return nil
+			}
+
+			return printData(state, map[string]any{
+				"probes":       results,
+				"iterations":   iterations,
+				"server_perf":  perf,
+				"server_url":   state.opts.serverURL,
+				"completed_at": time.Now().UTC(),
+			})
+		},
+	}
+
+	cmd.Flags().StringVar(&projectID, "project", "", "project ID (enables jobs.list probe + server analytics)")
+	cmd.Flags().StringVar(&period, "period", "24h", "analytics period for server health (24h, 72h, 7d, 30d, 90d)")
+	cmd.Flags().IntVar(&iterations, "iterations", 3, "probe iterations per call")
 	return cmd
 }
 

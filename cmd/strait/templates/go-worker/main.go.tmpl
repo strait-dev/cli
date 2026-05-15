@@ -1,0 +1,55 @@
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+
+	"github.com/strait-dev/strait-go/authoring"
+	"github.com/strait-dev/strait-go/worker"
+)
+
+type helloPayload struct {
+	Name string `json:"name"`
+}
+
+var helloJob = authoring.DefineJob(authoring.JobOptions[helloPayload]{
+	Name: "hello",
+	Slug: "hello",
+	Run: func(p helloPayload, _ authoring.RunContext) (any, error) {
+		name := p.Name
+		if name == "" {
+			name = "world"
+		}
+		return map[string]string{"greeting": "hello, " + name}, nil
+	},
+})
+
+func main() {
+	queues := strings.Split(envOr("STRAIT_QUEUES", "default"), ",")
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	log.Println("worker starting, queues:", queues)
+	err := worker.Run(ctx,
+		[]worker.Handler{worker.Job(helloJob)},
+		worker.WithEndpoint(envOr("STRAIT_SERVER", "api.strait.dev:443")),
+		worker.WithToken(os.Getenv("STRAIT_API_KEY")),
+		worker.WithQueues(queues...),
+		worker.WithSlots(8),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

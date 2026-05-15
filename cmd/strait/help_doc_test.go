@@ -23,9 +23,8 @@ func TestResourceGroupsDocumentIdOrSlug(t *testing.T) {
 	groups := []string{
 		"jobs",
 		"workflows",
-		"environments",
+		"env",
 		"event-sources",
-		"job-groups",
 	}
 
 	for _, name := range groups {

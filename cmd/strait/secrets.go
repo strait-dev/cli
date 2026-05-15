@@ -1,34 +1,26 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"slices"
-	"sort"
 	"strings"
 
 	"github.com/strait-dev/cli/internal/client"
-	cliconfig "github.com/strait-dev/cli/internal/config"
 	"github.com/strait-dev/cli/internal/styles"
 
 	"github.com/spf13/cobra"
-	"github.com/zalando/go-keyring"
 )
-
-const secretServiceName = "strait-secrets"
 
 func newSecretsCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secrets",
 		Short: "Manage project secrets",
-		Long:  "Manage server-side secrets and local keyring secrets.",
+		Long:  "Manage server-side secrets.",
 	}
 
 	cmd.AddCommand(newSecretsListCommand(state))
 	cmd.AddCommand(newSecretsCreateCommand(state))
 	cmd.AddCommand(newSecretsDeleteCommand(state))
-	cmd.AddCommand(newSecretsLocalCommand(state))
 
 	return cmd
 }
@@ -195,173 +187,6 @@ func newSecretsDeleteCommand(state *appState) *cobra.Command {
 	return cmd
 }
 
-// Local keyring secrets commands.
-
-func newSecretsLocalCommand(state *appState) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "local",
-		Short: "Manage local keyring secrets",
-	}
-
-	cmd.AddCommand(newSecretsLocalCreateCommand(state))
-	cmd.AddCommand(newSecretsLocalListCommand(state))
-	cmd.AddCommand(newSecretsLocalDeleteCommand(state))
-
-	return cmd
-}
-
-func newSecretsLocalCreateCommand(state *appState) *cobra.Command {
-	var fromEnv string
-	var fromFile string
-	var projectID string
-
-	cmd := &cobra.Command{
-		Use:   "create <name>",
-		Short: "Create or update a local secret value",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			var err error
-			projectID, err = requireProjectID(state, projectID)
-			if err != nil {
-				return err
-			}
-
-			name := strings.TrimSpace(args[0])
-			if name == "" {
-				return fmt.Errorf("secret name is required")
-			}
-
-			value, err := resolveSecretValue(fromEnv, fromFile)
-			if err != nil {
-				return err
-			}
-
-			if err := keyring.Set(secretServiceName, secretKey(projectID, name), value); err != nil {
-				return err
-			}
-
-			cfg, path, err := loadConfigForWrite(state)
-			if err != nil {
-				return err
-			}
-			if cfg.Secrets == nil {
-				cfg.Secrets = make(map[string][]string)
-			}
-			cfg.Secrets[projectID] = addUnique(cfg.Secrets[projectID], name)
-			if err := cliconfig.Save(path, cfg); err != nil {
-				return err
-			}
-
-			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Stored local secret "+styles.Bold.Render(name)))
-				return nil
-			}
-			return printData(state, map[string]any{"project": projectID, "name": name, "stored": true})
-		},
-	}
-
-	cmd.Flags().StringVar(&fromEnv, "from-env", "", "read secret value from environment variable name")
-	cmd.Flags().StringVar(&fromFile, "from-file", "", "read secret value from file path")
-	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
-
-	return cmd
-}
-
-func newSecretsLocalListCommand(state *appState) *cobra.Command {
-	var projectID string
-
-	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List local secret names for a project",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			var err error
-			projectID, err = requireProjectID(state, projectID)
-			if err != nil {
-				return err
-			}
-
-			cfg := state.config
-			if cfg == nil {
-				cfg = &cliconfig.File{}
-			}
-
-			names := append([]string(nil), cfg.Secrets[projectID]...)
-			sort.Strings(names)
-
-			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.SectionHeader("Local Secrets", len(names)))
-				for _, name := range names {
-					fmt.Fprintf(os.Stderr, "  %s\n", styles.Bold.Render(name))
-				}
-				return nil
-			}
-			rows := make([]map[string]any, 0, len(names))
-			for _, name := range names {
-				rows = append(rows, map[string]any{"project": projectID, "name": name})
-			}
-			return printData(state, rows)
-		},
-	}
-
-	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
-
-	return cmd
-}
-
-func newSecretsLocalDeleteCommand(state *appState) *cobra.Command {
-	var projectID string
-	var yes bool
-
-	cmd := &cobra.Command{
-		Use:   "delete <name>",
-		Short: "Delete a local secret",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			var err error
-			projectID, err = requireProjectID(state, projectID)
-			if err != nil {
-				return err
-			}
-			if err := requireConfirmation(state, "Delete this secret?", yes); err != nil {
-				return err
-			}
-
-			name := strings.TrimSpace(args[0])
-			if name == "" {
-				return fmt.Errorf("secret name is required")
-			}
-
-			err = keyring.Delete(secretServiceName, secretKey(projectID, name))
-			if err != nil && !errors.Is(err, keyring.ErrNotFound) {
-				return err
-			}
-
-			cfg, path, err := loadConfigForWrite(state)
-			if err != nil {
-				return err
-			}
-			if cfg.Secrets == nil {
-				cfg.Secrets = make(map[string][]string)
-			}
-			cfg.Secrets[projectID] = removeValue(cfg.Secrets[projectID], name)
-			if err := cliconfig.Save(path, cfg); err != nil {
-				return err
-			}
-
-			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Deleted local secret "+styles.Bold.Render(name)))
-				return nil
-			}
-			return printData(state, map[string]any{"project": projectID, "name": name, "deleted": true})
-		},
-	}
-
-	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
-	cmd.Flags().BoolVar(&yes, "yes", false, "confirm deletion")
-
-	return cmd
-}
-
 // Helper functions.
 
 func resolveServerSecretValue(directValue, fromEnv, fromFile string) (string, error) {
@@ -403,25 +228,4 @@ func resolveSecretValue(fromEnv, fromFile string) (string, error) {
 		return "", fmt.Errorf("secret value is required")
 	}
 	return value, nil
-}
-
-func secretKey(projectID, name string) string {
-	return projectID + ":" + name
-}
-
-func addUnique(values []string, value string) []string {
-	if slices.Contains(values, value) {
-		return values
-	}
-	return append(values, value)
-}
-
-func removeValue(values []string, value string) []string {
-	out := make([]string, 0, len(values))
-	for _, v := range values {
-		if v != value {
-			out = append(out, v)
-		}
-	}
-	return out
 }

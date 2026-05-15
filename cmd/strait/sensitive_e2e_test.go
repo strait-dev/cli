@@ -110,68 +110,6 @@ func TestEnvironmentsVariables_MasksByDefault(t *testing.T) {
 	}
 }
 
-func TestNotificationsGet_MasksConfigByDefault(t *testing.T) {
-	t.Parallel()
-
-	channel := types.NotificationChannel{
-		ID:        "chan-1",
-		ProjectID: "proj-test",
-		Name:      "oncall-slack",
-		Type:      "slack",
-		Config:    []byte(`{"webhook_url":"https://hooks.slack.com/T01/B02/secret-token-xyz"}`),
-	}
-
-	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/notification-channels/chan-1": func(w http.ResponseWriter, r *http.Request) {
-			respondJSON(t, w, http.StatusOK, channel)
-		},
-	})
-	state := newTestState(t, srv)
-	cmd := newNotificationsGetCommand(state)
-	cmd.SetArgs([]string{"chan-1"})
-
-	out := captureStateOutput(t, state, func() {
-		if err := cmd.Execute(); err != nil {
-			t.Fatalf("Execute: %v", err)
-		}
-	})
-	if strings.Contains(out, "secret-token-xyz") {
-		t.Fatalf("output leaked Slack webhook URL:\n%s", out)
-	}
-	if !strings.Contains(out, sensitiveMask) {
-		t.Fatalf("output missing mask placeholder:\n%s", out)
-	}
-}
-
-func TestNotificationsGet_RevealsConfigWithFlag(t *testing.T) {
-	t.Parallel()
-
-	channel := types.NotificationChannel{
-		ID:     "chan-1",
-		Name:   "oncall-slack",
-		Type:   "slack",
-		Config: []byte(`{"webhook_url":"https://hooks.slack.com/secret-token"}`),
-	}
-
-	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/notification-channels/chan-1": func(w http.ResponseWriter, r *http.Request) {
-			respondJSON(t, w, http.StatusOK, channel)
-		},
-	})
-	state := newTestState(t, srv)
-	cmd := newNotificationsGetCommand(state)
-	cmd.SetArgs([]string{"chan-1", "--reveal"})
-
-	out := captureStateOutput(t, state, func() {
-		if err := cmd.Execute(); err != nil {
-			t.Fatalf("Execute: %v", err)
-		}
-	})
-	if !strings.Contains(out, "secret-token") {
-		t.Fatalf("--reveal output missing Slack token:\n%s", out)
-	}
-}
-
 func TestLogDrainsGet_MasksConfigByDefault(t *testing.T) {
 	t.Parallel()
 

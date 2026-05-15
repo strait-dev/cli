@@ -61,11 +61,6 @@ func TestCommandEntryRejectsMalformedIDs(t *testing.T) {
 		{name: "webhooks retry", buildCmd: newWebhooksRetryCommand, argFn: func(id string) []string { return []string{id} }},
 		{name: "webhooks test", buildCmd: newWebhooksTestCommand, argFn: func(id string) []string { return []string{id} }},
 
-		// Notifications
-		{name: "notifications get", buildCmd: newNotificationsGetCommand, argFn: func(id string) []string { return []string{id} }},
-		{name: "notifications update", buildCmd: newNotificationsUpdateCommand, argFn: func(id string) []string { return []string{id, "--name", "x"} }},
-		{name: "notifications delete", buildCmd: newNotificationsDeleteCommand, argFn: func(id string) []string { return []string{id, "--yes"} }},
-
 		// Log drains
 		{name: "log-drains get", buildCmd: newLogDrainsGetCommand, argFn: func(id string) []string { return []string{id} }},
 		{name: "log-drains update", buildCmd: newLogDrainsUpdateCommand, argFn: func(id string) []string { return []string{id, "--name", "x"} }},
@@ -80,8 +75,6 @@ func TestCommandEntryRejectsMalformedIDs(t *testing.T) {
 		{name: "runs reschedule", buildCmd: newRunsRescheduleCommand, argFn: func(id string) []string { return []string{id, "--at", "2026-01-01T00:00:00Z"} }},
 		{name: "runs dlq-replay", buildCmd: newRunsDLQReplayCommand, argFn: func(id string) []string { return []string{id} }},
 		{name: "runs outputs", buildCmd: newRunsOutputsCommand, argFn: func(id string) []string { return []string{id} }},
-		{name: "runs tool-calls", buildCmd: newRunsToolCallsCommand, argFn: func(id string) []string { return []string{id} }},
-		{name: "runs usage", buildCmd: newRunsUsageCommand, argFn: func(id string) []string { return []string{id} }},
 		{name: "runs checkpoints", buildCmd: newRunsCheckpointsCommand, argFn: func(id string) []string { return []string{id} }},
 
 		// Team policies

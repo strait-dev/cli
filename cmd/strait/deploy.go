@@ -1,209 +1,114 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/strait-dev/cli/internal/client"
-	"github.com/strait-dev/cli/internal/deploy"
 	"github.com/strait-dev/cli/internal/styles"
-	"github.com/strait-dev/cli/internal/types"
 
 	"github.com/spf13/cobra"
 )
 
-func newDeployCommand(state *appState) *cobra.Command {
-	var (
-		jobSlug        string
-		imageURI       string
-		dockerfile     string
-		registry       string
-		tag            string
-		buildArgs      []string
-		push           bool
-		preset         string
-		region         string
-		dryRun         bool
-		cacheEnabled   bool
-		configPath     string
-		env            string
-		artifactURI    string
-		strategy       string
-		canaryPercent  int
-		canaryDuration string
-	)
+// DeployManifest is the on-disk shape consumed by `strait deploy push`. It is
+// a fallback for projects that don't yet have strait-go SDK introspection
+// wired up: write a strait.deploy.json file at the project root and the CLI
+// will upsert each entry. Once strait-go v0.2.0 ships, the SDK will also be
+// able to emit this same shape from its definitions registry.
+type DeployManifest struct {
+	Version   string           `json:"version"`
+	Jobs      []DeployJob      `json:"jobs"`
+	Workflows []DeployWorkflow `json:"workflows,omitempty"`
+	Metadata  map[string]any   `json:"metadata,omitempty"`
+}
 
+// DeployJob is the manifest representation of a single SDK-defined job.
+type DeployJob struct {
+	Slug        string          `json:"slug"`
+	Name        string          `json:"name,omitempty"`
+	Description string          `json:"description,omitempty"`
+	EndpointURL string          `json:"endpoint_url"`
+	Cron        string          `json:"cron,omitempty"`
+	MaxAttempts int             `json:"max_attempts,omitempty"`
+	TimeoutSecs int             `json:"timeout_secs,omitempty"`
+	RunTTLSecs  int             `json:"run_ttl_secs,omitempty"`
+	Schema      json.RawMessage `json:"payload_schema,omitempty"`
+}
+
+// DeployWorkflow is the manifest representation of a workflow.
+type DeployWorkflow struct {
+	Slug        string                       `json:"slug"`
+	Name        string                       `json:"name,omitempty"`
+	Description string                       `json:"description,omitempty"`
+	Enabled     *bool                        `json:"enabled,omitempty"`
+	Steps       []client.WorkflowStepRequest `json:"steps,omitempty"`
+}
+
+// DeployResult is the per-resource outcome reported by `deploy push`.
+type DeployResult struct {
+	Kind   string `json:"kind"`
+	Slug   string `json:"slug"`
+	Action string `json:"action"`
+	ID     string `json:"id,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
+
+// DeploySummary aggregates DeployResult across a push run.
+type DeploySummary struct {
+	Created int            `json:"created"`
+	Updated int            `json:"updated"`
+	Skipped int            `json:"skipped"`
+	Failed  int            `json:"failed"`
+	Results []DeployResult `json:"results"`
+}
+
+func newDeployCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "deploy",
-		Short: "Deploy a managed job image or manifest",
-		Long:  "Build, push, and update a managed job's container image, or deploy via manifests.",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			cli, err := newAPIClient(state)
-			if err != nil {
-				return err
-			}
-
-			// Validate deployment strategy.
-			resolvedStrategy := types.DeploymentStrategy(strategy)
-			if !resolvedStrategy.IsValid() {
-				return fmt.Errorf("invalid deployment strategy: %q (valid: direct, canary)", strategy)
-			}
-			if resolvedStrategy == types.DeploymentStrategyCanary {
-				if canaryPercent < 1 || canaryPercent > 99 {
-					return fmt.Errorf("--canary-percent must be between 1 and 99 (got %d)", canaryPercent)
-				}
-			}
-
-			// Manifest-based deploy: --config provided and no --job
-			if configPath != "" && jobSlug == "" {
-				return deploy.DeployManifest(cmd.Context(), cli, deploy.ManifestDeployOptions{
-					ConfigPath:     configPath,
-					Environment:    env,
-					ArtifactURI:    artifactURI,
-					DryRun:         dryRun,
-					Strategy:       strategy,
-					CanaryPercent:  canaryPercent,
-					CanaryDuration: canaryDuration,
-				})
-			}
-
-			// Config-file multi-job mode (legacy): --config with implied jobs
-			if configPath != "" {
-				cfg, cfgErr := deploy.LoadDeployConfig(configPath)
-				if cfgErr != nil {
-					return cfgErr
-				}
-
-				jobs := cfg.Jobs
-				if jobSlug != "" {
-					var filtered []deploy.DeployJobConfig
-					for _, j := range cfg.Jobs {
-						if j.Slug == jobSlug {
-							filtered = append(filtered, j)
-						}
-					}
-					if len(filtered) == 0 {
-						return fmt.Errorf("job %q not found in config %s", jobSlug, configPath)
-					}
-					jobs = filtered
-				}
-
-				reg := registry
-				if cfg.Registry != "" {
-					reg = cfg.Registry
-				}
-
-				for _, jobCfg := range jobs {
-					jobPreset := jobCfg.Preset
-					if preset != "" {
-						jobPreset = preset
-					}
-					jobRegion := jobCfg.Region
-					if region != "" {
-						jobRegion = region
-					}
-
-					var ba []string
-					for k, v := range jobCfg.BuildArgs {
-						ba = append(ba, fmt.Sprintf("%s=%s", k, v))
-					}
-
-					opts := deploy.DeployOptions{
-						JobSlug:      jobCfg.Slug,
-						Dockerfile:   jobCfg.Dockerfile,
-						Registry:     reg,
-						Tag:          tag,
-						BuildArgs:    ba,
-						Push:         push,
-						Preset:       jobPreset,
-						Region:       jobRegion,
-						DryRun:       dryRun,
-						CacheEnabled: cacheEnabled,
-					}
-
-					fmt.Fprintln(os.Stderr, styles.Info("Deploying "+jobCfg.Slug+"..."))
-					if deployErr := deploy.DeployJob(cmd.Context(), cli, opts); deployErr != nil {
-						return fmt.Errorf("deploy %s: %w", jobCfg.Slug, deployErr)
-					}
-					if !dryRun {
-						fmt.Fprintln(os.Stderr, styles.Success("Deployed "+jobCfg.Slug))
-					}
-				}
-				return nil
-			}
-
-			// Single job mode
-			if jobSlug == "" {
-				return fmt.Errorf("--job is required (or use --config for multi-job/manifest deploy)")
-			}
-
-			opts := deploy.DeployOptions{
-				JobSlug:      jobSlug,
-				ImageURI:     imageURI,
-				Dockerfile:   dockerfile,
-				Registry:     registry,
-				Tag:          tag,
-				BuildArgs:    buildArgs,
-				Push:         push,
-				Preset:       preset,
-				Region:       region,
-				DryRun:       dryRun,
-				CacheEnabled: cacheEnabled,
-			}
-
-			if err := deploy.DeployJob(cmd.Context(), cli, opts); err != nil {
-				return err
-			}
-
-			if !dryRun {
-				fmt.Fprintln(os.Stderr, styles.Success("Deployed "+jobSlug))
-			}
-			return nil
-		},
+		Short: "Push SDK-defined jobs and workflows to the orchestrator",
 	}
-
-	cmd.Flags().StringVar(&jobSlug, "job", "", "job slug to deploy (required unless --config)")
-	cmd.Flags().StringVar(&imageURI, "image", "", "pre-built image URI (skip build)")
-	cmd.Flags().StringVar(&dockerfile, "dockerfile", "./Dockerfile", "path to Dockerfile")
-	cmd.Flags().StringVar(&registry, "registry", "registry.fly.io", "container registry")
-	cmd.Flags().StringVar(&tag, "tag", "", "image tag (default: git SHA or 'latest')")
-	cmd.Flags().StringArrayVar(&buildArgs, "build-arg", nil, "docker build args (repeatable)")
-	cmd.Flags().BoolVar(&push, "push", true, "push image after build")
-	cmd.Flags().StringVar(&preset, "preset", "", "machine preset override")
-	cmd.Flags().StringVar(&region, "region", "", "region override")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print plan without executing")
-	cmd.Flags().BoolVar(&cacheEnabled, "cache", true, "enable Docker layer caching via buildx")
-	cmd.Flags().StringVar(&configPath, "config", "", "path to config file for manifest/multi-job deploy")
-	cmd.Flags().StringVar(&env, "env", "", "deployment environment (default: production)")
-	cmd.Flags().StringVar(&artifactURI, "artifact-uri", "", "pre-built artifact URI override")
-	cmd.Flags().StringVar(&strategy, "strategy", "direct", "deployment strategy (direct, canary)")
-	cmd.Flags().IntVar(&canaryPercent, "canary-percent", 0, "percentage of traffic for canary (1-99)")
-	cmd.Flags().StringVar(&canaryDuration, "canary-duration", "", "duration to run canary before full rollout (e.g. 10m, 1h)")
-
-	cmd.AddCommand(newDeployPromoteCommand(state))
-	cmd.AddCommand(newDeployRollbackCommand(state))
-	cmd.AddCommand(newDeployListCommand(state))
-	cmd.AddCommand(newDeployPreviewCommand(state))
-	cmd.AddCommand(newDeployCreateCommand(state))
-	cmd.AddCommand(newDeployFinalizeCommand(state))
-	cmd.AddCommand(newDeploySourceCommand(state))
-
+	cmd.AddCommand(newDeployPushCommand(state))
 	return cmd
 }
 
-func newDeployCreateCommand(state *appState) *cobra.Command {
-	var configPath string
-	var environment string
-	var artifactURI string
-	var outDir string
+func newDeployPushCommand(state *appState) *cobra.Command {
+	var dir string
+	var manifestPath string
 	var dryRun bool
+	var prune bool
+	var yes bool
 
 	cmd := &cobra.Command{
-		Use:   "create",
-		Short: "Create a draft deployment from a manifest config",
+		Use:   "push",
+		Short: "Upsert jobs and workflows defined in strait.deploy.json",
+		Long: `Reads SDK definitions from a strait.deploy.json manifest at --dir (or
+--manifest) and upserts each job/workflow against the orchestrator.
+
+Until strait-go v0.2.0 ships, this is the manifest-based push path. Once
+the SDK is published, this command will additionally auto-discover
+definitions by introspecting the user's TS or Go project.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if configPath == "" {
-				return fmt.Errorf("--config is required")
+			projectID := state.opts.projectID
+			if strings.TrimSpace(projectID) == "" {
+				return fmt.Errorf("project is required (set --project, STRAIT_PROJECT, or context)")
+			}
+
+			path := manifestPath
+			if path == "" {
+				root := dir
+				if root == "" {
+					root = "."
+				}
+				path = filepath.Join(root, "strait.deploy.json")
+			}
+			manifest, err := loadDeployManifest(path)
+			if err != nil {
+				return err
 			}
 
 			cli, err := newAPIClient(state)
@@ -211,292 +116,293 @@ func newDeployCreateCommand(state *appState) *cobra.Command {
 				return err
 			}
 
-			deployment, manifest, resolvedEnv, cfg, err := deploy.CreateManifestDeployment(cmd.Context(), cli, deploy.ManifestDeployOptions{
-				ConfigPath:  configPath,
-				Environment: environment,
-				ArtifactURI: artifactURI,
-				DryRun:      dryRun,
-				OutDir:      outDir,
-			})
+			summary, err := planDeploy(cmd.Context(), cli, projectID, manifest)
 			if err != nil {
 				return err
 			}
 
 			if dryRun {
 				if isTTYRich(state) {
-					fmt.Fprintln(os.Stderr, styles.Info("Dry run: manifest preview"))
+					renderDeployPlan(summary)
 					return nil
 				}
-				return printData(state, manifest)
+				return printData(state, summary)
 			}
 
-			if err := deploy.WriteManifestForCommand(cfg, manifest, outDir); err != nil {
-				return err
+			if prune {
+				if err := requireConfirmation(state, "Pruning removes jobs not in the manifest. Continue?", yes); err != nil {
+					return err
+				}
 			}
 
-			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Created deployment "+styles.Bold.Render(deployment.ID)))
-				fmt.Fprintln(os.Stderr, styles.KeyValue("Environment", resolvedEnv))
-				fmt.Fprintln(os.Stderr, styles.KeyValue("Checksum", manifest.Checksum))
-				fmt.Fprintln(os.Stderr, styles.KeyValue("Status", deployment.Status))
-				return nil
-			}
-			return printData(state, map[string]any{
-				"deployment_id": deployment.ID,
-				"project_id":    manifest.ProjectID,
-				"environment":   resolvedEnv,
-				"checksum":      manifest.Checksum,
-				"status":        deployment.Status,
-			})
-		},
-	}
-
-	cmd.Flags().StringVar(&configPath, "config", "", "path to manifest config file")
-	cmd.Flags().StringVar(&environment, "env", "", "deployment environment (default: production)")
-	cmd.Flags().StringVar(&artifactURI, "artifact-uri", "", "artifact URI for the deployment bundle")
-	cmd.Flags().StringVar(&outDir, "out-dir", "", "directory to write manifest.json")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the manifest without creating a deployment")
-
-	return cmd
-}
-
-func newDeployFinalizeCommand(state *appState) *cobra.Command {
-	var projectID string
-	var environment string
-
-	cmd := &cobra.Command{
-		Use:   "finalize <deployment-id>",
-		Short: "Finalize a draft deployment",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			resolvedProject, err := requireProjectID(state, projectID)
-			if err != nil {
-				return err
-			}
-
-			cli, err := newAPIClient(state)
-			if err != nil {
-				return err
-			}
-
-			if err := deploy.FinalizeManifestDeployment(cmd.Context(), cli, args[0], resolvedProject, environment); err != nil {
-				return err
-			}
-
-			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Finalized deployment "+styles.Bold.Render(args[0])))
-				return nil
-			}
-			return printData(state, map[string]any{
-				"deployment_id": args[0],
-				"project_id":    resolvedProject,
-				"environment":   environment,
-				"finalized":     true,
-			})
-		},
-	}
-
-	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
-	cmd.Flags().StringVar(&environment, "env", "production", "deployment environment")
-
-	return cmd
-}
-
-func newDeployPromoteCommand(state *appState) *cobra.Command {
-	var projectID string
-	var env string
-	var dryRun bool
-
-	cmd := &cobra.Command{
-		Use:   "promote <deployment-id>",
-		Short: "Promote a deployment to an environment",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			resolvedProject, err := requireProjectID(state, projectID)
-			if err != nil {
-				return err
-			}
-
-			if dryRun {
-				fmt.Fprintln(os.Stderr, styles.Info("[dry-run] would promote deployment "+args[0]+" to "+env))
-				return nil
-			}
-
-			cli, err := newAPIClient(state)
-			if err != nil {
-				return err
-			}
-
-			if err := cli.PromoteDeployment(cmd.Context(), args[0], client.PromoteDeploymentRequest{
-				ProjectID:   resolvedProject,
-				Environment: env,
-			}); err != nil {
-				return err
-			}
-
-			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Promoted deployment "+styles.Bold.Render(args[0])+" to "+env))
-				return nil
-			}
-			return printData(state, map[string]any{
-				"promoted":    true,
-				"deployment":  args[0],
-				"environment": env,
-			})
-		},
-	}
-
-	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
-	cmd.Flags().StringVar(&env, "env", "production", "target environment")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print plan without executing")
-
-	return cmd
-}
-
-func newDeployRollbackCommand(state *appState) *cobra.Command {
-	var projectID string
-	var env string
-	var toID string
-	var dryRun bool
-
-	cmd := &cobra.Command{
-		Use:   "rollback",
-		Short: "Rollback to a previous deployment",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			if toID == "" {
-				return fmt.Errorf("--to is required (deployment ID to rollback to)")
-			}
-
-			resolvedProject, err := requireProjectID(state, projectID)
-			if err != nil {
-				return err
-			}
-
-			if dryRun {
-				fmt.Fprintln(os.Stderr, styles.Info("[dry-run] would rollback to deployment "+toID+" in "+env))
-				return nil
-			}
-
-			cli, err := newAPIClient(state)
-			if err != nil {
-				return err
-			}
-
-			if err := cli.RollbackDeployment(cmd.Context(), toID, client.RollbackDeploymentRequest{
-				ProjectID:   resolvedProject,
-				Environment: env,
-			}); err != nil {
-				return err
-			}
-
-			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Rolled back to deployment "+styles.Bold.Render(toID)+" in "+env))
-				return nil
-			}
-			return printData(state, map[string]any{
-				"rolled_back": true,
-				"deployment":  toID,
-				"environment": env,
-			})
-		},
-	}
-
-	cmd.Flags().StringVar(&toID, "to", "", "deployment ID to rollback to")
-	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
-	cmd.Flags().StringVar(&env, "env", "production", "target environment")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print plan without executing")
-
-	return cmd
-}
-
-func newDeployListCommand(state *appState) *cobra.Command {
-	var projectID string
-	var limit int
-
-	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List deployment history",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			resolvedProject, err := requireProjectID(state, projectID)
-			if err != nil {
-				return err
-			}
-
-			cli, err := newAPIClient(state)
-			if err != nil {
-				return err
-			}
-
-			deps, err := cli.ListDeployments(cmd.Context(), resolvedProject, limit)
+			final, err := applyDeploy(cmd.Context(), cli, projectID, manifest, summary, prune)
 			if err != nil {
 				return err
 			}
 
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.SectionHeader("Deployments", len(deps)))
-				for _, dep := range deps {
-					fmt.Fprintf(os.Stderr, "  %s  %s  %s  %s  %s\n",
-						styles.Bold.Render(dep.ID),
-						dep.Environment,
-						styles.StatusBadge(dep.Status),
-						styles.MutedStyle.Render(dep.Checksum),
-						styles.RelativeTime(dep.CreatedAt),
-					)
+				renderDeployPlan(final)
+				if final.Failed > 0 {
+					return fmt.Errorf("%d resource(s) failed to deploy", final.Failed)
 				}
 				return nil
 			}
-			rows := make([]map[string]any, 0, len(deps))
-			for _, dep := range deps {
-				rows = append(rows, map[string]any{
-					"id":          dep.ID,
-					"environment": dep.Environment,
-					"status":      dep.Status,
-					"checksum":    dep.Checksum,
-					"created_at":  dep.CreatedAt,
-				})
+			if err := printData(state, final); err != nil {
+				return err
 			}
-			return printData(state, rows)
+			if final.Failed > 0 {
+				return fmt.Errorf("%d resource(s) failed to deploy", final.Failed)
+			}
+			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
-	cmd.Flags().IntVar(&limit, "limit", 20, "max deployments to show")
-
+	cmd.Flags().StringVar(&dir, "dir", "", "project root containing strait.deploy.json (default: current dir)")
+	cmd.Flags().StringVar(&manifestPath, "manifest", "", "explicit path to a manifest file (overrides --dir)")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print the deploy plan without making any changes")
+	cmd.Flags().BoolVar(&prune, "prune", false, "delete jobs not present in the manifest (destructive)")
+	cmd.Flags().BoolVar(&yes, "yes", false, "skip the confirmation prompt for --prune")
 	return cmd
 }
 
-func newDeployPreviewCommand(state *appState) *cobra.Command {
-	var projectID string
-	var configPath string
+// loadDeployManifest reads and validates a manifest from disk.
+func loadDeployManifest(path string) (*DeployManifest, error) {
+	abs := path
+	if !filepath.IsAbs(abs) {
+		cwd, _ := os.Getwd()
+		abs = filepath.Join(cwd, abs)
+	}
+	data, err := os.ReadFile(abs) //nolint:gosec // path is user-provided via flag
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, fmt.Errorf("manifest not found at %s; run `strait deploy push --manifest <path>` or create the file", path)
+		}
+		return nil, fmt.Errorf("read manifest: %w", err)
+	}
+	var m DeployManifest
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, fmt.Errorf("invalid manifest JSON: %w", err)
+	}
+	if len(m.Jobs) == 0 && len(m.Workflows) == 0 {
+		return nil, fmt.Errorf("manifest %s has no jobs or workflows", path)
+	}
+	for i, j := range m.Jobs {
+		if strings.TrimSpace(j.Slug) == "" {
+			return nil, fmt.Errorf("manifest jobs[%d]: slug is required", i)
+		}
+		if strings.TrimSpace(j.EndpointURL) == "" {
+			return nil, fmt.Errorf("manifest jobs[%d] (%s): endpoint_url is required", i, j.Slug)
+		}
+	}
+	for i, w := range m.Workflows {
+		if strings.TrimSpace(w.Slug) == "" {
+			return nil, fmt.Errorf("manifest workflows[%d]: slug is required", i)
+		}
+	}
+	return &m, nil
+}
 
-	cmd := &cobra.Command{
-		Use:   "preview",
-		Short: "Create a preview deployment",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			if configPath == "" {
-				return fmt.Errorf("--config is required for preview deployments")
-			}
-
-			if _, err := requireProjectID(state, projectID); err != nil {
-				return err
-			}
-
-			cli, err := newAPIClient(state)
-			if err != nil {
-				return err
-			}
-
-			previewEnv := "preview"
-
-			return deploy.DeployManifest(cmd.Context(), cli, deploy.ManifestDeployOptions{
-				ConfigPath:  configPath,
-				Environment: previewEnv,
-			})
-		},
+// planDeploy classifies each manifest entry as create / update / skip without
+// applying any changes.
+func planDeploy(ctx context.Context, cli *client.Client, projectID string, manifest *DeployManifest) (*DeploySummary, error) {
+	existing, err := cli.ListJobs(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("list existing jobs: %w", err)
+	}
+	bySlug := make(map[string]string, len(existing))
+	endpointBySlug := make(map[string]string, len(existing))
+	for _, j := range existing {
+		bySlug[j.Slug] = j.ID
+		endpointBySlug[j.Slug] = j.EndpointURL
 	}
 
-	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
-	cmd.Flags().StringVar(&configPath, "config", "", "path to config file")
+	summary := &DeploySummary{}
+	for _, job := range manifest.Jobs {
+		res := DeployResult{Kind: "job", Slug: job.Slug}
+		id, ok := bySlug[job.Slug]
+		switch {
+		case !ok:
+			res.Action = "create"
+			summary.Created++
+		case endpointBySlug[job.Slug] == job.EndpointURL:
+			res.Action = "skip"
+			res.ID = id
+			summary.Skipped++
+		default:
+			res.Action = "update"
+			res.ID = id
+			summary.Updated++
+		}
+		summary.Results = append(summary.Results, res)
+	}
 
-	return cmd
+	for _, wf := range manifest.Workflows {
+		res := DeployResult{Kind: "workflow", Slug: wf.Slug, Action: "create"}
+		summary.Created++
+		summary.Results = append(summary.Results, res)
+	}
+
+	sort.SliceStable(summary.Results, func(i, j int) bool {
+		if summary.Results[i].Kind != summary.Results[j].Kind {
+			return summary.Results[i].Kind < summary.Results[j].Kind
+		}
+		return summary.Results[i].Slug < summary.Results[j].Slug
+	})
+	return summary, nil
+}
+
+// applyDeploy executes the create/update operations recorded in summary.
+// Workflows are always created via CreateWorkflow (the API treats it as
+// idempotent by slug); failures are recorded per-result rather than aborting.
+func applyDeploy(ctx context.Context, cli *client.Client, projectID string, manifest *DeployManifest, plan *DeploySummary, prune bool) (*DeploySummary, error) {
+	out := &DeploySummary{}
+	jobByID := map[string]DeployJob{}
+	for _, j := range manifest.Jobs {
+		jobByID[j.Slug] = j
+	}
+
+	for _, res := range plan.Results {
+		switch res.Kind {
+		case "job":
+			job := jobByID[res.Slug]
+			switch res.Action {
+			case "create":
+				req := jobCreateRequest(projectID, job)
+				created, err := cli.CreateJob(ctx, req, "")
+				if err != nil {
+					res.Error = err.Error()
+					out.Failed++
+				} else {
+					res.ID = created.ID
+					out.Created++
+				}
+			case "update":
+				req := jobUpdateRequest(job)
+				updated, err := cli.UpdateJob(ctx, res.ID, req)
+				if err != nil {
+					res.Error = err.Error()
+					out.Failed++
+				} else {
+					res.ID = updated.ID
+					out.Updated++
+				}
+			case "skip":
+				out.Skipped++
+			}
+		case "workflow":
+			wf := findWorkflow(manifest.Workflows, res.Slug)
+			req := client.CreateWorkflowRequest{
+				ProjectID:   projectID,
+				Slug:        wf.Slug,
+				Name:        wf.Name,
+				Description: wf.Description,
+				Enabled:     wf.Enabled,
+				Steps:       wf.Steps,
+			}
+			created, err := cli.CreateWorkflow(ctx, req, "")
+			if err != nil {
+				res.Error = err.Error()
+				out.Failed++
+			} else {
+				res.ID = created.ID
+				out.Created++
+			}
+		}
+		out.Results = append(out.Results, res)
+	}
+
+	if prune {
+		existing, err := cli.ListJobs(ctx, projectID)
+		if err != nil {
+			return out, fmt.Errorf("list jobs for prune: %w", err)
+		}
+		want := map[string]bool{}
+		for _, j := range manifest.Jobs {
+			want[j.Slug] = true
+		}
+		for _, j := range existing {
+			if want[j.Slug] {
+				continue
+			}
+			res := DeployResult{Kind: "job", Slug: j.Slug, ID: j.ID, Action: "delete"}
+			if err := cli.DeleteJob(ctx, j.ID); err != nil {
+				res.Error = err.Error()
+				out.Failed++
+			} else {
+				out.Updated++
+			}
+			out.Results = append(out.Results, res)
+		}
+	}
+
+	return out, nil
+}
+
+func jobCreateRequest(projectID string, job DeployJob) client.CreateJobRequest {
+	return client.CreateJobRequest{
+		ProjectID:   projectID,
+		Name:        firstNonEmpty(job.Name, job.Slug),
+		Slug:        job.Slug,
+		Description: job.Description,
+		Cron:        job.Cron,
+		EndpointURL: job.EndpointURL,
+		MaxAttempts: job.MaxAttempts,
+		TimeoutSecs: job.TimeoutSecs,
+		RunTTLSecs:  job.RunTTLSecs,
+		Schema:      job.Schema,
+	}
+}
+
+func jobUpdateRequest(job DeployJob) client.UpdateJobRequest {
+	req := client.UpdateJobRequest{
+		EndpointURL: &job.EndpointURL,
+	}
+	if job.Name != "" {
+		req.Name = &job.Name
+	}
+	if job.Description != "" {
+		req.Description = &job.Description
+	}
+	if job.Cron != "" {
+		req.Cron = &job.Cron
+	}
+	if job.MaxAttempts != 0 {
+		req.MaxAttempts = &job.MaxAttempts
+	}
+	if job.TimeoutSecs != 0 {
+		req.TimeoutSecs = &job.TimeoutSecs
+	}
+	if job.RunTTLSecs != 0 {
+		req.RunTTLSecs = &job.RunTTLSecs
+	}
+	if len(job.Schema) > 0 {
+		s := job.Schema
+		req.Schema = &s
+	}
+	return req
+}
+
+func findWorkflow(workflows []DeployWorkflow, slug string) DeployWorkflow {
+	for _, w := range workflows {
+		if w.Slug == slug {
+			return w
+		}
+	}
+	return DeployWorkflow{}
+}
+
+func renderDeployPlan(s *DeploySummary) {
+	fmt.Fprintln(os.Stderr, styles.KeyValue("Create", fmt.Sprintf("%d", s.Created)))
+	fmt.Fprintln(os.Stderr, styles.KeyValue("Update", fmt.Sprintf("%d", s.Updated)))
+	fmt.Fprintln(os.Stderr, styles.KeyValue("Skip", fmt.Sprintf("%d", s.Skipped)))
+	if s.Failed > 0 {
+		fmt.Fprintln(os.Stderr, styles.Warn(fmt.Sprintf("Failed: %d", s.Failed)))
+	}
+	for _, r := range s.Results {
+		line := fmt.Sprintf("  %s %s %s", r.Action, r.Kind, r.Slug)
+		if r.Error != "" {
+			line += " — " + r.Error
+		}
+		fmt.Fprintln(os.Stderr, line)
+	}
 }

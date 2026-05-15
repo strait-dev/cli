@@ -17,6 +17,75 @@ func newAnalyticsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newAnalyticsCostsCommand(state))
 	cmd.AddCommand(newAnalyticsReliabilityCommand(state))
 	cmd.AddCommand(newAnalyticsTopFailingCommand(state))
+	cmd.AddCommand(newAnalyticsPerformanceCommand(state))
+	return cmd
+}
+
+func newAnalyticsPerformanceCommand(state *appState) *cobra.Command {
+	var projectID string
+	var period string
+	var limit int
+	cmd := &cobra.Command{
+		Use:   "performance",
+		Short: "Show performance analytics (slowest jobs, throughput, health summary)",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			pid, err := requireProjectID(state, projectID)
+			if err != nil {
+				return err
+			}
+			hours, err := parsePerfPeriodHours(period)
+			if err != nil {
+				return err
+			}
+			cli, err := newAPIClient(state)
+			if err != nil {
+				return err
+			}
+			perf, err := cli.GetPerformanceAnalytics(cmd.Context(), pid, hours)
+			if err != nil {
+				return err
+			}
+			if isTTYRich(state) {
+				summary := []string{
+					styles.DetailLine("Total jobs", fmt.Sprintf("%d", perf.HealthSummary.TotalJobs)),
+					styles.DetailLine("Active jobs", fmt.Sprintf("%d", perf.HealthSummary.ActiveJobs)),
+					styles.DetailLine("Success rate", fmt.Sprintf("%.2f%%", perf.HealthSummary.SuccessRate*100)),
+					styles.DetailLine("Avg duration (s)", fmt.Sprintf("%.2f", perf.HealthSummary.AvgDurationSecs)),
+					styles.DetailLine("Queue depth", fmt.Sprintf("%d", perf.HealthSummary.QueueDepth)),
+				}
+				fmt.Fprint(os.Stderr, styles.DetailBox("Health", summary))
+
+				throughput := []string{
+					styles.DetailLine("Period (hours)", fmt.Sprintf("%d", perf.Throughput.PeriodHours)),
+					styles.DetailLine("Completed", fmt.Sprintf("%d", perf.Throughput.Completed)),
+					styles.DetailLine("Failed", fmt.Sprintf("%d", perf.Throughput.Failed)),
+					styles.DetailLine("Timed out", fmt.Sprintf("%d", perf.Throughput.TimedOut)),
+					styles.DetailLine("Canceled", fmt.Sprintf("%d", perf.Throughput.Canceled)),
+				}
+				fmt.Fprint(os.Stderr, styles.DetailBox("Throughput", throughput))
+
+				slowest := perf.SlowestJobs
+				if limit > 0 && len(slowest) > limit {
+					slowest = slowest[:limit]
+				}
+				if len(slowest) > 0 {
+					fmt.Fprintln(os.Stderr, styles.SectionHeader("Slowest jobs", len(slowest)))
+					for _, j := range slowest {
+						fmt.Fprintf(os.Stderr, "  %s  avg=%.2fs  p95=%.2fs  runs=%d  failed=%d\n",
+							styles.Bold.Render(j.JobSlug), j.AvgDurationSecs, j.P95DurationSecs, j.TotalRuns, j.FailedRuns)
+					}
+				}
+				return nil
+			}
+			if limit > 0 && len(perf.SlowestJobs) > limit {
+				perf.SlowestJobs = perf.SlowestJobs[:limit]
+			}
+			return printData(state, perf)
+		},
+	}
+	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
+	cmd.Flags().StringVar(&period, "period", "7d", "analytics period (24h, 72h, 7d, 30d, 90d)")
+	cmd.Flags().IntVar(&limit, "limit", 10, "max slowest jobs to show (0 = unlimited)")
 	return cmd
 }
 

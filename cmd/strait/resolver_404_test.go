@@ -267,34 +267,3 @@ func TestResolveEventSourceIdentifier_DoesNotFallbackOn500(t *testing.T) {
 		t.Fatalf("resolver fell back to list on 503; list calls: %d", listCalls.Load())
 	}
 }
-
-// TestResolveJobGroupIdentifier_DoesNotFallbackOn500 — same coverage for the
-// new job groups resolver.
-func TestResolveJobGroupIdentifier_DoesNotFallbackOn500(t *testing.T) {
-	t.Parallel()
-
-	var listCalls atomic.Int32
-	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/job-groups/grp-1": func(w http.ResponseWriter, _ *http.Request) {
-			respondError(t, w, http.StatusGatewayTimeout, "timeout")
-		},
-		"GET /v1/job-groups": func(w http.ResponseWriter, _ *http.Request) {
-			listCalls.Add(1)
-			respondPaginated(t, w, http.StatusOK, []types.JobGroup{{ID: "grp-1", Slug: "default"}})
-		},
-	})
-
-	state := newTestState(t, srv)
-	cli, _ := newAPIClient(state)
-
-	_, err := resolveJobGroupIdentifier(t.Context(), cli, state, "grp-1")
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "504") {
-		t.Fatalf("error should mention 504: %v", err)
-	}
-	if listCalls.Load() != 0 {
-		t.Fatalf("resolver fell back to list on 504; list calls: %d", listCalls.Load())
-	}
-}

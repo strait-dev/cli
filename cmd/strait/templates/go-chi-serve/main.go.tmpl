@@ -1,0 +1,53 @@
+package main
+
+import (
+	"log"
+	"net/http"
+	"os"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/strait-dev/strait-go/authoring"
+	"github.com/strait-dev/strait-go/serve"
+)
+
+type helloPayload struct {
+	Name string `json:"name"`
+}
+
+var helloJob = authoring.DefineJob(authoring.JobOptions[helloPayload]{
+	Name: "hello",
+	Slug: "hello",
+	Run: func(p helloPayload, _ authoring.RunContext) (any, error) {
+		name := p.Name
+		if name == "" {
+			name = "world"
+		}
+		return map[string]string{"greeting": "hello, " + name}, nil
+	},
+})
+
+func main() {
+	handler, err := serve.Serve(
+		[]serve.Handler{serve.Job(helloJob)},
+		serve.WithSecret([]byte(os.Getenv("STRAIT_SIGNING_SECRET"))),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	r := chi.NewRouter()
+	r.Mount("/api/strait", handler)
+
+	addr := ":" + envOr("PORT", "3000")
+	log.Println("listening on", addr)
+	if err := http.ListenAndServe(addr, r); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

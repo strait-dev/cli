@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
@@ -22,7 +23,88 @@ func newTeamCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newTeamRemoveCommand(state))
 	cmd.AddCommand(newTeamRolesCommand(state))
 	cmd.AddCommand(newTeamPoliciesCommand(state))
+	cmd.AddCommand(newTeamAuditCommand(state))
 
+	return cmd
+}
+
+func newTeamAuditCommand(state *appState) *cobra.Command {
+	var projectID, actorID, resourceType, resourceID, order, since string
+	var limit int
+
+	cmd := &cobra.Command{
+		Use:   "audit",
+		Short: "List audit events for the project",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			pid, err := requireProjectID(state, projectID)
+			if err != nil {
+				return err
+			}
+
+			params := client.ListAuditEventsParams{
+				ProjectID:    pid,
+				ActorID:      actorID,
+				ResourceType: resourceType,
+				ResourceID:   resourceID,
+				Limit:        limit,
+				Order:        order,
+			}
+			if since != "" {
+				t, err := time.Parse(time.RFC3339, since)
+				if err != nil {
+					return fmt.Errorf("invalid --since (expected RFC3339): %w", err)
+				}
+				params.From = &t
+			}
+
+			cli, err := newAPIClient(state)
+			if err != nil {
+				return err
+			}
+
+			events, err := cli.ListAuditEvents(cmd.Context(), params)
+			if err != nil {
+				return err
+			}
+
+			if isTTYRich(state) {
+				fmt.Fprintln(os.Stderr, styles.SectionHeader("Audit Events", len(events)))
+				for _, e := range events {
+					fmt.Fprintf(os.Stderr, "  %s  %s  %s/%s  by %s  %s\n",
+						styles.MutedStyle.Render(e.CreatedAt.Format(time.RFC3339)),
+						styles.Bold.Render(e.Action),
+						e.ResourceType, e.ResourceID,
+						e.ActorID,
+						styles.MutedStyle.Render(e.ID),
+					)
+				}
+				return nil
+			}
+			rows := make([]map[string]any, 0, len(events))
+			for _, e := range events {
+				rows = append(rows, map[string]any{
+					"id":            e.ID,
+					"project_id":    e.ProjectID,
+					"actor_id":      e.ActorID,
+					"actor_type":    e.ActorType,
+					"action":        e.Action,
+					"resource_type": e.ResourceType,
+					"resource_id":   e.ResourceID,
+					"details":       e.Details,
+					"created_at":    e.CreatedAt,
+				})
+			}
+			return printData(state, rows)
+		},
+	}
+
+	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
+	cmd.Flags().StringVar(&actorID, "actor", "", "filter by actor ID")
+	cmd.Flags().StringVar(&resourceType, "resource-type", "", "filter by resource type (e.g. job, workflow, secret)")
+	cmd.Flags().StringVar(&resourceID, "resource-id", "", "filter by resource ID")
+	cmd.Flags().StringVar(&order, "order", "", "sort order: asc or desc")
+	cmd.Flags().StringVar(&since, "since", "", "only events at or after this RFC3339 timestamp")
+	cmd.Flags().IntVar(&limit, "limit", 50, "max events to return")
 	return cmd
 }
 

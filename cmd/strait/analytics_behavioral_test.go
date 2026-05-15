@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/types"
 )
 
@@ -81,6 +82,42 @@ func TestAnalyticsReliability_Success(t *testing.T) {
 
 	if err := captureAndExec(t, state, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAnalyticsPerformance_Success(t *testing.T) {
+	t.Parallel()
+
+	perf := client.PerformanceAnalytics{
+		SlowestJobs: []client.JobPerformance{
+			{JobID: "job-1", JobSlug: "slow-job", AvgDurationSecs: 12.5, P95DurationSecs: 40.0, TotalRuns: 200, FailedRuns: 5},
+		},
+		Throughput: client.ThroughputStats{Completed: 190, Failed: 5, PeriodHours: 168},
+		HealthSummary: client.HealthSummary{
+			TotalJobs: 10, ActiveJobs: 8, SuccessRate: 0.97, AvgDurationSecs: 9.1, QueueDepth: 4,
+		},
+	}
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/analytics/performance": func(w http.ResponseWriter, r *http.Request) {
+			assertQuery(t, r, "project_id", "proj-test")
+			assertQuery(t, r, "period_hours", "168")
+			respondJSON(t, w, http.StatusOK, perf)
+		},
+	})
+
+	state := newTestState(t, srv)
+	cmd := newAnalyticsPerformanceCommand(state)
+	cmd.SetArgs([]string{"--project", "proj-test", "--period", "7d"})
+
+	out := captureStateOutput(t, state, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "slow-job") {
+		t.Fatalf("expected slowest job slug in output: %s", out)
 	}
 }
 

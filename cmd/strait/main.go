@@ -12,7 +12,7 @@ import (
 	"github.com/strait-dev/cli/internal/styles"
 )
 
-var version = "dev"
+var version = "0.2.0-dev"
 var commit = "none"
 var date = "unknown"
 

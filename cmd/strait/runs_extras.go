@@ -134,63 +134,6 @@ func newRunsOutputsCommand(state *appState) *cobra.Command {
 	}
 }
 
-func newRunsToolCallsCommand(state *appState) *cobra.Command {
-	return &cobra.Command{
-		Use:   "tool-calls <run-id>",
-		Short: "List tool calls invoked during a run",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validate.SlugOrID(args[0]); err != nil {
-				return fmt.Errorf("invalid run id: %w", err)
-			}
-			cli, err := newAPIClient(state)
-			if err != nil {
-				return err
-			}
-			calls, err := cli.ListRunToolCalls(cmd.Context(), args[0])
-			if err != nil {
-				return err
-			}
-			return printData(state, calls)
-		},
-	}
-}
-
-func newRunsUsageCommand(state *appState) *cobra.Command {
-	return &cobra.Command{
-		Use:   "usage <run-id>",
-		Short: "Show resource usage for a run",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validate.SlugOrID(args[0]); err != nil {
-				return fmt.Errorf("invalid run id: %w", err)
-			}
-			cli, err := newAPIClient(state)
-			if err != nil {
-				return err
-			}
-			usage, err := cli.GetRunUsage(cmd.Context(), args[0])
-			if err != nil {
-				return err
-			}
-			if isTTYRich(state) {
-				lines := []string{
-					styles.DetailLine("Run", usage.RunID),
-					styles.DetailLine("Duration ms", fmt.Sprintf("%d", usage.DurationMS)),
-					styles.DetailLine("CPU seconds", fmt.Sprintf("%.2f", usage.CPUSeconds)),
-					styles.DetailLine("Memory MB-hours", fmt.Sprintf("%.4f", usage.MemoryMBHours)),
-					styles.DetailLine("Tokens in", fmt.Sprintf("%d", usage.TokensInput)),
-					styles.DetailLine("Tokens out", fmt.Sprintf("%d", usage.TokensOutput)),
-					styles.DetailLine("Cost (USD)", fmt.Sprintf("%.4f", usage.CostUSD)),
-				}
-				fmt.Fprint(os.Stderr, styles.DetailBox("Run Usage", lines))
-				return nil
-			}
-			return printData(state, usage)
-		},
-	}
-}
-
 func newRunsCheckpointsCommand(state *appState) *cobra.Command {
 	return &cobra.Command{
 		Use:   "checkpoints <run-id>",

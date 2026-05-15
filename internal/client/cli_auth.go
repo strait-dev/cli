@@ -1,3 +1,9 @@
+// Device-code auth lives here permanently. The Go SDK
+// (github.com/strait-dev/strait-go) intentionally omits interactive auth —
+// shipping it there would couple SDK consumers to terminal I/O. If a future
+// SDK release exposes equivalent helpers, prefer delegating; until then this
+// file owns the flow.
+
 package client
 
 import (

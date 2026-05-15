@@ -46,7 +46,7 @@ func TestLLMSManifest_ContainsTopLevelCommands(t *testing.T) {
 
 	out := renderLLMSManifest(t)
 
-	for _, want := range []string{"jobs", "runs", "deploy", "schema", "agent", "doctor"} {
+	for _, want := range []string{"jobs", "runs", "workflows", "triggers", "auth", "debug"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("manifest missing command %q", want)
 		}

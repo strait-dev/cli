@@ -14,9 +14,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newProjectCommand(state *appState) *cobra.Command {
+func newProjectsCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "project",
+		Use:   "projects",
 		Short: "Manage project bundles for GitOps workflows",
 	}
 

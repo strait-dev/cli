@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"flag"
 	"io"
@@ -92,15 +91,6 @@ func assertMethod(t *testing.T, r *http.Request, w http.ResponseWriter, want str
 	if r.Method != want {
 		t.Errorf("method: got %s, want %s", r.Method, want)
 		http.Error(w, "method assertion failed", http.StatusInternalServerError)
-	}
-}
-
-// assertPath fails the test if the request path does not match want.
-func assertPath(t *testing.T, r *http.Request, w http.ResponseWriter, want string) {
-	t.Helper()
-	if r.URL.Path != want {
-		t.Errorf("path: got %q, want %q", r.URL.Path, want)
-		http.Error(w, "path assertion failed", http.StatusInternalServerError)
 	}
 }
 
@@ -244,24 +234,6 @@ func forceLogsTimeNow(t *testing.T, fn func() time.Time) {
 	})
 }
 
-func forceTopTimeNow(t *testing.T, fn func() time.Time) {
-	t.Helper()
-	prev := topTimeNow
-	topTimeNow = fn
-	t.Cleanup(func() {
-		topTimeNow = prev
-	})
-}
-
-func forceTopAfter(t *testing.T, fn func(time.Duration) <-chan time.Time) {
-	t.Helper()
-	prev := topAfter
-	topAfter = fn
-	t.Cleanup(func() {
-		topAfter = prev
-	})
-}
-
 func withMockStdin(t *testing.T, input string, fn func()) {
 	t.Helper()
 	orig := os.Stdin
@@ -299,12 +271,4 @@ func newRouterServer(t *testing.T, routes map[string]http.HandlerFunc) *httptest
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte(`{"error":"not found"}`))
 	}))
-}
-
-// testContextWithTimeout creates a context with a timeout and registers cleanup.
-func testContextWithTimeout(t *testing.T, d time.Duration) (context.Context, context.CancelFunc) {
-	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), d)
-	t.Cleanup(cancel)
-	return ctx, cancel
 }

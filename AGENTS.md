@@ -14,18 +14,17 @@ If instructions conflict, use this priority order:
 ## 1) What this project is
 
 - **Project**: Strait CLI
-- **Language**: Go 1.26
+- **Language**: Go 1.26.3
 - **Module**: `github.com/strait-dev/cli`
-- **Purpose**: Standalone command-line interface for the Strait job orchestration platform.
-  - 70+ top-level commands covering jobs and workflows, deployment, environments and webhooks, billing and analytics, RBAC, local development, and real-time monitoring
-  - REST API client — all commands call the Strait server API over HTTP (zero database, queue, or worker dependencies)
+- **Purpose**: Standalone command-line interface for the Strait orchestration platform. Strait is **orchestration-only** — customer code runs on customer infrastructure (Vercel, Cloudflare Workers, AWS Lambda, Netlify, Express, Kubernetes, Go) and Strait orchestrates execution via signed HTTPS push (`strait.serve`) or a long-lived gRPC worker stream (`strait.worker`).
+  - Canonical surface: jobs, runs, workflows, workflow-runs, triggers, webhooks, event-sources, log-drains, secrets, team, projects, env, analytics, usage, auth, debug, extension, init, migrate, deploy push, endpoint, worker, dev
+  - Two transports side-by-side: `internal/client/` (hand-rolled HTTP) for existing commands and CLI-only flows (device-code auth, worker admin); `internal/sdk/` is a real wrapper around `*strait.Client` from `github.com/strait-dev/strait-go` v0.2.0 for new commands.
   - OAuth device code flow + keychain credential storage
   - Config file management (`~/.config/strait/config.yaml`, `.strait.yaml`)
   - Multi-format output (table, JSON, YAML, CSV, go-template, jsonpath)
-  - Interactive TUI dashboard, wizard forms, DAG visualization
-  - Extension/plugin system with hooks
-  - CI/CD pipeline generation
-  - Docker build/push deployment workflow
+  - Embedded starter templates for `strait init --template <name>` (8 runtimes)
+  - Best-effort migration converters (`strait migrate inngest|trigger|hatchet`)
+  - Extension/plugin system: `extension list/install/run/create/remove`
 
 This repo was extracted from `strait-dev/strait` (monorepo `apps/strait/`) to ship CLI updates independently of the server.
 
@@ -39,25 +38,26 @@ Core technical model:
 ## 2) Repository map (how to navigate)
 
 ```
-cmd/strait/              CLI commands and app entrypoint (70+ command files)
+cmd/strait/              CLI commands and app entrypoint
+cmd/strait/templates/    Embedded starter projects for `strait init --template`
 internal/
   types/                 CLI-own types matching REST API JSON contract
-  client/                HTTP API client (100+ methods, SSE streaming, device auth)
+  client/                Hand-rolled HTTP client (existing commands + CLI-only flows)
+  sdk/                   Wrapper around *strait.Client from strait-go v0.2.0 (new commands)
   auth/                  Keyring credential storage + OAuth device flow
   config/                Config file management and context resolution
   styles/                Terminal color and formatting (lipgloss)
   output/                Multi-format output rendering
   dag/                   Workflow DAG visualization (box-drawing)
-  deploy/                Docker build/push and manifest deployment
-  devtest/               Local job testing engine
   extension/             Plugin manifest, hooks, and lifecycle
-  manifest/              Project config loading and compilation
   ci/                    CI provider detection and config generation
   tui/                   TUI dashboard components
   tunnel/                Cloudflare tunnel integration
   wizard/                Interactive form validation
   bundle/                GitOps bundle export/import/diff
 ```
+
+See `internal/AGENTS.md` for the `internal/client/` vs `internal/sdk/` migration policy.
 
 Support files:
 - `.github/workflows/ci.yml` — CI (test + lint + goreleaser check)

@@ -622,7 +622,7 @@ func TestLogoutAndAuthStatus(t *testing.T) {
 
 		jsonOut := captureCommandOutput(t, func() {
 			cmd := newAuthCommand(state)
-			cmd.SetArgs([]string{"status"})
+			cmd.SetArgs([]string{"whoami"})
 			if err := cmd.Execute(); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -642,7 +642,7 @@ func TestLogoutAndAuthStatus(t *testing.T) {
 		})
 		stderr := captureCommandErrorOutput(t, func() {
 			cmd := newAuthCommand(state)
-			cmd.SetArgs([]string{"status"})
+			cmd.SetArgs([]string{"whoami"})
 			if err := cmd.Execute(); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

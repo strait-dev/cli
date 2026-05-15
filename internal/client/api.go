@@ -472,6 +472,26 @@ func (c *Client) SendEvent(ctx context.Context, eventKey string, payload map[str
 	return &out, nil
 }
 
+// SendRawEvent posts a raw event to the project's event-ingest endpoint.
+// Unlike SendEvent, which targets a waiting typed trigger keyed by event_key,
+// this fans out to any subscribers attached to the raw event stream.
+func (c *Client) SendRawEvent(ctx context.Context, projectID, eventKey string, payload map[string]any) error {
+	if strings.TrimSpace(projectID) == "" {
+		return fmt.Errorf("project id is required")
+	}
+	if strings.TrimSpace(eventKey) == "" {
+		return fmt.Errorf("event key is required")
+	}
+	body := map[string]any{
+		"project_id": projectID,
+		"event_key":  eventKey,
+	}
+	if payload != nil {
+		body["payload"] = payload
+	}
+	return c.doJSON(ctx, http.MethodPost, "/v1/events", nil, body, nil)
+}
+
 // PurgeEventTriggers purges old event triggers.
 func (c *Client) PurgeEventTriggers(ctx context.Context, olderThanDays int, dryRun bool) (int64, error) {
 	body := map[string]any{
@@ -501,54 +521,6 @@ func (c *Client) ListEnvironments(ctx context.Context, projectID string) ([]type
 
 	var out []types.Environment
 	if err := c.doListJSON(ctx, "/v1/environments", query, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// CreateDeploymentVersion creates a new deployment version.
-func (c *Client) CreateDeploymentVersion(ctx context.Context, req CreateDeploymentVersionRequest) (*DeploymentVersion, error) {
-	var out DeploymentVersion
-	if err := c.doJSON(ctx, http.MethodPost, "/v1/deployments", nil, req, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-// FinalizeDeployment finalizes a deployment version.
-func (c *Client) FinalizeDeployment(ctx context.Context, id string, req FinalizeDeploymentRequest) error {
-	if err := validatePathSegment(id); err != nil {
-		return fmt.Errorf("invalid deployment id: %w", err)
-	}
-	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/deployments", id, "finalize"), nil, req, nil)
-}
-
-// PromoteDeployment promotes a deployment version.
-func (c *Client) PromoteDeployment(ctx context.Context, id string, req PromoteDeploymentRequest) error {
-	if err := validatePathSegment(id); err != nil {
-		return fmt.Errorf("invalid deployment id: %w", err)
-	}
-	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/deployments", id, "promote"), nil, req, nil)
-}
-
-// RollbackDeployment rolls back a deployment.
-func (c *Client) RollbackDeployment(ctx context.Context, id string, req RollbackDeploymentRequest) error {
-	if err := validatePathSegment(id); err != nil {
-		return fmt.Errorf("invalid deployment id: %w", err)
-	}
-	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/deployments", id, "rollback"), nil, req, nil)
-}
-
-// ListDeployments returns deployments for a project.
-func (c *Client) ListDeployments(ctx context.Context, projectID string, limit int) ([]DeploymentVersion, error) {
-	query := url.Values{}
-	query.Set("project_id", projectID)
-	if limit > 0 {
-		query.Set("limit", fmt.Sprintf("%d", limit))
-	}
-
-	var out []DeploymentVersion
-	if err := c.doListJSON(ctx, "/v1/deployments", query, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -711,99 +683,6 @@ func (c *Client) GetJobBySlug(ctx context.Context, projectID, slug string) (*typ
 		}
 	}
 	return nil, fmt.Errorf("job with slug %q not found in project", slug)
-}
-
-// CreateCodeDeployment creates a new code-first deployment and returns the
-// deployment record plus a presigned PUT URL for uploading the source tarball.
-func (c *Client) CreateCodeDeployment(ctx context.Context, jobID string, req CreateCodeDeploymentRequest) (*CreateCodeDeploymentResponse, error) {
-	if err := validatePathSegment(jobID); err != nil {
-		return nil, fmt.Errorf("invalid job id: %w", err)
-	}
-	var out CreateCodeDeploymentResponse
-	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments"), nil, req, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-// ConfirmCodeDeployment marks the tarball upload complete, triggering the build.
-func (c *Client) ConfirmCodeDeployment(ctx context.Context, jobID, deploymentID string, req ConfirmCodeDeploymentRequest) (*CodeDeployment, error) {
-	if err := validatePathSegment(jobID); err != nil {
-		return nil, fmt.Errorf("invalid job id: %w", err)
-	}
-	if err := validatePathSegment(deploymentID); err != nil {
-		return nil, fmt.Errorf("invalid deployment id: %w", err)
-	}
-	var out CodeDeployment
-	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments", deploymentID, "confirm"), nil, req, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-// GetCodeDeployment fetches a single code deployment by ID.
-func (c *Client) GetCodeDeployment(ctx context.Context, jobID, deploymentID string) (*CodeDeployment, error) {
-	if err := validatePathSegment(jobID); err != nil {
-		return nil, fmt.Errorf("invalid job id: %w", err)
-	}
-	if err := validatePathSegment(deploymentID); err != nil {
-		return nil, fmt.Errorf("invalid deployment id: %w", err)
-	}
-	var out CodeDeployment
-	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/jobs", jobID, "deployments", deploymentID), nil, nil, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-// ListCodeDeployments lists code deployments for a job.
-func (c *Client) ListCodeDeployments(ctx context.Context, jobID string, limit int) ([]CodeDeployment, error) {
-	if err := validatePathSegment(jobID); err != nil {
-		return nil, fmt.Errorf("invalid job id: %w", err)
-	}
-	query := url.Values{}
-	if limit > 0 {
-		query.Set("limit", fmt.Sprintf("%d", limit))
-	}
-	var out []CodeDeployment
-	if err := c.doListJSON(ctx, path.Join("/v1/jobs", jobID, "deployments"), query, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// RollbackCodeDeployment activates a previously ready deployment as the active
-// deployment for the job, effectively rolling back to that version.
-func (c *Client) RollbackCodeDeployment(ctx context.Context, jobID, deploymentID, projectID string) (*CodeDeployment, error) {
-	if err := validatePathSegment(jobID); err != nil {
-		return nil, fmt.Errorf("invalid job id: %w", err)
-	}
-	if err := validatePathSegment(deploymentID); err != nil {
-		return nil, fmt.Errorf("invalid deployment id: %w", err)
-	}
-	body := ConfirmCodeDeploymentRequest{ProjectID: projectID}
-	var out CodeDeployment
-	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments", deploymentID, "rollback"), nil, body, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-// ServerCapabilities represents the capabilities reported by a Strait server instance.
-type ServerCapabilities struct {
-	CodeDeployEnabled bool   `json:"code_deploy_enabled"`
-	BuildKitAddress   string `json:"buildkit_address,omitempty"`
-	RegistryHost      string `json:"registry_host,omitempty"`
-}
-
-// GetServerCapabilities returns the server's feature capabilities.
-// Returns an error when the capabilities endpoint is unavailable (e.g. older servers).
-func (c *Client) GetServerCapabilities(ctx context.Context) (*ServerCapabilities, error) {
-	var out ServerCapabilities
-	if err := c.doJSON(ctx, http.MethodGet, "/v1/system/capabilities", nil, nil, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
 }
 
 // GetEnvironment returns an environment by ID.
@@ -1624,4 +1503,28 @@ func (c *Client) DeleteTeamPolicy(ctx context.Context, id string) error {
 		return fmt.Errorf("invalid policy id: %w", err)
 	}
 	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/team/policies", id), nil, nil, &map[string]string{})
+}
+
+// ListWorkers returns the connected workers for the given project. The server
+// reports the workers it currently observes via the WorkerService gRPC
+// connection.
+func (c *Client) ListWorkers(ctx context.Context, projectID string) ([]types.WorkerInfo, error) {
+	query := url.Values{}
+	if projectID != "" {
+		query.Set("project_id", projectID)
+	}
+	var out []types.WorkerInfo
+	if err := c.doListJSON(ctx, "/v1/workers", query, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// DisconnectWorker asks the server to gracefully drain and disconnect the
+// worker with the given ID.
+func (c *Client) DisconnectWorker(ctx context.Context, id string) error {
+	if err := validatePathSegment(id); err != nil {
+		return fmt.Errorf("invalid worker id: %w", err)
+	}
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/workers", id, "disconnect"), nil, nil, &map[string]string{})
 }

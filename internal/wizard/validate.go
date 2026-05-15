@@ -104,8 +104,7 @@ func isPrivateIP(ip net.IP) bool {
 
 // ValidateRuntime checks that a runtime is one of the known values.
 // It accepts both server-canonical names (typescript, go, python, ruby, rust)
-// and CLI aliases (node, bun → typescript). docker is accepted for legacy
-// manifest deployments but not for code-first source deployments.
+// and CLI aliases (node, bun → typescript).
 func ValidateRuntime(runtime string) error {
 	runtime = strings.TrimSpace(strings.ToLower(runtime))
 	valid := map[string]bool{
@@ -118,8 +117,6 @@ func ValidateRuntime(runtime string) error {
 		// CLI aliases (node/bun are normalised to typescript by the deploy pipeline).
 		"node": true,
 		"bun":  true,
-		// Legacy: docker-image manifest deployments only.
-		"docker": true,
 	}
 	if !valid[runtime] {
 		return fmt.Errorf("runtime must be one of: go, python, typescript, ruby, rust (node/bun are aliases for typescript)")
@@ -174,5 +171,5 @@ func ValidateMaxAttempts(n int) error {
 
 // Runtimes returns the list of supported runtimes for display purposes.
 func Runtimes() []string {
-	return []string{"go", "python", "typescript", "ruby", "rust", "node", "bun", "docker"}
+	return []string{"go", "python", "typescript", "ruby", "rust", "node", "bun"}
 }
