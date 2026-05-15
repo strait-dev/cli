@@ -13,7 +13,7 @@ require (
 	github.com/spf13/pflag v1.0.9
 	github.com/strait-dev/strait-go v0.2.0
 	github.com/zalando/go-keyring v0.2.8
-	golang.org/x/term v0.41.0
+	golang.org/x/term v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -41,6 +41,6 @@ require (
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 )
