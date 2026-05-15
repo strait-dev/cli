@@ -1,20 +1,24 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/go-chi/chi/v5"
-	strait "github.com/strait-dev/strait-go"
+	"github.com/strait-dev/strait-go/authoring"
 	"github.com/strait-dev/strait-go/serve"
 )
 
-var helloJob = strait.DefineJob(strait.JobSpec{
+type helloPayload struct {
+	Name string `json:"name"`
+}
+
+var helloJob = authoring.DefineJob(authoring.JobOptions[helloPayload]{
+	Name: "hello",
 	Slug: "hello",
-	Run: func(ctx context.Context, in strait.RunInput) (any, error) {
-		name, _ := in.Payload["name"].(string)
+	Run: func(p helloPayload, _ authoring.RunContext) (any, error) {
+		name := p.Name
 		if name == "" {
 			name = "world"
 		}
@@ -23,10 +27,13 @@ var helloJob = strait.DefineJob(strait.JobSpec{
 })
 
 func main() {
-	handler := serve.Handler(serve.Options{
-		Jobs:          []strait.Job{helloJob},
-		SigningSecret: os.Getenv("STRAIT_SIGNING_SECRET"),
-	})
+	handler, err := serve.Serve(
+		[]serve.Handler{serve.Job(helloJob)},
+		serve.WithSecret([]byte(os.Getenv("STRAIT_SIGNING_SECRET"))),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	r := chi.NewRouter()
 	r.Mount("/api/strait", handler)

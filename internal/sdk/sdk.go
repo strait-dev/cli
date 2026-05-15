@@ -1,40 +1,42 @@
-// Package sdk is a thin shim that the CLI uses to construct the canonical
-// strait Go SDK client (github.com/strait-dev/strait-go) once it is published.
+// Package sdk is the canonical Go-SDK client for new CLI commands.
 //
-// Until strait-go v0.2.0 lands the shim returns the existing
-// internal/client.Client as the underlying transport. New CLI commands should
-// depend on this package rather than internal/client directly so the eventual
-// swap is a single edit.
+// It wraps *github.com/strait-dev/strait-go.Client so new commands target the
+// published SDK surface (Jobs, Workflows, Runs, etc.) instead of internal/client.
+// Existing commands continue to use internal/client until they are individually
+// migrated; do not re-implement an API that already lives there.
 //
-// See internal/AGENTS.md for the migration policy (when to call sdk.New vs.
-// internal/client.New).
+// See internal/AGENTS.md for the migration policy.
 package sdk
 
 import (
 	"time"
 
-	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/config"
+	strait "github.com/strait-dev/strait-go"
 )
 
-// Client is the orchestration client used by new CLI commands. While the Go
-// SDK is unpublished it is a thin alias around *internal/client.Client. When
-// strait-go v0.2.0 ships, the alias will be replaced with *strait.Client and
-// the constructor will route to strait.NewClient(...).
-type Client = client.Client
+// Client is the orchestration client used by new CLI commands. It embeds the
+// strait-go *strait.Client so all 23 services (Jobs, Workflows, Runs, ...) are
+// reachable directly: `c.Jobs.Get(ctx, slug)`.
+type Client struct {
+	*strait.Client
+}
 
 // New constructs an orchestration client from the resolved CLI configuration.
-//
-// New commands (worker, endpoint, deploy push) should call this. Existing
-// commands continue to call internal/client.New until they are individually
-// migrated; do not re-implement an API that already lives on the internal
-// client.
+// resolved.Timeout, when non-empty, is parsed as a time.Duration and forwarded
+// as milliseconds to strait.WithTimeout.
 func New(resolved config.Resolved) (*Client, error) {
-	timeout := 30 * time.Second
+	opts := []strait.Option{}
+	if resolved.ServerURL != "" {
+		opts = append(opts, strait.WithBaseURL(resolved.ServerURL))
+	}
+	if resolved.Credential != "" {
+		opts = append(opts, strait.WithAPIKey(resolved.Credential))
+	}
 	if resolved.Timeout != "" {
 		if d, err := time.ParseDuration(resolved.Timeout); err == nil && d > 0 {
-			timeout = d
+			opts = append(opts, strait.WithTimeout(int(d/time.Millisecond)))
 		}
 	}
-	return client.New(resolved.ServerURL, resolved.Credential, timeout)
+	return &Client{Client: strait.NewClient(opts...)}, nil
 }

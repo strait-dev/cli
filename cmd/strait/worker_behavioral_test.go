@@ -104,55 +104,12 @@ func TestWorkerDrain_Success(t *testing.T) {
 	}
 }
 
-func TestWorkerStart_RequiresSDK(t *testing.T) {
-	t.Parallel()
-
-	state := newTestState(t, newRouterServer(t, map[string]http.HandlerFunc{}))
-	cmd := newWorkerStartCommand(state)
-	cmd.SetArgs([]string{})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error indicating SDK is required")
-	}
-	if !strings.Contains(err.Error(), "strait-go") {
-		t.Fatalf("expected SDK error message, got: %v", err)
-	}
-}
-
-func TestWorkerLogs_RequiresSDK(t *testing.T) {
-	t.Parallel()
-
-	state := newTestState(t, newRouterServer(t, map[string]http.HandlerFunc{}))
-	cmd := newWorkerLogsCommand(state)
-	cmd.SetArgs([]string{"wkr-1"})
-
-	err := cmd.Execute()
-	if err == nil {
-		t.Fatal("expected error indicating SDK is required")
-	}
-	if !strings.Contains(err.Error(), "strait-go") {
-		t.Fatalf("expected SDK error message, got: %v", err)
-	}
-}
-
 func TestWorkerCommand_Wiring(t *testing.T) {
 	t.Parallel()
 
 	cmd := newRootCommand()
 	worker := findSubcommand(t, cmd, "worker")
-	for _, sub := range []string{"start", "status", "drain", "logs"} {
+	for _, sub := range []string{"status", "drain"} {
 		findSubcommand(t, worker, sub)
-	}
-}
-
-func TestWorkerStart_Flags(t *testing.T) {
-	t.Parallel()
-
-	cmd := newWorkerStartCommand(nil)
-	for _, name := range []string{"queue", "concurrency", "name"} {
-		if cmd.Flags().Lookup(name) == nil {
-			t.Errorf("missing --%s flag", name)
-		}
 	}
 }

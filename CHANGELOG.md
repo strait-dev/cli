@@ -22,9 +22,9 @@ via signed HTTPS push (`strait.serve`) or a long-lived gRPC worker stream
   returns a recognisable `serve()` response. Useful for confirming a
   freshly-deployed serve adapter is wired up correctly.
 - `strait worker status|drain` — list active gRPC workers for a project and
-  graceful-disconnect a specific worker. `worker start` and `worker logs`
-  are stubbed with a clean SDK-required error pending `strait-go v0.2.0`
-  (they will boot an in-process worker and tail gRPC logs respectively).
+  graceful-disconnect a specific worker. Workers themselves run on customer
+  infrastructure via `github.com/strait-dev/strait-go/worker.Run`; scaffold
+  one with `strait init --template go-worker` or `--template k8s-worker`.
 - `strait deploy push` — manifest-driven upsert of jobs and workflows
   defined in `strait.deploy.json`. Supports `--dry-run`, `--prune` (with
   `--yes` for non-interactive sessions), and produces a structured
@@ -81,6 +81,14 @@ via signed HTTPS push (`strait.serve`) or a long-lived gRPC worker stream
   `PromoteDeployment`, `RollbackDeployment`, `ListDeployments`,
   `CreateCodeDeployment`, `ConfirmCodeDeployment`, `GetCodeDeployment`,
   `ListCodeDeployments`, `RollbackCodeDeployment`, `GetServerCapabilities`.
+
+#### `worker start` and `worker logs`
+
+`worker start` was never implementable from the CLI alone (it needs the user's
+compiled Go handlers); `worker logs` requires a server-side log-tail endpoint
+that doesn't exist yet. Both are removed. Run workers on customer infra via
+`strait-go/worker` (scaffold with `strait init --template go-worker`) and use
+`strait worker status` / `strait worker drain` for admin operations.
 
 #### Non-canonical commands (STR-522)
 

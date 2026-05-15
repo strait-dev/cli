@@ -8,14 +8,19 @@ import (
 	"strings"
 	"syscall"
 
-	strait "github.com/strait-dev/strait-go"
+	"github.com/strait-dev/strait-go/authoring"
 	"github.com/strait-dev/strait-go/worker"
 )
 
-var helloJob = strait.DefineJob(strait.JobSpec{
+type helloPayload struct {
+	Name string `json:"name"`
+}
+
+var helloJob = authoring.DefineJob(authoring.JobOptions[helloPayload]{
+	Name: "hello",
 	Slug: "hello",
-	Run: func(ctx context.Context, in strait.RunInput) (any, error) {
-		name, _ := in.Payload["name"].(string)
+	Run: func(p helloPayload, _ authoring.RunContext) (any, error) {
+		name := p.Name
 		if name == "" {
 			name = "world"
 		}
@@ -26,22 +31,18 @@ var helloJob = strait.DefineJob(strait.JobSpec{
 func main() {
 	queues := strings.Split(envOr("STRAIT_QUEUES", "default"), ",")
 
-	w, err := worker.New(worker.Options{
-		APIKey:      os.Getenv("STRAIT_API_KEY"),
-		ServerURL:   envOr("STRAIT_SERVER", "https://api.strait.dev"),
-		Queues:      queues,
-		Concurrency: 8,
-		Jobs:        []strait.Job{helloJob},
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	log.Println("worker started, queues:", queues)
-	if err := w.Run(ctx); err != nil {
+	log.Println("worker starting, queues:", queues)
+	err := worker.Run(ctx,
+		[]worker.Handler{worker.Job(helloJob)},
+		worker.WithEndpoint(envOr("STRAIT_SERVER", "api.strait.dev:443")),
+		worker.WithToken(os.Getenv("STRAIT_API_KEY")),
+		worker.WithQueues(queues...),
+		worker.WithSlots(8),
+	)
+	if err != nil {
 		log.Fatal(err)
 	}
 }

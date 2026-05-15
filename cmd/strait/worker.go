@@ -11,50 +11,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// ErrWorkerSDKRequired is returned by `worker start` and `worker logs`. Those
-// subcommands need the long-lived gRPC streaming client that lives in the Go
-// SDK (github.com/strait-dev/strait-go) — until that ships the CLI cannot
-// run a worker in-process. The orchestration server, status and drain
-// subcommands work today.
-const workerSDKRequired = "this subcommand requires github.com/strait-dev/strait-go v0.2.0+; pin the SDK in your project and use `strait deploy push` to register jobs"
-
 func newWorkerCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "worker",
-		Short: "Run and manage Strait workers",
-		Long: `Manage long-lived workers that connect to the Strait orchestrator via
-gRPC and execute SDK-defined jobs.`,
+		Short: "Inspect and drain workers connected to the orchestrator",
+		Long: `Worker administration. Workers themselves run on customer infrastructure
+using github.com/strait-dev/strait-go/worker — scaffold one with
+` + "`" + `strait init --template go-worker` + "`" + ` or
+` + "`" + `strait init --template k8s-worker` + "`" + `.`,
 	}
-	cmd.AddCommand(newWorkerStartCommand(state))
 	cmd.AddCommand(newWorkerStatusCommand(state))
 	cmd.AddCommand(newWorkerDrainCommand(state))
-	cmd.AddCommand(newWorkerLogsCommand(state))
-	return cmd
-}
-
-func newWorkerStartCommand(state *appState) *cobra.Command {
-	var queues []string
-	var concurrency int
-	var name string
-
-	cmd := &cobra.Command{
-		Use:   "start",
-		Short: "Run a worker process that pulls tasks from the orchestrator",
-		Long: `Starts a long-lived worker that connects to the orchestrator via gRPC
-and executes registered jobs. Requires the strait-go SDK to run.
-
-Use Ctrl-C to gracefully drain the worker.`,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			_ = queues
-			_ = concurrency
-			_ = name
-			_ = state
-			return fmt.Errorf("%s", workerSDKRequired)
-		},
-	}
-	cmd.Flags().StringSliceVar(&queues, "queue", []string{"default"}, "queue(s) to pull tasks from")
-	cmd.Flags().IntVar(&concurrency, "concurrency", 16, "maximum concurrent tasks")
-	cmd.Flags().StringVar(&name, "name", "", "human-readable worker name")
 	return cmd
 }
 
@@ -117,21 +84,5 @@ func newWorkerDrainCommand(state *appState) *cobra.Command {
 		},
 	}
 	cmd.Flags().DurationVar(&timeout, "timeout", 30*time.Second, "maximum drain wait (informational, server-enforced)")
-	return cmd
-}
-
-func newWorkerLogsCommand(state *appState) *cobra.Command {
-	var follow bool
-	cmd := &cobra.Command{
-		Use:   "logs <worker-id>",
-		Short: "Stream logs from a worker",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, _ []string) error {
-			_ = follow
-			_ = state
-			return fmt.Errorf("%s", workerSDKRequired)
-		},
-	}
-	cmd.Flags().BoolVarP(&follow, "follow", "f", false, "stream new log lines as they arrive")
 	return cmd
 }

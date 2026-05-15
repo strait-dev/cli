@@ -44,12 +44,13 @@ strait endpoint verify hello                   # Round-trip a signed canary
 strait runs watch <run-id>                     # Stream a run's logs
 ```
 
-To run a long-lived worker (gRPC) instead of a serve endpoint:
+To run a long-lived worker (gRPC) instead of a serve endpoint, scaffold one and
+run it on your own infrastructure — workers are SDK programs, not CLI processes:
 
 ```bash
 strait init --template go-worker --name my-worker
-strait deploy push
-strait worker start --queue default
+cd my-worker && go run .              # connects via strait-go/worker
+strait worker status                   # confirm it's connected
 ```
 
 ## Commands
@@ -62,7 +63,7 @@ Canonical surface (orchestration-only). `strait --help` lists the full tree.
 | Migration | `migrate inngest\|trigger\|hatchet --input <path>` |
 | Deploy | `deploy push` |
 | Endpoint | `endpoint set/get/verify` |
-| Worker | `worker start/status/drain/logs` |
+| Worker | `worker status/drain` (workers themselves run via `strait-go/worker`, scaffolded with `init --template go-worker\|k8s-worker`) |
 | Dev | `dev` (Cloudflare Tunnel + watch + auto-register) |
 | Jobs | `jobs list/get/create/update/delete/clone/trigger/health/versions/dependencies/batch` |
 | Runs | `runs list/get/logs/cancel/replay/reschedule/dlq-replay/outputs/checkpoints/events/watch` |
@@ -84,9 +85,10 @@ Canonical surface (orchestration-only). `strait --help` lists the full tree.
 | Extensions | `extension list/install/run/create/remove` |
 
 Removed in this minor (managed-mode + non-canonical surfaces): `build`,
-`verify`, `deployments`, `code_deploy`, `top`, `tui`, `agent`, `validate`,
+`verify`, `deployments`, `code_deploy`, `top`, `agent`, `validate`,
 `apply`, `diff`, `doctor`, `health`, `api`, `stats`, `perf`, `profile`,
-`backup`, `fixtures`, `notifications`, `job-groups`, top-level
+`backup`, `fixtures`, `notifications`, `job-groups`, `worker start`,
+`worker logs`, top-level
 `send/listen/drain/events/trigger/login/logout/whoami/audit`. See
 [CHANGELOG.md](CHANGELOG.md) for the full mapping.
 
