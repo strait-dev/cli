@@ -93,25 +93,25 @@ func TestMigrateInngest_GeneratesJobsAndManifest(t *testing.T) {
 		t.Fatalf("missing cron TODO: %s", cron)
 	}
 
-	manifestRaw, err := os.ReadFile(filepath.Join(tmp, "out", "strait.deploy.json"))
+	manifestRaw, err := os.ReadFile(filepath.Join(tmp, "out", "strait.json"))
 	if err != nil {
 		t.Fatalf("read manifest: %v", err)
 	}
-	var manifest struct {
-		Platform string `json:"platform"`
-		Jobs     []struct {
-			Slug   string `json:"slug"`
-			Source string `json:"source"`
-		} `json:"jobs"`
-	}
+	var manifest ProjectConfig
 	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	if manifest.Platform != "inngest" {
-		t.Fatalf("platform = %q, want inngest", manifest.Platform)
+	if manifest.SchemaURL != "https://schemas.strait.dev/v1/strait.json" {
+		t.Fatalf("$schema = %q", manifest.SchemaURL)
+	}
+	if manifest.Metadata["migration_platform"] != "inngest" {
+		t.Fatalf("migration_platform = %v, want inngest", manifest.Metadata["migration_platform"])
 	}
 	if len(manifest.Jobs) != 2 {
 		t.Fatalf("jobs = %d, want 2", len(manifest.Jobs))
+	}
+	if manifest.Jobs[0].EndpointURL == "" {
+		t.Fatalf("expected placeholder endpoint_url in migrated strait.json")
 	}
 }
 

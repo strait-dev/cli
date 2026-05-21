@@ -27,7 +27,7 @@ fi
 Use `--ci` to disable color output and interactive prompts:
 
 ```bash
-strait deploy --config strait.config.json --ci
+strait sync --file strait.json --ci
 ```
 
 CI mode is also enabled automatically when `CI=true` or `STRAIT_CI=true` is set.
@@ -80,12 +80,11 @@ strait runs list --status failed --limit 50 -o json | jq -r '.[].id' | while rea
 done
 ```
 
-### Wait for queue to drain before deploy
+### Sync definitions in CI
 
 ```bash
-strait drain --timeout 10m
-strait deploy --config strait.config.json --ci
-strait verify
+strait sync --file strait.json --dry-run
+strait sync --file strait.json --ci
 ```
 
 ### Check if a job exists before creating

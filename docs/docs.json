@@ -69,6 +69,7 @@
               "cli-reference/runs",
               "cli-reference/workflows",
               "cli-reference/workflow-runs",
+              "cli-reference/sync",
               "cli-reference/deploy",
               "cli-reference/secrets",
               "cli-reference/api-keys",

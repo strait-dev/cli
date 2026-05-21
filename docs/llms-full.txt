@@ -145,16 +145,11 @@ Roles: `strait team roles --project ID`
 
 `strait audit --project ID [--actor-id U] [--resource-type T] [--resource-id R] [--from RFC3339] [--to RFC3339] [--order asc|desc] [--limit 50]`
 
-## Deployment
+## Sync
 
-Single job: `strait deploy --job S --dockerfile F [--tag T] [--registry R] [--image URI] [--region R] [--preset P] [--env E] [--strategy direct|canary] [--canary-percent N] [--canary-duration D] [--build-arg K=V] [--cache] [--push] [--dry-run]`
-Manifest: `strait deploy --config F [--dry-run]`
-Draft: `strait deploy create --config F --artifact-uri URI`
-Finalize: `strait deploy finalize <id>`
-Promote: `strait deploy promote <id>`
-Rollback: `strait deploy rollback --to <id>`
-List: `strait deploy list --project ID`
-Verify: `strait verify`
+Project file: `strait sync --file strait.json [--dry-run] [--prune --yes]`
+Endpoint: `strait endpoint set <job-slug> <url>`
+Verify: `strait endpoint verify <job-slug>`
 
 ## GitOps
 
@@ -163,7 +158,7 @@ Check: `strait check -f F [--check-endpoints]`
 Diff: `strait diff -f F`
 Apply: `strait apply -f F [--dry-run]`
 Export: `strait export all|jobs|workflows|api-keys --project ID [--output-dir D] [--name-contains S] [--dry-run] [--force-overwrite]`
-Build: `strait build [--config F] [--out-dir D] [--dry-run] [--json]`
+Build: `strait sync --file strait.json --dry-run
 
 ## Project Bundles
 

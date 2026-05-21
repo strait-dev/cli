@@ -17,5 +17,5 @@ npm run build
 2. Set the `STRAIT_SIGNING_SECRET` environment variable on the Lambda.
 3. Configure a Function URL or API Gateway route to the handler.
 4. `strait endpoint set hello https://<function-url>`
-5. `strait deploy push` to upsert the job definitions in `src/jobs.ts`.
+5. `strait sync` to sync the `strait.json` orchestration definitions.
 6. `strait endpoint verify hello` to round-trip a signed canary payload.

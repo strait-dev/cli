@@ -218,6 +218,7 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newInitCommand(state))
 	cmd.AddCommand(newMigrateCommand(state))
 	cmd.AddCommand(newTUICommand(state))
+	cmd.AddCommand(newSyncCommand(state))
 	cmd.AddCommand(newEndpointCommand(state))
 	cmd.AddCommand(newWorkerCommand(state))
 	cmd.AddCommand(newDeployCommand(state))

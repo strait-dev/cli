@@ -47,14 +47,14 @@ func containsUnsafeChars(s string) bool {
 }
 
 var templates = map[string]string{
-	"github": `name: Strait Deploy
+	"github": `name: Strait Sync
 
 on:
   push:
     branches: [main, master]
 
 jobs:
-  deploy:
+  sync:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -64,42 +64,30 @@ jobs:
           curl -fsSL https://get.strait.run | sh
           echo "$HOME/.strait/bin" >> $GITHUB_PATH
 
-      - name: Build manifest
-        run: strait build
-
-      - name: Validate
-        run: strait check -f .strait/manifest.json
-
-      - name: Deploy
-        run: strait deploy --config strait.json --env {{.Environment}}
+      - name: Sync orchestration definitions
+        run: strait sync --file strait.json
         env:
           STRAIT_API_KEY: ${{"{{"}} secrets.STRAIT_API_KEY {{"}}"}}
           STRAIT_PROJECT: {{.ProjectID}}
+          STRAIT_ENVIRONMENT: {{.Environment}}
 `,
 	"gitlab": `stages:
   - validate
-  - deploy
+  - sync
 
-validate:
-  stage: validate
+sync:
+  stage: sync
   script:
     - curl -fsSL https://get.strait.run | sh
     - export PATH="$HOME/.strait/bin:$PATH"
-    - strait build
-    - strait check -f .strait/manifest.json
-
-deploy:
-  stage: deploy
-  script:
-    - curl -fsSL https://get.strait.run | sh
-    - export PATH="$HOME/.strait/bin:$PATH"
-    - strait deploy --config strait.json --env {{.Environment}}
+    - strait sync --file strait.json
   only:
     - main
     - master
   variables:
     STRAIT_API_KEY: $STRAIT_API_KEY
     STRAIT_PROJECT: {{.ProjectID}}
+    STRAIT_ENVIRONMENT: {{.Environment}}
 `,
 	"generic": `#!/bin/bash
 set -euo pipefail
@@ -108,13 +96,10 @@ set -euo pipefail
 curl -fsSL https://get.strait.run | sh
 export PATH="$HOME/.strait/bin:$PATH"
 
-# Build and validate
-strait build
-strait check -f .strait/manifest.json
-
-# Deploy
+# Sync orchestration definitions
 export STRAIT_API_KEY="${STRAIT_API_KEY}"
 export STRAIT_PROJECT="{{.ProjectID}}"
-strait deploy --config strait.json --env {{.Environment}}
+export STRAIT_ENVIRONMENT="{{.Environment}}"
+strait sync --file strait.json
 `,
 }

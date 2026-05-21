@@ -18,7 +18,7 @@ import (
 // newMigrateCommand returns the `strait migrate` command, which converts
 // existing job/workflow definitions from competing platforms (Inngest,
 // Trigger.dev, Hatchet) into Strait `defineJob` / `defineWorkflow` TypeScript
-// sources plus a `strait.deploy.json` manifest. Conversions are best-effort:
+// sources plus a `strait.json` manifest. Conversions are best-effort:
 // fields that don't have a clean Strait analogue are emitted as `// TODO:
 // review` comments.
 func newMigrateCommand(state *appState) *cobra.Command {
@@ -51,7 +51,7 @@ func newMigrateInngestCommand(state *appState) *cobra.Command {
 		Short: "Convert an Inngest functions export into Strait sources",
 		Long: "Reads an Inngest functions JSON export (typically the output of " +
 			"`inngest functions list --json` or the `inngest.json` config) and " +
-			"emits `defineJob` TypeScript sources plus a `strait.deploy.json` " +
+			"emits `defineJob` TypeScript sources plus a `strait.json` " +
 			"manifest. Conversion is best-effort; review the emitted TODO " +
 			"comments before deploying.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -255,7 +255,7 @@ func loadHatchetJobs(path string) ([]migratedJob, error) {
 }
 
 // emitMigratedJobs writes one TypeScript source per migrated job under
-// outDir/jobs/<slug>.ts plus a strait.deploy.json manifest at outDir/. The
+// outDir/jobs/<slug>.ts plus a strait.json manifest at outDir/. The
 // caller's platform name is included in the file header comments so users can
 // trace where each block came from.
 func emitMigratedJobs(cmd *cobra.Command, state *appState, platform, outDir string, jobs []migratedJob, force bool) error {
@@ -271,10 +271,11 @@ func emitMigratedJobs(cmd *cobra.Command, state *appState, platform, outDir stri
 		return fmt.Errorf("create jobs dir: %w", err)
 	}
 
-	manifest := struct {
-		Platform string          `json:"platform"`
-		Jobs     []manifestEntry `json:"jobs"`
-	}{Platform: platform}
+	manifest := ProjectConfig{
+		SchemaURL: "https://schemas.strait.dev/v1/strait.json",
+		Version:   "1",
+		Metadata:  map[string]any{"migration_platform": platform},
+	}
 
 	// Pre-flight: collect any pre-existing destination files. The migrate
 	// emitter would silently clobber them otherwise, which destroys user edits
@@ -289,7 +290,7 @@ func emitMigratedJobs(cmd *cobra.Command, state *appState, platform, outDir stri
 			conflicts = append(conflicts, path)
 		}
 	}
-	manifestPath := filepath.Join(abs, "strait.deploy.json")
+	manifestPath := filepath.Join(abs, "strait.json")
 	if _, err := os.Stat(manifestPath); err == nil {
 		conflicts = append(conflicts, manifestPath)
 	}
@@ -302,11 +303,20 @@ func emitMigratedJobs(cmd *cobra.Command, state *appState, platform, outDir stri
 		if err := os.WriteFile(path, []byte(renderJobTS(platform, job)), 0o600); err != nil {
 			return fmt.Errorf("write %s: %w", path, err)
 		}
-		manifest.Jobs = append(manifest.Jobs, manifestEntry{
-			Slug:       job.Slug,
-			Source:     filepath.ToSlash(filepath.Join("jobs", job.Slug+".ts")),
-			EventTypes: job.EventTypes,
+		source := filepath.ToSlash(filepath.Join("jobs", job.Slug+".ts"))
+		manifest.Jobs = append(manifest.Jobs, ProjectJob{
+			Slug:        job.Slug,
+			Name:        firstNonEmpty(job.Name, job.Slug),
+			Description: job.Description,
+			EndpointURL: "https://example.com/strait/" + job.Slug,
 		})
+		if manifest.Metadata == nil {
+			manifest.Metadata = map[string]any{}
+		}
+		manifest.Metadata[job.Slug+"_source"] = source
+		if len(job.EventTypes) > 0 {
+			manifest.Metadata[job.Slug+"_event_types"] = job.EventTypes
+		}
 	}
 
 	manifestBytes, err := json.MarshalIndent(manifest, "", "  ")
@@ -320,7 +330,7 @@ func emitMigratedJobs(cmd *cobra.Command, state *appState, platform, outDir stri
 	if isTTYRich(state) {
 		fmt.Fprintln(cmd.ErrOrStderr(), styles.Success(fmt.Sprintf("Migrated %d job(s) from %s", len(jobs), platform)))
 		fmt.Fprintln(cmd.ErrOrStderr(), styles.KeyValue("Output", abs))
-		fmt.Fprintln(cmd.ErrOrStderr(), styles.KeyValue("Next", "review TODO comments, then `strait deploy push`"))
+		fmt.Fprintln(cmd.ErrOrStderr(), styles.KeyValue("Next", "review TODO comments, then `strait sync`"))
 		return nil
 	}
 	return printData(state, map[string]any{
@@ -330,16 +340,10 @@ func emitMigratedJobs(cmd *cobra.Command, state *appState, platform, outDir stri
 	})
 }
 
-type manifestEntry struct {
-	Slug       string   `json:"slug"`
-	Source     string   `json:"source"`
-	EventTypes []string `json:"event_types,omitempty"`
-}
-
 // renderJobTS produces the TypeScript source for one migrated job. The
 // generated module imports `defineJob` from the SDK, declares a placeholder
 // `run` body, and surfaces every conversion note as a `// TODO: review`
-// comment so the developer sees them before deploy.
+// comment so the developer sees them before syncing.
 func renderJobTS(platform string, job migratedJob) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "// Migrated from %s\n", platform)

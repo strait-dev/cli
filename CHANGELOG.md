@@ -25,14 +25,14 @@ via signed HTTPS push (`strait.serve`) or a long-lived gRPC worker stream
   graceful-disconnect a specific worker. Workers themselves run on customer
   infrastructure via `github.com/strait-dev/strait-go/worker.Run`; scaffold
   one with `strait init --template go-worker` or `--template k8s-worker`.
-- `strait deploy push` — manifest-driven upsert of jobs and workflows
-  defined in `strait.deploy.json`. Supports `--dry-run`, `--prune` (with
+- `strait sync` — `strait.json`-driven upsert of jobs and workflows
+  defined in `strait.json`. Supports `--dry-run`, `--prune` (with
   `--yes` for non-interactive sessions), and produces a structured
   `{created, updated, skipped, failed, results}` summary. SDK-side
   introspection of TS/Go projects lands once `strait-go v0.2.0` ships;
   until then the manifest is the canonical input.
 - `strait dev` — replaces the legacy local-server `dev` command. Launches a
-  Cloudflare Quick Tunnel, patches each manifest job's `endpoint_url` to
+  Cloudflare Quick Tunnel, patches each `strait.json` job's `endpoint_url` to
   `<tunnel-url>/<slug>`, and restores the previous endpoints on shutdown
   (pass `--keep-endpoint` to keep the tunnel URLs in place).
 - `strait init --template <name>` — template-driven scaffolder backed by
@@ -41,7 +41,7 @@ via signed HTTPS push (`strait.serve`) or a long-lived gRPC worker stream
   `strait init --list` to see the full set.
 - `strait migrate inngest|trigger|hatchet` — best-effort converter that turns
   an Inngest/Trigger.dev/Hatchet export into Strait `defineJob` TypeScript
-  sources plus a `strait.deploy.json` manifest. Conversion notes are surfaced
+  sources plus a `strait.json` manifest. Conversion notes are surfaced
   inline as `// TODO: review` comments.
 - `internal/sdk/` — forward-looking shim that new commands consume in place of
   `internal/client/`. The shim becomes a thin wrapper around `strait-go` once
@@ -96,10 +96,10 @@ standard "unknown command" error; use the canonical replacement instead:
 
 | Removed | Replacement |
 |---|---|
-| `deploy` (Docker form) | `strait deploy push` (SDK-defined jobs) |
-| `build` | `strait deploy push` |
+| `deploy` (Docker form) | `strait sync` (SDK-defined jobs) |
+| `build` | `strait sync` |
 | `verify` | `strait endpoint verify <slug>` |
-| `deployments` | `strait deploy push` |
+| `deployments` | `strait sync` |
 | `dev` (server-stack form) | `strait dev` (orchestration mode) |
 | `init` (interactive wizard) | `strait init --template <name>` |
 | `top` / `tui` / `agent` | use the dashboard |
@@ -141,7 +141,7 @@ workflow is gone. Instead:
    (Go). See `strait init --template <name>` for working scaffolds.
 3. Deploy your code to the platform of your choice (Vercel, Cloudflare,
    Lambda, your own Kubernetes cluster, etc.).
-4. Run `strait deploy push` to upsert your SDK-defined jobs into the
+4. Run `strait sync` to upsert your SDK-defined jobs into the
    orchestrator.
 5. Run `strait endpoint set <job-slug> <url>` and `strait endpoint verify
    <job-slug>` to wire up the signed-push integration.

@@ -35,17 +35,17 @@ func withStubTunnel(t *testing.T, url string) *bool {
 func TestDev_RegistersAndRestoresEndpoints(t *testing.T) {
 	stopped := withStubTunnel(t, "https://test.trycloudflare.com")
 
-	manifest := DeployManifest{
+	config := ProjectConfig{
 		Version: "1",
-		Jobs: []DeployJob{
+		Jobs: []ProjectJob{
 			{Slug: "existing", EndpointURL: "ignored"},
 			{Slug: "fresh", EndpointURL: "ignored"},
 		},
 	}
 	dir := t.TempDir()
-	manifestPath := filepath.Join(dir, "strait.deploy.json")
-	data, _ := json.Marshal(manifest)
-	if err := os.WriteFile(manifestPath, data, 0o600); err != nil {
+	configPath := filepath.Join(dir, "strait.json")
+	data, _ := json.Marshal(config)
+	if err := os.WriteFile(configPath, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -85,7 +85,7 @@ func TestDev_RegistersAndRestoresEndpoints(t *testing.T) {
 	state.opts.outputFormat = "json"
 
 	cmd := newDevCommand(state)
-	cmd.SetArgs([]string{"--manifest", manifestPath})
+	cmd.SetArgs([]string{"--file", configPath})
 
 	// Run dev in a goroutine; deliver SIGINT once endpoints have been registered.
 	done := make(chan error, 1)
@@ -154,17 +154,17 @@ func TestDev_RejectsMissingProject(t *testing.T) {
 	}
 }
 
-func TestDev_RejectsMissingManifest(t *testing.T) {
+func TestDev_RejectsMissingProjectConfig(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{})
 	state := newTestState(t, srv)
 	cmd := newDevCommand(state)
-	cmd.SetArgs([]string{"--manifest", "/nonexistent/strait.deploy.json"})
+	cmd.SetArgs([]string{"--file", "/nonexistent/strait.json"})
 
 	err := cmd.Execute()
 	if err == nil {
-		t.Fatal("expected error for missing manifest")
+		t.Fatal("expected error for missing config")
 	}
 }
 
@@ -173,7 +173,7 @@ func TestDevCommand_Wiring(t *testing.T) {
 
 	cmd := newRootCommand()
 	dev := findSubcommand(t, cmd, "dev")
-	for _, flag := range []string{"port", "dir", "manifest", "keep-endpoint"} {
+	for _, flag := range []string{"port", "dir", "file", "keep-endpoint"} {
 		if dev.Flags().Lookup(flag) == nil {
 			t.Errorf("missing --%s flag", flag)
 		}

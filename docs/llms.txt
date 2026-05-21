@@ -2,7 +2,7 @@
 
 > Command-line interface for the Strait job orchestration platform
 
-Strait CLI is the primary interface for the Strait job orchestration platform. 55+ commands for managing jobs, runs, workflows, deployments, secrets, and infrastructure.
+Strait CLI is the primary interface for the Strait job orchestration platform. 55+ commands for managing jobs, runs, workflows, secrets, and orchestration.
 
 ## Docs
 
@@ -31,7 +31,7 @@ Strait CLI is the primary interface for the Strait job orchestration platform. 5
 - [Global Flags](cli-reference/global-flags.mdx)
 - [Output Formats](cli-reference/output-formats.mdx)
 - [Environment Variables](cli-reference/environment-variables.mdx): every env var the CLI reads
-- [Config File Reference](cli-reference/config-files.mdx): config.yaml, .strait.yaml, strait.config.json schema
+- [Config File Reference](cli-reference/config-files.mdx): config.yaml, .strait.yaml, strait.json schema
 - [Manifest Schema](cli-reference/manifest-schema.mdx): declarative YAML schema for jobs, workflows, api-keys
 - [Run Statuses](cli-reference/run-statuses.mdx): status lifecycle, terminal vs active, filter values
 - [API Scopes](cli-reference/scopes.mdx): all permission scopes for API keys
@@ -42,7 +42,8 @@ Strait CLI is the primary interface for the Strait job orchestration platform. 5
 - [runs](cli-reference/runs.mdx): list, get, watch, cancel, replay, logs, reschedule, dlq, dlq-replay, outputs, tool-calls, checkpoints
 - [workflows](cli-reference/workflows.mdx): list, get, create, update, delete, clone, trigger, dry-run, plan, simulate, versions, diff, policy, visualize
 - [workflow-runs](cli-reference/workflow-runs.mdx): list, get, steps, watch, cancel, pause, resume, retry, step actions
-- [deploy](cli-reference/deploy.mdx): deploy, create, finalize, promote, rollback, list
+- [sync](cli-reference/sync.mdx): sync strait.json jobs and workflows
+- [deploy](cli-reference/deploy.mdx): deprecated compatibility alias for sync
 - [secrets](cli-reference/secrets.mdx): list, create, delete, local set, local get
 - [api-keys](cli-reference/api-keys.mdx): list, create, rotate, revoke
 - [triggers](cli-reference/triggers.mdx): list, get, send, purge
@@ -52,7 +53,7 @@ Strait CLI is the primary interface for the Strait job orchestration platform. 5
 - [config](cli-reference/config.mdx): edit, path
 - [context](cli-reference/context.mdx): create, use, list, current
 - [logs / events / send](cli-reference/logs.mdx): logs, events, send
-- [dev / run](cli-reference/dev.mdx): dev, dev test, dev tunnel, dev status, run
+- [dev](cli-reference/dev.mdx): local tunnel and endpoint registration
 - [ci](cli-reference/ci.mdx): setup, check
 - [tui](cli-reference/tui.mdx): interactive terminal dashboard
 - [api](cli-reference/api.mdx): raw REST API calls

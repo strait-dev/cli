@@ -1,6 +1,6 @@
 ---
 title: "CI/CD Integration"
-description: "Add Strait to your CI pipeline — authenticate, validate, and deploy automatically"
+description: "Add Strait orchestration sync to your CI pipeline"
 ---
 
 ## Generate your pipeline config
@@ -38,12 +38,12 @@ script:
 ```
 </CodeGroup>
 
-## Deploy in CI mode
+## Sync in CI mode
 
 The `--ci` flag disables color and interactive prompts — safe for headless environments:
 
 ```bash
-strait deploy --config strait.config.json --ci
+strait sync --file strait.json --ci
 ```
 
 ## Required environment variables
@@ -60,13 +60,13 @@ strait deploy --config strait.config.json --ci
 
 <Accordion title="Full GitHub Actions example">
 ```yaml
-name: Deploy to Strait
+name: Sync Strait
 on:
   push:
     branches: [main]
 
 jobs:
-  deploy:
+  sync:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -79,10 +79,7 @@ jobs:
       - name: Authenticate
         run: echo ${{ secrets.STRAIT_API_KEY }} | strait login --with-token
 
-      - name: Validate
-        run: strait validate -f ./definitions/
-
-      - name: Deploy
-        run: strait apply -f ./definitions/ --ci
+      - name: Sync
+        run: strait sync --file strait.json --ci
 ```
 </Accordion>

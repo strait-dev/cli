@@ -59,8 +59,8 @@ strait init --template vercel --name my-app
 # 2. Authenticate with the orchestrator (opens a browser)
 strait auth login
 
-# 3. Push your SDK-defined jobs to the orchestrator
-cd my-app && strait deploy push
+# 3. Sync strait.json orchestration definitions
+cd my-app && strait sync
 
 # 4. Point Strait at your deployed endpoint and round-trip a signed canary
 strait endpoint set hello https://my-app.vercel.app/api/strait
@@ -103,7 +103,7 @@ strait dev
 | `go-worker`    | Go worker holding a gRPC stream    |
 | `k8s-worker`   | TypeScript worker for Kubernetes   |
 
-Each scaffold ships a starter `strait.deploy.json` so `strait deploy push` works immediately.
+Each scaffold ships a starter `strait.json` so `strait sync` works immediately.
 
 ## Commands
 
@@ -113,7 +113,7 @@ Each scaffold ships a starter `strait.deploy.json` so `strait deploy push` works
 |-----------------|-----------------------------------------------------------------------|
 | Scaffolding     | `init --template <name>`                                              |
 | Migration       | `migrate inngest\|trigger\|hatchet --input <path>`                    |
-| Deploy          | `deploy push` (manifest-driven upsert; supports `--dry-run`, `--prune`) |
+| Sync            | `sync` (`strait.json` orchestration upsert; supports `--dry-run`, `--prune`) |
 | Endpoint        | `endpoint set/get/verify`                                             |
 | Worker          | `worker status/drain` (workers run on customer infra via `strait-go/worker`) |
 | Dev             | `dev` (Cloudflare Tunnel + auto-register)                             |

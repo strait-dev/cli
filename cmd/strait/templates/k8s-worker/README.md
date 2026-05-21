@@ -30,6 +30,6 @@ kubectl apply -f k8s/deployment.yaml
 ## Register jobs
 
 ```bash
-strait deploy push   # upserts src/jobs.ts to the orchestrator
+strait sync   # syncs strait.json to the orchestrator
 strait worker status # confirms your worker pod has connected
 ```

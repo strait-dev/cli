@@ -19,6 +19,7 @@ func TestRootCommand_HasExpectedSubcommands(t *testing.T) {
 		"upgrade", "projects", "debug", "team", "config",
 		"env", "webhooks", "event-sources", "log-drains",
 		"job-groups", "notifications", "usage", "analytics", "init", "migrate", "tui",
+		"sync", "endpoint", "worker", "deploy", "dev",
 	}
 
 	subs := make(map[string]bool)

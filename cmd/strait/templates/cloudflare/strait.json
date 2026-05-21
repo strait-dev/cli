@@ -1,10 +1,11 @@
 {
+  "$schema": "https://schemas.strait.dev/v1/strait.json",
   "version": "1",
   "jobs": [
     {
       "slug": "hello",
       "name": "Hello",
-      "endpoint_url": "https://example.com/strait",
+      "endpoint_url": "https://example.workers.dev",
       "max_attempts": 3,
       "timeout_secs": 30
     }
