@@ -3,7 +3,7 @@ title: "Cron Expressions"
 description: "The cheatsheet you will keep coming back to for --cron schedules"
 ---
 
-Cron expressions set recurring schedules. You will use them with `strait create job --cron`, `strait jobs edit --field "cron=..."`, and in YAML manifests.
+Cron expressions set recurring schedules. You will use them with `strait jobs create --cron`, `strait jobs update --field "cron=..."`, and in YAML manifests.
 
 ## Format
 
@@ -50,17 +50,17 @@ Cron expressions set recurring schedules. You will use them with `strait create 
 
 <CodeGroup>
 ```bash Every 10 minutes
-strait create job --name "Health Check" --slug health-check \
+strait jobs create --name "Health Check" --slug health-check \
   --endpoint https://api.example.com/health \
   --cron "*/10 * * * *"
 ```
 
 ```bash Weekday mornings
-strait jobs edit my-job --field "cron=0 9 * * 1-5"
+strait jobs update my-job --field "cron=0 9 * * 1-5"
 ```
 
 ```bash Twice daily
-strait jobs edit my-job --field "cron=0 9,17 * * *"
+strait jobs update my-job --field "cron=0 9,17 * * *"
 ```
 </CodeGroup>
 

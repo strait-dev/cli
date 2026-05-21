@@ -16,5 +16,5 @@ go run .
 1. Build: `go build -o bin/server .` and deploy the binary or container to
    your host of choice.
 2. `strait endpoint set hello https://<your-host>/api/strait`
-3. `strait deploy push` to upsert the job definitions.
+3. `strait sync` to sync the `strait.json` orchestration definitions.
 4. `strait endpoint verify hello` to round-trip a signed canary payload.

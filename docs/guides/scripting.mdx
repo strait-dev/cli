@@ -27,7 +27,7 @@ fi
 Use `--ci` to disable color output and interactive prompts:
 
 ```bash
-strait deploy --config strait.config.json --ci
+strait sync --file strait.json --ci
 ```
 
 CI mode is also enabled automatically when `CI=true` or `STRAIT_CI=true` is set.
@@ -57,14 +57,14 @@ strait runs list -o json | jq 'group_by(.status) | map({status: .[0].status, cou
 
 ```bash
 # Trigger a job and wait for the run to complete
-RUN_ID=$(strait trigger my-job --payload '{}' -o json | jq -r '.id')
+RUN_ID=$(strait jobs trigger my-job --payload '{}' -o json | jq -r '.id')
 strait runs watch "$RUN_ID"
 ```
 
 ### Trigger, wait, and check logs on failure
 
 ```bash
-RUN_ID=$(strait trigger my-job --payload '{}' -o json | jq -r '.id')
+RUN_ID=$(strait jobs trigger my-job --payload '{}' -o json | jq -r '.id')
 if ! strait runs watch "$RUN_ID"; then
   strait logs --run "$RUN_ID" --level error
   exit 1
@@ -80,19 +80,18 @@ strait runs list --status failed --limit 50 -o json | jq -r '.[].id' | while rea
 done
 ```
 
-### Wait for queue to drain before deploy
+### Sync definitions in CI
 
 ```bash
-strait drain --timeout 10m
-strait deploy --config strait.config.json --ci
-strait verify
+strait sync --file strait.json --dry-run
+strait sync --file strait.json --ci
 ```
 
 ### Check if a job exists before creating
 
 ```bash
 if ! strait jobs get my-job -o json > /dev/null 2>&1; then
-  strait create job --name "My Job" --slug my-job --endpoint https://example.com/api
+  strait jobs create --name "My Job" --slug my-job --endpoint https://example.com/api
 fi
 ```
 
@@ -113,7 +112,7 @@ API errors go to stderr with structured messages:
 
 ```bash
 # Capture stderr for error handling
-if ! OUTPUT=$(strait trigger my-job --payload '{}' 2>&1); then
+if ! OUTPUT=$(strait jobs trigger my-job --payload '{}' 2>&1); then
   echo "Error: $OUTPUT"
   exit 1
 fi
@@ -124,7 +123,7 @@ fi
 Use `-q` / `--quiet` for minimal output:
 
 ```bash
-strait trigger my-job --payload '{}' -q
+strait jobs trigger my-job --payload '{}' -q
 ```
 
 ## Template output
@@ -145,5 +144,5 @@ strait jobs list -o jsonpath --output-jsonpath '{.items[*].name}'
 export STRAIT_SERVER=https://api.strait.dev
 export STRAIT_PROJECT=proj_abc123
 export STRAIT_CI=true
-echo "$STRAIT_API_KEY" | strait login --with-token
+echo "$STRAIT_API_KEY" | strait auth login --with-token
 ```

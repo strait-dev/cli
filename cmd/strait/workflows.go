@@ -43,6 +43,8 @@ func newWorkflowsCommand(state *appState) *cobra.Command {
 	diffCmd.ValidArgsFunction = completeWorkflowSlugs(state)
 	policyCmd := newWorkflowsPolicyCommand(state)
 	policyCmd.ValidArgsFunction = completeWorkflowSlugs(state)
+	visualizeCmd := newWorkflowsVisualizeCommand(state)
+	visualizeCmd.ValidArgsFunction = completeWorkflowSlugs(state)
 
 	cmd.AddCommand(newWorkflowsListCommand(state))
 	cmd.AddCommand(getCmd)
@@ -57,6 +59,7 @@ func newWorkflowsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(versionsCmd)
 	cmd.AddCommand(diffCmd)
 	cmd.AddCommand(policyCmd)
+	cmd.AddCommand(visualizeCmd)
 
 	return cmd
 }

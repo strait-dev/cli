@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -28,7 +27,7 @@ var devStartTunnel = startCloudflaredTunnel
 
 func newDevCommand(state *appState) *cobra.Command {
 	var port int
-	var manifestPath string
+	var configPath string
 	var dir string
 	var keepEndpoint bool
 
@@ -36,7 +35,7 @@ func newDevCommand(state *appState) *cobra.Command {
 		Use:   "dev",
 		Short: "Run a development tunnel and auto-register SDK jobs",
 		Long: `Launches a Cloudflare Quick Tunnel pointing at a local serve handler,
-reads strait.deploy.json, and updates each job's endpoint_url to
+reads strait.json, and updates each job's endpoint_url to
 <tunnel-url>/<job-slug>.
 
 Press Ctrl-C to shut down. On shutdown the previously-registered
@@ -48,17 +47,12 @@ pointing at the tunnel).`,
 				return fmt.Errorf("project is required (set --project, STRAIT_PROJECT, or context)")
 			}
 
-			path := manifestPath
-			if path == "" {
-				root := dir
-				if root == "" {
-					root = "."
-				}
-				path = filepath.Join(root, "strait.deploy.json")
-			}
-			manifest, err := loadDeployManifest(path)
+			loaded, err := loadProjectConfig(resolveProjectConfigPath(dir, configPath))
 			if err != nil {
 				return err
+			}
+			if loaded.Legacy && isTTYRich(state) {
+				fmt.Fprintln(os.Stderr, styles.Warn("strait.deploy.json is deprecated; rename it to strait.json"))
 			}
 
 			cli, err := newAPIClient(state)
@@ -80,7 +74,7 @@ pointing at the tunnel).`,
 				fmt.Fprintln(os.Stderr, styles.KeyValue("URL", tunnelURL))
 			}
 
-			previous, err := registerDevEndpoints(ctx, cli, projectID, manifest, tunnelURL)
+			previous, err := registerDevEndpoints(ctx, cli, projectID, loaded.Config, tunnelURL)
 			if err != nil {
 				return err
 			}
@@ -96,7 +90,7 @@ pointing at the tunnel).`,
 			if !keepEndpoint {
 				restoreCtx, cancelRestore := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancelRestore()
-				restoreDevEndpoints(restoreCtx, cli, manifest, previous)
+				restoreDevEndpoints(restoreCtx, cli, projectID, loaded.Config, previous)
 			}
 
 			return nil
@@ -104,8 +98,9 @@ pointing at the tunnel).`,
 	}
 
 	cmd.Flags().IntVar(&port, "port", 3000, "local port that the serve handler is listening on")
-	cmd.Flags().StringVar(&dir, "dir", "", "project root containing strait.deploy.json (default: current dir)")
-	cmd.Flags().StringVar(&manifestPath, "manifest", "", "explicit path to a manifest file (overrides --dir)")
+	cmd.Flags().StringVar(&dir, "dir", "", "project root containing strait.json (default: current dir)")
+	cmd.Flags().StringVarP(&configPath, "file", "f", "", "explicit path to a strait.json file (overrides --dir)")
+	cmd.Flags().StringVar(&configPath, "manifest", "", "deprecated alias for --file")
 	cmd.Flags().BoolVar(&keepEndpoint, "keep-endpoint", false, "do not restore previous endpoint URLs on shutdown")
 	return cmd
 }
@@ -170,10 +165,10 @@ func startCloudflaredTunnel(ctx context.Context, port int) (string, func() error
 	}
 }
 
-// registerDevEndpoints updates each manifest job's endpoint_url to point at
+// registerDevEndpoints updates each configured job's endpoint_url to point at
 // the tunnel. It returns a map of slug -> previous endpoint so the caller can
 // restore them on shutdown.
-func registerDevEndpoints(ctx context.Context, cli *client.Client, projectID string, manifest *DeployManifest, tunnelURL string) (map[string]string, error) {
+func registerDevEndpoints(ctx context.Context, cli *client.Client, projectID string, cfg *ProjectConfig, tunnelURL string) (map[string]string, error) {
 	existing, err := cli.ListJobs(ctx, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("list jobs: %w", err)
@@ -186,7 +181,7 @@ func registerDevEndpoints(ctx context.Context, cli *client.Client, projectID str
 	}
 
 	base := strings.TrimRight(tunnelURL, "/")
-	for _, job := range manifest.Jobs {
+	for _, job := range cfg.Jobs {
 		endpoint := base + "/" + job.Slug
 		id, ok := bySlug[job.Slug]
 		if !ok {
@@ -208,11 +203,11 @@ func registerDevEndpoints(ctx context.Context, cli *client.Client, projectID str
 	return previousEndpoint, nil
 }
 
-// restoreDevEndpoints reverts each manifest job's endpoint_url to its
+// restoreDevEndpoints reverts each configured job's endpoint_url to its
 // pre-dev-session value. Failures are logged but not fatal; the caller is in
 // shutdown.
-func restoreDevEndpoints(ctx context.Context, cli *client.Client, manifest *DeployManifest, previous map[string]string) {
-	existing, err := cli.ListJobs(ctx, "")
+func restoreDevEndpoints(ctx context.Context, cli *client.Client, projectID string, cfg *ProjectConfig, previous map[string]string) {
+	existing, err := cli.ListJobs(ctx, projectID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "restore endpoints: list jobs failed: %v\n", err)
 		return
@@ -221,7 +216,7 @@ func restoreDevEndpoints(ctx context.Context, cli *client.Client, manifest *Depl
 	for _, j := range existing {
 		bySlug[j.Slug] = j.ID
 	}
-	for _, job := range manifest.Jobs {
+	for _, job := range cfg.Jobs {
 		id, ok := bySlug[job.Slug]
 		if !ok {
 			continue

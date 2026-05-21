@@ -10,19 +10,25 @@ Find what you need. Every Strait CLI command is documented below with its subcom
     `login`, `logout`, `auth status`, `whoami`
   </Card>
   <Card title="jobs" icon="briefcase" href="/cli-reference/jobs">
-    `list`, `get`, `create`, `trigger`, `trigger-bulk`, `edit`, `describe`, `versions`, `delete`
+    `list`, `get`, `create`, `update`, `delete`, `clone`, `trigger`, `health`, `versions`, `dependencies`, `add-dependency`, `batch`
+  </Card>
+  <Card title="job-groups" icon="objects-column" href="/cli-reference/job-groups">
+    `list`, `get`, `create`, `update`, `delete`, `jobs`, `pause`, `resume`, `stats`
   </Card>
   <Card title="runs" icon="play" href="/cli-reference/runs">
-    `list`, `get`, `last`, `watch`, `cancel`, `replay`, `logs`, `diff`
+    `list`, `get`, `watch`, `cancel`, `replay`, `logs`, `reschedule`, `dlq`, `dlq-replay`, `outputs`, `tool-calls`, `checkpoints`
   </Card>
   <Card title="workflows" icon="diagram-project" href="/cli-reference/workflows">
-    `list`, `get`, `create`, `describe`, `update`, `delete`, `trigger`, `visualize`
+    `list`, `get`, `create`, `update`, `delete`, `clone`, `trigger`, `dry-run`, `plan`, `simulate`, `versions`, `diff`, `policy`, `visualize`
   </Card>
   <Card title="workflow-runs" icon="layer-group" href="/cli-reference/workflow-runs">
-    `list`, `get`, `steps`, `watch`, `cancel`
+    `list`, `get`, `steps`, `watch`, `cancel`, `pause`, `resume`, `retry`, step actions
+  </Card>
+  <Card title="sync" icon="rotate" href="/cli-reference/sync">
+    Sync `strait.json` jobs and workflows
   </Card>
   <Card title="deploy" icon="cloud-arrow-up" href="/cli-reference/deploy">
-    `deploy`, `create`, `finalize`, `promote`, `rollback`, `list`
+    Deprecated compatibility alias for `sync`
   </Card>
   <Card title="secrets" icon="lock" href="/cli-reference/secrets">
     `list`, `create`, `delete`, `local set`, `local get`
@@ -32,6 +38,9 @@ Find what you need. Every Strait CLI command is documented below with its subcom
   </Card>
   <Card title="triggers" icon="bolt" href="/cli-reference/triggers">
     `list`, `get`, `send`, `purge`
+  </Card>
+  <Card title="notifications" icon="bell" href="/cli-reference/notifications">
+    `list`, `get`, `create`, `update`, `delete`
   </Card>
   <Card title="team" icon="users" href="/cli-reference/team">
     `list`, `add`, `remove`, `roles`
@@ -48,8 +57,8 @@ Find what you need. Every Strait CLI command is documented below with its subcom
   <Card title="logs / events / send" icon="scroll" href="/cli-reference/logs">
     `logs`, `events`, `send`
   </Card>
-  <Card title="dev / run" icon="code" href="/cli-reference/dev">
-    `dev`, `dev test`, `dev tunnel`, `dev status`, `run`
+  <Card title="dev" icon="code" href="/cli-reference/dev">
+    Local tunnel and endpoint registration from `strait.json`
   </Card>
   <Card title="ci" icon="gears" href="/cli-reference/ci">
     `setup`, `check`

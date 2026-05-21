@@ -1,0 +1,26 @@
+---
+title: "sync"
+description: "Sync strait.json orchestration definitions"
+---
+
+## strait sync
+
+Read `strait.json` and upsert jobs and workflows into Strait.
+
+```bash
+strait sync
+strait sync --file ./strait.json
+strait sync --dry-run
+strait sync --prune --yes
+```
+
+| Flag | Description |
+|---|---|
+| `--dir` | Project root containing `strait.json` |
+| `--file`, `-f` | Explicit path to a `strait.json` file |
+| `--dry-run` | Print planned changes without applying them |
+| `--prune` | Delete remote jobs and workflows absent from local `strait.json` |
+| `--yes` | Skip confirmation for `--prune` |
+
+`sync` only changes orchestration metadata. Customer code runs on customer
+infrastructure.

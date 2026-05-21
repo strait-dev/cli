@@ -1,6 +1,6 @@
 ---
 title: "jobs"
-description: "Create, list, trigger, edit, and delete jobs"
+description: "Create, list, trigger, update, clone, inspect, and delete jobs"
 ---
 
 ## strait jobs list
@@ -23,21 +23,21 @@ Get a job by ID or slug.
 strait jobs get <job-id-or-slug>
 ```
 
-## strait create job
+## strait jobs create
 
 Create a new job via flags, JSON stdin, or interactive wizard.
 
 <CodeGroup>
 ```bash Flags
-strait create job --name "My Job" --slug my-job --endpoint https://example.com/api/process --project proj_1
+strait jobs create --name "My Job" --slug my-job --endpoint https://example.com/api/process --project proj_1
 ```
 
 ```bash Interactive wizard (TTY)
-strait create job
+strait jobs create
 ```
 
 ```bash JSON from stdin
-echo '{"name":"my-job","endpoint_url":"http://localhost:3000"}' | strait create job --json
+echo '{"name":"my-job","endpoint_url":"http://localhost:3000"}' | strait jobs create --json
 ```
 </CodeGroup>
 
@@ -53,7 +53,7 @@ echo '{"name":"my-job","endpoint_url":"http://localhost:3000"}' | strait create 
 | `--json` | Read job definition from stdin as JSON | `false` |
 
 <Info>
-  `strait jobs create` also works as an alias for `strait create job` with the same flags (except `--description` instead of wizard, and `--timeout-secs`/`--run-ttl-secs` naming).
+  In TTY mode, `strait jobs create` can prompt for missing fields. In CI or scripts, pass the required flags explicitly.
 </Info>
 
 ## strait jobs trigger
@@ -73,47 +73,49 @@ strait jobs trigger <job-id-or-slug> --payload '{"key": "value"}'
 | `--idempotency-key` | Prevents duplicate triggers |
 
 <Info>
-  `strait trigger <slug>` is a top-level shortcut for `strait jobs trigger`.
+  Use `strait jobs trigger <slug>` to trigger a job by slug.
 </Info>
 
-## strait jobs trigger-bulk
+## strait jobs clone
 
-Trigger multiple runs for a job in a single API call.
-
-```bash
-strait jobs trigger-bulk <job-id-or-slug> --items-json '[{"payload":{"id":"1"}}]'
-strait jobs trigger-bulk <job-id-or-slug> --items-file items.json
-```
-
-| Flag | Description |
-|---|---|
-| `--items-json` | JSON array of bulk trigger items |
-| `--items-file` | Path to JSON file with bulk trigger items |
-
-## strait jobs describe
-
-Show rich details and recent runs for a job.
+Clone an existing job.
 
 ```bash
-strait jobs describe <job-id-or-slug>
+strait jobs clone <job-id-or-slug> --slug cloned-job
 ```
 
-## strait jobs edit
+## strait jobs health
 
-Edit a job via single field update or interactive editor.
+Show health metrics for a job.
 
 ```bash
-strait jobs edit <job-id-or-slug> --field "cron=*/10 * * * *"
-strait jobs edit <job-id-or-slug>                # Opens $EDITOR
-strait jobs edit <job-id-or-slug> --editor vim
+strait jobs health <job-id-or-slug>
 ```
 
-| Flag | Description |
-|---|---|
-| `--field` | Field update in `key=value` form |
-| `--editor` | Editor command for interactive mode |
+## strait jobs dependencies/add-dependency
 
-Supported fields: `name`, `slug`, `description`, `cron`, `endpoint_url`, `enabled`, `max_attempts`, `timeout_secs`, `run_ttl_secs`.
+List dependency edges for a job or add a new dependency edge.
+
+```bash
+strait jobs dependencies <job-id-or-slug>
+strait jobs add-dependency <job-id-or-slug> --depends-on upstream-job --type success
+```
+
+## strait jobs batch
+
+Apply multiple job updates in one API call.
+
+```bash
+strait jobs batch --from-file batch.json
+```
+
+## strait jobs update
+
+Update job fields.
+
+```bash
+strait jobs update <job-id-or-slug> --name "Nightly sync"
+```
 
 ## strait jobs versions
 
@@ -125,7 +127,7 @@ strait jobs versions <job-id-or-slug>
 
 ## strait jobs delete
 
-Disable and delete a job.
+Delete a job.
 
 ```bash
 strait jobs delete <job-id-or-slug> --yes

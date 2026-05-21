@@ -1,74 +1,16 @@
 ---
 title: "deploy"
-description: "Build, push, and deploy managed job images and manifests"
+description: "Deprecated compatibility alias for orchestration sync"
 ---
 
-## strait deploy
+## strait deploy push
 
-Deploy a managed job image or manifest.
-
-```bash
-strait deploy --job my-job --dockerfile ./Dockerfile
-strait deploy --config strait.config.json
-strait deploy --config strait.config.json --strategy canary --canary-percent 10
-```
-
-| Flag | Description | Default |
-|---|---|---|
-| `--job` | Job slug for single-job deploy | |
-| `--config` | Config file for manifest deploy | |
-| `--dockerfile` | Path to Dockerfile | `./Dockerfile` |
-| `--tag` | Image tag | git SHA |
-| `--registry` | Container registry | `registry.fly.io` |
-| `--image` | Pre-built image URI (skip build) | |
-| `--region` | Region override | |
-| `--preset` | Machine preset override | |
-| `--env` | Deployment environment | `production` |
-| `--strategy` | `direct` or `canary` | `direct` |
-| `--canary-percent` | Canary traffic percentage (1-99) | |
-| `--canary-duration` | Canary duration (e.g. `10m`) | |
-| `--build-arg` | Docker build args (repeatable) | |
-| `--cache` | Enable Docker layer caching | `true` |
-| `--push` | Push image after build | `true` |
-| `--dry-run` | Print plan without executing | `false` |
-| `--artifact-uri` | Pre-built artifact URI | |
-
-## strait deploy create
-
-Create a draft deployment.
+Deprecated. Use [`strait sync`](/cli-reference/sync) instead.
 
 ```bash
-strait deploy create --config strait.config.json --artifact-uri registry.example.com/app:v1.0
+strait sync
 ```
 
-## strait deploy finalize
-
-Finalize a draft deployment.
-
-```bash
-strait deploy finalize <deployment-id>
-```
-
-## strait deploy promote
-
-Promote a deployment.
-
-```bash
-strait deploy promote <deployment-id>
-```
-
-## strait deploy rollback
-
-Rollback to a previous deployment.
-
-```bash
-strait deploy rollback --to <deployment-id>
-```
-
-## strait deploy list
-
-List deployments for a project.
-
-```bash
-strait deploy list --project proj_1
-```
+During the transition, `strait deploy push` delegates to the same
+orchestration sync behavior. It does not build images, push containers, select
+regions, run canary deployments, or host customer code.

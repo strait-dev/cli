@@ -11,7 +11,7 @@
   <a href="https://github.com/strait-dev/cli/releases"><img src="https://img.shields.io/github/v/release/strait-dev/cli" alt="Release" /></a>
   <a href="https://github.com/strait-dev/cli/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License" /></a>
   <a href="https://scorecard.dev/viewer/?uri=github.com/strait-dev/cli"><img src="https://api.scorecard.dev/projects/github.com/strait-dev/cli/badge" alt="OpenSSF Scorecard" /></a>
-  <img src="https://img.shields.io/badge/go-1.26-00ADD8?logo=go" alt="Go" />
+  <img src="https://img.shields.io/badge/go-1.26.3-00ADD8?logo=go" alt="Go" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey" alt="Platform" />
 </p>
 
@@ -59,8 +59,8 @@ strait init --template vercel --name my-app
 # 2. Authenticate with the orchestrator (opens a browser)
 strait auth login
 
-# 3. Push your SDK-defined jobs to the orchestrator
-cd my-app && strait deploy push
+# 3. Sync strait.json orchestration definitions
+cd my-app && strait sync
 
 # 4. Point Strait at your deployed endpoint and round-trip a signed canary
 strait endpoint set hello https://my-app.vercel.app/api/strait
@@ -103,7 +103,26 @@ strait dev
 | `go-worker`    | Go worker holding a gRPC stream    |
 | `k8s-worker`   | TypeScript worker for Kubernetes   |
 
-Each scaffold ships a starter `strait.deploy.json` so `strait deploy push` works immediately.
+Each scaffold ships a starter `strait.json` so `strait sync` works immediately.
+
+Example `strait.json`:
+
+```json
+{
+  "$schema": "https://schemas.strait.dev/v1/strait.json",
+  "version": "1",
+  "jobs": [
+    {
+      "slug": "hello",
+      "name": "Hello",
+      "endpoint_url": "https://my-app.example.com/api/strait",
+      "max_attempts": 3,
+      "timeout_secs": 30
+    }
+  ],
+  "workflows": []
+}
+```
 
 ## Commands
 
@@ -113,28 +132,32 @@ Each scaffold ships a starter `strait.deploy.json` so `strait deploy push` works
 |-----------------|-----------------------------------------------------------------------|
 | Scaffolding     | `init --template <name>`                                              |
 | Migration       | `migrate inngest\|trigger\|hatchet --input <path>`                    |
-| Deploy          | `deploy push` (manifest-driven upsert; supports `--dry-run`, `--prune`) |
+| Sync            | `sync` (`strait.json` orchestration upsert; supports `--dry-run`, `--prune`) |
 | Endpoint        | `endpoint set/get/verify`                                             |
 | Worker          | `worker status/drain` (workers run on customer infra via `strait-go/worker`) |
 | Dev             | `dev` (Cloudflare Tunnel + auto-register)                             |
-| Jobs            | `jobs list/get/create/update/delete/clone/trigger/health/versions/dependencies/batch` |
-| Runs            | `runs list/get/logs/cancel/replay/reschedule/dlq-replay/outputs/checkpoints/events/watch` |
-| Workflows       | `workflows list/get/create/update/delete/clone/trigger/dry-run/plan/simulate/versions/diff/policy` |
-| Workflow runs   | `workflow-runs list/get/pause/resume/retry`, `workflow-runs steps {list\|approve\|retry\|skip\|force-complete}` |
+| Jobs            | `jobs list/get/create/update/delete/clone/trigger/health/versions/dependencies/add-dependency/batch` |
+| Job groups      | `job-groups list/get/create/update/delete/jobs/pause/resume/stats` |
+| Runs            | `runs list/get/logs/cancel/replay/reschedule/dlq/dlq-replay/outputs/tool-calls/checkpoints/watch` |
+| Workflows       | `workflows list/get/create/update/delete/clone/trigger/dry-run/plan/simulate/versions/diff/policy/visualize` |
+| Workflow runs   | `workflow-runs list/get/pause/resume/retry/approve-step/retry-step/skip-step/force-complete-step`, `workflow-runs steps {list\|approve\|retry\|skip\|force-complete}` |
 | Triggers        | `triggers list/get/send/stream/purge`                                 |
 | Webhooks        | `webhooks list/get/create/delete/deliveries/retry/test`               |
 | Event sources   | `event-sources list/get/create/update/delete`                         |
+| Notifications   | `notifications list/get/create/update/delete`                          |
 | Log drains      | `log-drains list/get/create/update/delete`                            |
 | Logs            | `logs`                                                                |
 | Secrets         | `secrets list/create/delete`, `api-keys list/create/rotate/revoke`    |
 | Team            | `team list/add/remove/roles/policies/audit`                           |
-| Projects / Env  | `projects list/switch/get/create/delete/export/import`, `env list/get/create/update/delete/variables` |
+| Projects / Env  | `projects list/switch/get/create/delete/export/import`, `env`/`environments list/get/create/update/delete/variables` |
 | Analytics       | `analytics costs/reliability/top-failing/performance`                 |
 | Billing         | `usage current/history/forecast`                                      |
 | Auth            | `auth login/logout/whoami`, `context`, `alias`, `completion`, `config` |
 | Dashboard       | `tui` (interactive jobs/runs/workflows pane switcher)                 |
 | Diagnostics     | `debug bundle/profile/request`, `version`, `upgrade`                  |
 | Extensions      | `extension list/install/run/create/remove`                            |
+
+`strait deploy push` is deprecated and currently delegates to `strait sync` for compatibility. New scripts should use `strait sync`.
 
 ## Configuration
 

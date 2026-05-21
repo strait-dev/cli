@@ -3,37 +3,24 @@ title: "Examples and Recipes"
 description: "Copy-paste workflows for the things you actually do every day"
 ---
 
-## Deploy a new version with canary rollout
+## Sync orchestration definitions
 
 <Steps>
-  <Step title="Build and deploy with canary">
+  <Step title="Preview the sync">
     ```bash
-    strait deploy --config strait.config.json \
-      --strategy canary \
-      --canary-percent 10 \
-      --canary-duration 15m
+    strait sync --file strait.json --dry-run
     ```
   </Step>
 
-  <Step title="Monitor the canary">
+  <Step title="Apply changes">
     ```bash
-    strait listen --project proj_1 --status failed
+    strait sync --file strait.json
     ```
   </Step>
 
-  <Step title="Check health">
+  <Step title="Verify the endpoint">
     ```bash
-    strait verify
-    ```
-  </Step>
-
-  <Step title="Promote or rollback">
-    ```bash
-    # If healthy:
-    strait deploy promote dep_abc123
-
-    # If issues:
-    strait deploy rollback --to dep_previous
+    strait endpoint verify hello
     ```
   </Step>
 </Steps>
@@ -42,7 +29,7 @@ description: "Copy-paste workflows for the things you actually do every day"
 
 ```bash
 # Create a job that runs every 10 minutes, retries 3 times, 2-minute timeout
-strait create job \
+strait jobs create \
   --name "Sync Inventory" \
   --slug sync-inventory \
   --endpoint https://api.example.com/jobs/sync \
@@ -166,7 +153,7 @@ strait listen --project proj_1
 
 ```bash
 # In your CI pipeline:
-strait login --with-token <<< "$STRAIT_API_KEY"
+strait auth login --with-token <<< "$STRAIT_API_KEY"
 strait validate -f ./definitions/
 strait check -f ./definitions/ --check-endpoints
 strait diff -f ./definitions/
@@ -235,6 +222,6 @@ done
 
 # Check if a job exists before creating
 if ! strait jobs get my-job -o json > /dev/null 2>&1; then
-  strait create job --name "My Job" --slug my-job --endpoint https://example.com/api
+  strait jobs create --name "My Job" --slug my-job --endpoint https://example.com/api
 fi
 ```

@@ -15,9 +15,10 @@ import (
 
 func newEnvCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "env",
-		Short: "Manage project environments",
-		Long:  idOrSlugLong("environment", "Manage project environments."),
+		Use:     "env",
+		Aliases: []string{"environments", "environment"},
+		Short:   "Manage project environments",
+		Long:    idOrSlugLong("environment", "Manage project environments."),
 	}
 
 	getCmd := newEnvironmentsGetCommand(state)

@@ -1,81 +1,69 @@
 ---
-title: "Deployment"
-description: "Build Docker images, push to a registry, and deploy — all in one command"
+title: "Sync Orchestration Definitions"
+description: "Use strait.json to register jobs and workflows while your code runs on your infrastructure"
 ---
 
-## Deploy a single job
+Strait is orchestration-only. It does not build, host, deploy, or run your
+application code. Deploy your HTTP handler or worker to your own platform, then
+sync the orchestration metadata Strait needs.
 
-Point at a Dockerfile and go:
+## 1. Deploy your runtime
 
-```bash
-strait deploy --job my-job --dockerfile ./Dockerfile
-```
-
-The CLI builds the image, pushes it to the registry, and updates the job. One command.
-
-### All the knobs
-
-| Flag | What it does | Default |
-|---|---|---|
-| `--dockerfile` | Path to Dockerfile | `./Dockerfile` |
-| `--tag` | Image tag | git SHA or `latest` |
-| `--registry` | Container registry | `registry.fly.io` |
-| `--image` | Skip the build — use a pre-built image | |
-| `--region` | Region override | |
-| `--preset` | Machine preset override | |
-| `--env` | Target environment | `production` |
-| `--strategy` | `direct` or `canary` | `direct` |
-| `--canary-percent` | Traffic percentage for canary (1-99) | |
-| `--canary-duration` | How long to run canary before full rollout | |
-| `--build-arg` | Docker build args (pass multiple times) | |
-| `--cache` | Use Docker layer caching | `true` |
-| `--push` | Push image after building | `true` |
-| `--dry-run` | Show the plan without executing | `false` |
-
-## Deploy from a manifest
-
-Got a config file with all your jobs defined? Deploy them all at once:
+Use the platform that owns your code:
 
 ```bash
-strait deploy --config strait.config.json
+vercel deploy
+wrangler deploy
+netlify deploy --prod
+kubectl apply -f k8s/deployment.yaml
 ```
 
-Preview first with `--dry-run`:
+## 2. Set the endpoint
+
+For HTTPS push jobs, point Strait at the route that mounts your signed serve
+handler:
 
 ```bash
-strait deploy --config strait.config.json --dry-run
+strait endpoint set hello https://my-app.example.com/api/strait
+strait endpoint verify hello
 ```
 
-## Ship with canary rollouts
+## 3. Sync strait.json
 
-Roll changes out to 10% of traffic, watch for failures, then promote:
+`strait.json` is the project orchestration file.
 
 ```bash
-strait deploy --config strait.config.json \
-  --strategy canary \
-  --canary-percent 10 \
-  --canary-duration 15m
+strait sync
+strait sync --dry-run
+strait sync --prune --yes
 ```
 
-## Stage, promote, and rollback
-
-For more control, create a draft deployment and promote it when you are ready:
+Use `--file` when the file is not in the current directory:
 
 ```bash
-strait deploy create --config strait.config.json --artifact-uri registry.example.com/app:v1.0
-strait deploy finalize dep_abc123
-strait deploy promote dep_abc123
+strait sync --file ./configs/strait.json
 ```
 
-Something wrong? Roll back:
+## strait.json
 
-```bash
-strait deploy rollback --to dep_abc123
+```json
+{
+  "$schema": "https://schemas.strait.dev/v1/strait.json",
+  "version": "1",
+  "jobs": [
+    {
+      "slug": "hello",
+      "name": "Hello",
+      "endpoint_url": "https://my-app.example.com/api/strait",
+      "max_attempts": 3,
+      "timeout_secs": 30
+    }
+  ],
+  "workflows": []
+}
 ```
 
-## Check your deployments
+## Compatibility
 
-```bash
-strait deploy list --project proj_1
-strait verify                        # Post-deploy health checks
-```
+`strait deploy push` is deprecated. During the transition it delegates to
+`strait sync`, but new scripts should use `strait sync`.

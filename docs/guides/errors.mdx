@@ -12,10 +12,10 @@ description: "Saw an error? Find it here with the cause and the fix"
     **Fix**:
     ```bash
     # Use a different name/slug
-    strait create job --name "new-name" --slug "new-slug" ...
+    strait jobs create --name "new-name" --slug "new-slug" ...
 
     # Or update the existing resource
-    strait jobs edit existing-slug --field "endpoint_url=https://new-url.com"
+    strait jobs update existing-slug --field "endpoint_url=https://new-url.com"
     ```
   </Accordion>
 
@@ -39,7 +39,7 @@ description: "Saw an error? Find it here with the cause and the fix"
     **Fix**:
     ```bash
     # Re-authenticate
-    strait login
+    strait auth login
 
     # Or set the key directly
     export STRAIT_API_KEY=strait_abc123...
@@ -117,15 +117,15 @@ description: "Saw an error? Find it here with the cause and the fix"
   </Accordion>
 
   <Accordion title="non-interactive terminal detected">
-    **Cause**: `strait login` was run without a TTY and no token was provided.
+    **Cause**: `strait auth login` was run without a TTY and no token was provided.
 
     **Fix**:
     ```bash
     # Provide token directly
-    strait login --token strait_abc123...
+    strait auth login --token strait_abc123...
 
     # Or pipe from env
-    echo $STRAIT_API_KEY | strait login --with-token
+    echo $STRAIT_API_KEY | strait auth login --with-token
     ```
   </Accordion>
 </AccordionGroup>
@@ -165,7 +165,7 @@ description: "Saw an error? Find it here with the cause and the fix"
     **Fix**: Validate your JSON:
     ```bash
     echo '{"key": "value"}' | jq .   # Check syntax
-    strait trigger my-job --payload '{"key": "value"}'
+    strait jobs trigger my-job --payload '{"key": "value"}'
     ```
   </Accordion>
 </AccordionGroup>

@@ -40,7 +40,7 @@ The dashboard has three panels:
 
 ### Create job wizard
 
-When you run `strait create job` in a TTY without `--name`, an interactive form guides you through:
+When you run `strait jobs create` in a TTY without `--name`, an interactive form guides you through:
 
 1. Job name
 2. Job slug (auto-suggested)
@@ -50,12 +50,12 @@ When you run `strait create job` in a TTY without `--name`, an interactive form 
 6. Max retry attempts
 
 ```bash
-strait create job
+strait jobs create
 ```
 
 ### Create workflow wizard
 
-Similarly, `strait create workflow` launches a step builder:
+Similarly, `strait workflows create` launches a step builder:
 
 1. Workflow name
 2. Workflow slug (auto-suggested)
@@ -63,7 +63,7 @@ Similarly, `strait create workflow` launches a step builder:
 4. Step builder (add steps with job refs and dependencies)
 
 ```bash
-strait create workflow
+strait workflows create
 ```
 
 <Tip>
@@ -75,8 +75,8 @@ strait create workflow
 Edit a job definition in your preferred editor:
 
 ```bash
-strait jobs edit my-job
-strait jobs edit my-job --editor vim
+strait jobs update my-job
+strait jobs update my-job --editor vim
 ```
 
 This opens a YAML representation of the job with editable fields:
@@ -111,7 +111,7 @@ Opens the CLI config file and validates it after saving.
 
 ## Login prompt
 
-When `strait login` is run interactively without `--token`:
+When `strait auth login` is run interactively without `--token`:
 
 1. Opens browser for device code authorization
 2. Displays a one-time code

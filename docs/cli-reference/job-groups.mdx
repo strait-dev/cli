@@ -1,0 +1,62 @@
+---
+title: "job-groups"
+description: "Create, inspect, pause, resume, and report on job groups"
+---
+
+## strait job-groups list
+
+List job groups for a project.
+
+```bash
+strait job-groups list --project proj_1
+```
+
+## strait job-groups get
+
+Get job group details.
+
+```bash
+strait job-groups get <group-id>
+```
+
+## strait job-groups create
+
+Create a job group.
+
+```bash
+strait job-groups create --project proj_1 --name Backfills --slug backfills
+```
+
+| Flag | Description |
+|---|---|
+| `--project` | Project ID |
+| `--name` | Group name |
+| `--slug` | Group slug |
+| `--description` | Group description |
+
+## strait job-groups update/delete
+
+Update or delete a job group.
+
+```bash
+strait job-groups update <group-id> --name "Nightly backfills"
+strait job-groups delete <group-id> --yes
+```
+
+## strait job-groups jobs
+
+List jobs in a group.
+
+```bash
+strait job-groups jobs <group-id>
+```
+
+## strait job-groups pause/resume/stats
+
+Pause or resume every job in the group, or show aggregate stats.
+
+```bash
+strait job-groups pause <group-id>
+strait job-groups resume <group-id>
+strait job-groups stats <group-id>
+```

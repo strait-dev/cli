@@ -12,11 +12,11 @@ func TestGenerate_GitHub(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "name: Strait Deploy") {
+	if !strings.Contains(out, "name: Strait Sync") {
 		t.Fatalf("expected GitHub workflow header, got:\n%s", out)
 	}
-	if !strings.Contains(out, "strait build") {
-		t.Fatalf("expected 'strait build' in output:\n%s", out)
+	if !strings.Contains(out, "strait sync --file strait.json") {
+		t.Fatalf("expected 'strait sync --file strait.json' in output:\n%s", out)
 	}
 	if !strings.Contains(out, "my-proj") {
 		t.Fatalf("expected project ID in output:\n%s", out)
@@ -33,8 +33,8 @@ func TestGenerate_GitLab(t *testing.T) {
 	if !strings.Contains(out, "stages:") {
 		t.Fatalf("expected GitLab stages, got:\n%s", out)
 	}
-	if !strings.Contains(out, "validate") {
-		t.Fatalf("expected validate stage, got:\n%s", out)
+	if !strings.Contains(out, "sync") {
+		t.Fatalf("expected sync stage, got:\n%s", out)
 	}
 }
 

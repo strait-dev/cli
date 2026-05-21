@@ -3,16 +3,16 @@ title: "auth"
 description: "Authentication commands: login, logout, whoami, auth status"
 ---
 
-## strait login
+## strait auth login
 
 Authenticate with the Strait API.
 
 ```bash
-strait login                          # Browser-based device code flow
-strait login --token <api-key>        # Direct token
-echo $KEY | strait login --with-token # Read from stdin
-strait login --browser                # Open dashboard to create key
-strait login --no-browser             # Skip browser, manual entry
+strait auth login                          # Browser-based device code flow
+strait auth login --token <api-key>        # Direct token
+echo $KEY | strait auth login --with-token # Read from stdin
+strait auth login --browser                # Open dashboard to create key
+strait auth login --no-browser             # Skip browser, manual entry
 ```
 
 | Flag | Description |
@@ -38,12 +38,12 @@ strait logout --context staging
 |---|---|
 | `--context` | Context to remove API key from |
 
-## strait whoami
+## strait auth whoami
 
 Show the authenticated user, active context, server, and project.
 
 ```bash
-strait whoami
+strait auth whoami
 ```
 
 ## strait auth status

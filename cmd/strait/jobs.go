@@ -37,6 +37,8 @@ func newJobsCommand(state *appState) *cobra.Command {
 	healthCmd.ValidArgsFunction = completeJobSlugs(state)
 	dependenciesCmd := newJobsDependenciesCommand(state)
 	dependenciesCmd.ValidArgsFunction = completeJobSlugs(state)
+	addDependencyCmd := newJobsAddDependencyCommand(state)
+	addDependencyCmd.ValidArgsFunction = completeJobSlugs(state)
 
 	cmd.AddCommand(newJobsListCommand(state))
 	cmd.AddCommand(getCmd)
@@ -48,6 +50,7 @@ func newJobsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(healthCmd)
 	cmd.AddCommand(versionsCmd)
 	cmd.AddCommand(dependenciesCmd)
+	cmd.AddCommand(addDependencyCmd)
 	cmd.AddCommand(newJobsBatchCommand(state))
 
 	return cmd

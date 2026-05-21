@@ -164,3 +164,53 @@ func completeLogDrainIDs(state *appState) func(*cobra.Command, []string, string)
 		return ids, cobra.ShellCompDirectiveNoFileComp
 	}
 }
+
+// completeJobGroupIDs returns a ValidArgsFunction for job group IDs.
+func completeJobGroupIDs(state *appState) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		if len(args) > 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		if state.opts.apiKey == "" || state.opts.projectID == "" {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		cli, err := newAPIClient(state)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		groups, err := cli.ListJobGroups(context.Background(), state.opts.projectID)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		ids := make([]string, 0, len(groups))
+		for _, g := range groups {
+			ids = append(ids, g.ID)
+		}
+		return ids, cobra.ShellCompDirectiveNoFileComp
+	}
+}
+
+// completeNotificationChannelIDs returns a ValidArgsFunction for notification channel IDs.
+func completeNotificationChannelIDs(state *appState) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
+		if len(args) > 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		if state.opts.apiKey == "" || state.opts.projectID == "" {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		cli, err := newAPIClient(state)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		channels, err := cli.ListNotificationChannels(context.Background(), state.opts.projectID)
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		ids := make([]string, 0, len(channels))
+		for _, ch := range channels {
+			ids = append(ids, ch.ID)
+		}
+		return ids, cobra.ShellCompDirectiveNoFileComp
+	}
+}

@@ -1,6 +1,6 @@
 ---
 title: "Config File Reference"
-description: "Full annotated examples for config.yaml, .strait.yaml, and project manifests"
+description: "Full annotated examples for config.yaml, .strait.yaml, and strait.json"
 ---
 
 ## Global config (`~/.config/strait/config.yaml`)
@@ -50,7 +50,7 @@ format: table
 | `api_key` | string | Fallback API key (prefer keyring) |
 
 <Warning>
-  Avoid storing `api_key` in config files. Use `strait login` to store credentials securely in the system keyring.
+  Avoid storing `api_key` in config files. Use `strait auth login` to store credentials securely in the system keyring.
 </Warning>
 
 ## Local project config (`.strait.yaml`)
@@ -67,128 +67,59 @@ format: json
   If a local config contains sensitive fields like `api_key`, the CLI warns you on each command.
 </Info>
 
-## Project manifest (`strait.config.json` / `strait.config.yaml`)
+## Project orchestration file (`strait.json`)
 
-Defines your project's jobs and workflows for `strait build`, `strait deploy --config`, and `strait init`.
+Defines the jobs and workflows Strait orchestrates. It does not describe how
+your code is built, hosted, or deployed.
 
-<Tabs>
-  <Tab title="JSON">
-    ```json
+```json
+{
+  "$schema": "https://schemas.strait.dev/v1/strait.json",
+  "version": "1",
+  "jobs": [
     {
-      "project": {
-        "id": "proj_abc123",
-        "name": "My Project"
-      },
-      "runtime": "node",
-      "build": {
-        "outDir": ".strait"
-      },
-      "deploy": {
-        "defaultEnvironment": "production"
-      },
-      "jobs": [
+      "slug": "sync-inventory",
+      "name": "Sync Inventory",
+      "endpoint_url": "https://api.example.com/jobs/sync",
+      "cron": "*/10 * * * *",
+      "timeout_secs": 120,
+      "max_attempts": 3
+    }
+  ],
+  "workflows": [
+    {
+      "slug": "data-pipeline",
+      "name": "Data Pipeline",
+      "steps": [
         {
-          "slug": "sync-inventory",
-          "name": "Sync Inventory",
-          "endpointUrl": "https://api.example.com/jobs/sync",
-          "cron": "*/10 * * * *",
-          "timeoutSecs": 120,
-          "maxAttempts": 3
-        },
-        {
-          "slug": "send-reports",
-          "name": "Send Reports",
-          "endpointUrl": "https://api.example.com/jobs/reports",
-          "cron": "0 9 * * 1"
-        }
-      ],
-      "workflows": [
-        {
-          "slug": "data-pipeline",
-          "name": "Data Pipeline",
-          "steps": [
-            {
-              "stepRef": "extract",
-              "jobRef": "extract-data"
-            },
-            {
-              "stepRef": "transform",
-              "jobRef": "transform-data",
-              "dependsOn": ["extract"]
-            },
-            {
-              "stepRef": "load",
-              "jobRef": "load-data",
-              "dependsOn": ["transform"],
-              "onFailure": "continue"
-            }
-          ]
+          "step_ref": "extract",
+          "job_ref": "extract-data"
         }
       ]
     }
-    ```
-  </Tab>
-
-  <Tab title="YAML">
-    ```yaml
-    project:
-      id: proj_abc123
-      name: My Project
-    runtime: node
-    build:
-      outDir: .strait
-    deploy:
-      defaultEnvironment: production
-    jobs:
-      - slug: sync-inventory
-        name: Sync Inventory
-        endpointUrl: https://api.example.com/jobs/sync
-        cron: "*/10 * * * *"
-        timeoutSecs: 120
-        maxAttempts: 3
-      - slug: send-reports
-        name: Send Reports
-        endpointUrl: https://api.example.com/jobs/reports
-        cron: "0 9 * * 1"
-    workflows:
-      - slug: data-pipeline
-        name: Data Pipeline
-        steps:
-          - stepRef: extract
-            jobRef: extract-data
-          - stepRef: transform
-            jobRef: transform-data
-            dependsOn: [extract]
-          - stepRef: load
-            jobRef: load-data
-            dependsOn: [transform]
-            onFailure: continue
-    ```
-  </Tab>
-</Tabs>
+  ]
+}
+```
 
 ### Fields
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `project.id` | string | Yes | Project ID |
-| `project.name` | string | No | Display name |
-| `runtime` | string | No | Runtime hint (e.g. `node`, `go`, `python`) |
-| `build.outDir` | string | No | Output directory for compiled manifests |
-| `deploy.defaultEnvironment` | string | No | Default deployment environment |
+| `$schema` | string | No | JSON schema URL |
+| `version` | string | Yes | File format version |
 | `jobs[]` | array | No | Job definitions |
 | `jobs[].slug` | string | Yes | Unique job slug |
-| `jobs[].name` | string | Yes | Display name |
-| `jobs[].endpointUrl` | string | No | HTTP endpoint URL |
+| `jobs[].name` | string | No | Display name |
+| `jobs[].endpoint_url` | string | Yes | HTTP endpoint URL |
 | `jobs[].cron` | string | No | Cron schedule expression |
-| `jobs[].timeoutSecs` | int | No | Execution timeout (default: 60) |
-| `jobs[].maxAttempts` | int | No | Max retries (default: 3) |
+| `jobs[].timeout_secs` | int | No | Execution timeout |
+| `jobs[].max_attempts` | int | No | Max retries |
 | `jobs[].description` | string | No | Description |
 | `workflows[]` | array | No | Workflow definitions |
 | `workflows[].slug` | string | Yes | Unique workflow slug |
-| `workflows[].name` | string | Yes | Display name |
+| `workflows[].name` | string | No | Display name |
 | `workflows[].steps[]` | array | No | Workflow steps |
-| `workflows[].steps[].stepRef` | string | Yes | Step reference name |
-| `workflows[].steps[].jobRef` | string | Yes | Job slug this step runs |
-| `workflows[].steps[].dependsOn` | array | No | Step refs this step depends on |
-| `workflows[].steps[].onFailure` | string | No | Failure behavior (e.g. `continue`) |
+| `workflows[].steps[].step_ref` | string | Yes | Step reference name |
+| `workflows[].steps[].job_ref` | string | Yes | Job slug this step runs |
+| `workflows[].steps[].depends_on` | array | No | Step refs this step depends on |
+| `workflows[].steps[].on_failure` | string | No | Failure behavior (e.g. `continue`) |

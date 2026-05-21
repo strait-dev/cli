@@ -134,6 +134,28 @@ func newRunsOutputsCommand(state *appState) *cobra.Command {
 	}
 }
 
+func newRunsToolCallsCommand(state *appState) *cobra.Command {
+	return &cobra.Command{
+		Use:   "tool-calls <run-id>",
+		Short: "List tool calls made during a run",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := validate.SlugOrID(args[0]); err != nil {
+				return fmt.Errorf("invalid run id: %w", err)
+			}
+			cli, err := newAPIClient(state)
+			if err != nil {
+				return err
+			}
+			calls, err := cli.ListRunToolCalls(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			return printData(state, calls)
+		},
+	}
+}
+
 func newRunsCheckpointsCommand(state *appState) *cobra.Command {
 	return &cobra.Command{
 		Use:   "checkpoints <run-id>",

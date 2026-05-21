@@ -17,5 +17,5 @@ go run .
 1. Build: `go build -o bin/worker .`
 2. Run on your host (systemd, container, k8s Deployment, etc.) with the
    environment variables set.
-3. `strait deploy push` to upsert your job definitions to the orchestrator.
+3. `strait sync` to sync the `strait.json` orchestration definitions.
 4. `strait worker status` confirms your worker has connected.

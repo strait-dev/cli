@@ -1,54 +1,28 @@
 ---
-title: "dev / run"
-description: "Local development, testing, tunnels, and context-aware command execution"
+title: "dev"
+description: "Expose a local serve endpoint and temporarily sync job endpoints"
 ---
 
 ## strait dev
 
-Start local development mode.
+Launch a Cloudflare Quick Tunnel to your local serve handler, read
+`strait.json`, and temporarily update each job's `endpoint_url` to point at the
+tunnel.
 
 ```bash
 strait dev
-strait dev --no-docker --port 9090
-strait dev --seed
+strait dev --port 9090
+strait dev --file ./strait.json
+strait dev --keep-endpoint
 ```
 
 | Flag | Description |
 |---|---|
-| `--no-docker` | Skip Docker dependency startup |
-| `--port` | Override the default port |
-| `--seed` | Seed with sample data |
+| `--port` | Local port that the serve handler is listening on |
+| `--dir` | Project root containing `strait.json` |
+| `--file`, `-f` | Explicit path to a `strait.json` file |
+| `--keep-endpoint` | Do not restore previous endpoint URLs on shutdown |
 
-## strait dev test
-
-Test job handlers locally.
-
-```bash
-strait dev test <job-slug> --payload '{"id": "123"}'
-strait dev test --all --config strait.config.json
-```
-
-## strait dev tunnel
-
-Expose a local server via Cloudflare tunnel.
-
-```bash
-strait dev tunnel --port 3000
-```
-
-## strait dev status
-
-Check local development environment status.
-
-```bash
-strait dev status
-```
-
-## strait run
-
-Run a local command with Strait context environment variables injected.
-
-```bash
-strait run -- node worker.js
-strait run --context staging -- python process.py
-```
+`dev` does not start Docker or deploy customer code. Run your app locally with
+your framework's normal command, then use `strait dev` to route signed pushes to
+that local process.

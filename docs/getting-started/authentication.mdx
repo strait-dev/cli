@@ -10,7 +10,7 @@ Three ways in, depending on your situation:
 <Tabs>
   <Tab title="Browser (recommended)">
     ```bash
-    strait login
+    strait auth login
     ```
 
     The CLI opens your browser, you confirm a code, and your API key is saved to the system keyring. Done.
@@ -20,7 +20,7 @@ Three ways in, depending on your situation:
     Already have an API key? Skip the browser:
 
     ```bash
-    strait login --token strait_abc123...
+    strait auth login --token strait_abc123...
     ```
   </Tab>
 
@@ -28,7 +28,7 @@ Three ways in, depending on your situation:
     No TTY? No problem:
 
     ```bash
-    echo $STRAIT_API_KEY | strait login --with-token
+    echo $STRAIT_API_KEY | strait auth login --with-token
     ```
   </Tab>
 </Tabs>
@@ -44,7 +44,7 @@ strait logout
 ## Check who you are
 
 ```bash
-strait whoami        # User, context, server, project
+strait auth whoami        # User, context, server, project
 strait auth status   # Quick authenticated/not check
 ```
 

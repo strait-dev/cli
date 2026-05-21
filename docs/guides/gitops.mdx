@@ -60,13 +60,13 @@ strait export workflows --project proj_1
 
 Supported resource types: `jobs`, `workflows`, `api-keys`, `all`.
 
-## Build compiled manifests
+## Sync strait.json
 
-Compile your project config into a deployment manifest with a SHA-256 checksum:
+For the canonical project file, use `strait sync`:
 
 ```bash
-strait build --config strait.config.json --out-dir .strait
-strait build --dry-run --json
+strait sync --file strait.json --dry-run
+strait sync --file strait.json
 ```
 
 ## Project bundles

@@ -12,12 +12,12 @@ Upgrade: `strait upgrade`
 
 ## Authentication
 
-Login (browser): `strait login`
-Login (token): `strait login --token <api-key>`
-Login (stdin): `echo $KEY | strait login --with-token`
+Login (browser): `strait auth login`
+Login (token): `strait auth login --token <api-key>`
+Login (stdin): `echo $KEY | strait auth login --with-token`
 Login flags: --token, --with-token, --api-key (deprecated), --context, --server, --browser, --no-browser
 Logout: `strait logout [--context C]`
-Verify: `strait whoami`
+Verify: `strait auth whoami`
 Status: `strait auth status`
 
 ## Contexts
@@ -45,23 +45,28 @@ Env vars: STRAIT_SERVER, STRAIT_API_KEY, STRAIT_PROJECT, STRAIT_FORMAT, STRAIT_C
 
 List: `strait jobs list --project ID`
 Get: `strait jobs get <slug-or-id>`
-Describe: `strait jobs describe <slug-or-id>`
 
-Create (flags): `strait create job --name N --endpoint URL --project ID [--slug S] [--cron ""] [--timeout 60] [--max-attempts 3]`
-Create (wizard): `strait create job` (interactive TTY)
-Create (JSON stdin): `echo '{}' | strait create job --json`
-Also: `strait jobs create --name N --slug S --endpoint URL --project ID [--description ""] [--cron ""] [--timeout-secs 60] [--max-attempts 3] [--run-ttl-secs 0]`
+Create: `strait jobs create --name N --slug S --endpoint URL --project ID [--description ""] [--cron ""] [--timeout-secs 60] [--max-attempts 3] [--run-ttl-secs 0]`
 
-Trigger: `strait trigger <slug> [--payload '{}'] [--payload-file f] [--priority 0] [--scheduled-at RFC3339] [--idempotency-key K]`
-`strait trigger` is a top-level shortcut for `strait jobs trigger`.
+Trigger: `strait jobs trigger <slug> [--payload '{}'] [--payload-file f] [--priority 0] [--scheduled-at RFC3339] [--idempotency-key K]`
+Use `strait jobs trigger` to trigger a job run.
 
-Bulk trigger: `strait jobs trigger-bulk <slug> --items-json '[...]'` or `--items-file f`
-
-Edit: `strait jobs edit <slug> --field "key=value"` or `strait jobs edit <slug> [--editor vim]` (interactive)
-Editable fields: name, slug, description, cron, endpoint_url, enabled, max_attempts, timeout_secs, run_ttl_secs
-
+Clone: `strait jobs clone <slug> [--name N] [--slug S]`
+Health: `strait jobs health <slug>`
 Versions: `strait jobs versions <slug>`
+Dependencies: `strait jobs dependencies <slug>`; add with `strait jobs add-dependency <slug> --depends-on upstream [--type success]`
+Batch: `strait jobs batch --from-file batch.json`
 Delete: `strait jobs delete <slug> --yes`
+
+## Job Groups
+
+List: `strait job-groups list --project ID`
+Get: `strait job-groups get <group-id>`
+Create: `strait job-groups create --project ID --name N --slug S [--description D]`
+Update: `strait job-groups update <group-id> [--name N] [--slug S] [--description D]`
+Delete: `strait job-groups delete <group-id> --yes`
+Jobs: `strait job-groups jobs <group-id>`
+Pause/resume/stats: `strait job-groups pause|resume|stats <group-id>`
 
 ## Runs
 
@@ -69,28 +74,25 @@ List: `strait runs list --project ID [--status S] [--limit 50]`
 Valid statuses: delayed, queued, dequeued, executing, waiting, completed, failed, timed_out, crashed, system_failed, canceled, expired
 
 Get: `strait runs get <run-id>`
-Last: `strait runs last --project ID [--open]`
 Watch: `strait runs watch <run-id> [--interval 2s] [--timeout 5m]`
 Cancel: `strait runs cancel <run-id>` or `--all --status S --project ID [--limit 100] --yes`
 Replay: `strait runs replay <run-id> [--wait]`
 Logs: `strait runs logs <run-id> [-f] [--level L] [--type T]`
-Diff: `strait runs diff <r1> <r2> [--show-payload] [--show-events] [--event-limit 50]`
+Reschedule: `strait runs reschedule <run-id> --at RFC3339`
+DLQ: `strait runs dlq --project ID`; replay with `strait runs dlq-replay <dlq-id>`
+Artifacts: `strait runs outputs|tool-calls|checkpoints <run-id>`
 
 ## Workflows
 
 List: `strait workflows list --project ID`
 Get: `strait workflows get <slug>`
-Describe: `strait workflows describe <slug>`
 
-Create (flags): `strait create workflow --name N --project ID [--slug S] [--description D] [--steps-json '[...]']`
-Create (wizard): `strait create workflow` (interactive TTY)
-Create (JSON stdin): `echo '{}' | strait create workflow --json`
-
-Update: `strait workflows update <slug> --field "key=value"`
+Create: `strait workflows create --name N --project ID --slug S [--description D] [--steps-json '[...]']`
+Update: `strait workflows update <slug> [--name N] [--slug S] [--description D] [--enabled] [--steps-json '[...]']`
 Delete: `strait workflows delete <slug> --yes`
 Trigger: `strait workflows trigger <slug> [--payload '{}']`
-Visualize: `strait workflows visualize <slug> [--run wfr_id]`
-Runs: `strait workflows runs <slug>`
+Extras: `clone`, `dry-run`, `plan`, `simulate`, `versions`, `diff`, `policy`
+Visualize: `strait workflows visualize <slug> [--run wfr_id] [--format json]`
 
 ## Workflow Runs
 
@@ -99,6 +101,16 @@ Get: `strait workflow-runs get <wfr-id>`
 Steps: `strait workflow-runs steps <wfr-id>`
 Watch: `strait workflow-runs watch <wfr-id> [--interval 2s] [--timeout 5m]`
 Cancel: `strait workflow-runs cancel <wfr-id>`
+Pause/resume/retry: `strait workflow-runs pause|resume|retry <wfr-id>`
+Step actions: `strait workflow-runs approve-step|retry-step|skip-step|force-complete-step <wfr-id> <step-ref>`
+
+## Notifications
+
+List: `strait notifications list --project ID`
+Get: `strait notifications get <channel-id> [--reveal]`
+Create: `strait notifications create --project ID --name N --type slack --config-json '{}'`
+Update: `strait notifications update <channel-id> [--name N] [--config-json '{}'] [--enabled]`
+Delete: `strait notifications delete <channel-id> --yes`
 
 ## Secrets
 
@@ -133,16 +145,11 @@ Roles: `strait team roles --project ID`
 
 `strait audit --project ID [--actor-id U] [--resource-type T] [--resource-id R] [--from RFC3339] [--to RFC3339] [--order asc|desc] [--limit 50]`
 
-## Deployment
+## Sync
 
-Single job: `strait deploy --job S --dockerfile F [--tag T] [--registry R] [--image URI] [--region R] [--preset P] [--env E] [--strategy direct|canary] [--canary-percent N] [--canary-duration D] [--build-arg K=V] [--cache] [--push] [--dry-run]`
-Manifest: `strait deploy --config F [--dry-run]`
-Draft: `strait deploy create --config F --artifact-uri URI`
-Finalize: `strait deploy finalize <id>`
-Promote: `strait deploy promote <id>`
-Rollback: `strait deploy rollback --to <id>`
-List: `strait deploy list --project ID`
-Verify: `strait verify`
+Project file: `strait sync --file strait.json [--dry-run] [--prune --yes]`
+Endpoint: `strait endpoint set <job-slug> <url>`
+Verify: `strait endpoint verify <job-slug>`
 
 ## GitOps
 
@@ -151,7 +158,7 @@ Check: `strait check -f F [--check-endpoints]`
 Diff: `strait diff -f F`
 Apply: `strait apply -f F [--dry-run]`
 Export: `strait export all|jobs|workflows|api-keys --project ID [--output-dir D] [--name-contains S] [--dry-run] [--force-overwrite]`
-Build: `strait build [--config F] [--out-dir D] [--dry-run] [--json]`
+Build: `strait sync --file strait.json --dry-run
 
 ## Project Bundles
 
@@ -179,7 +186,7 @@ Run: `strait run [--context C] -- command args`
 Setup: `strait ci setup [--provider github|gitlab|generic] [--env E] [--project ID] [--dry-run]`
 Check: `strait ci check`
 CI mode: `--ci` flag on any command
-Auth: `echo $STRAIT_API_KEY | strait login --with-token`
+Auth: `echo $STRAIT_API_KEY | strait auth login --with-token`
 
 ## Monitoring
 

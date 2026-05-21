@@ -118,12 +118,20 @@ func TestInitCommand_ScaffoldsVercelTemplate(t *testing.T) {
 	for _, rel := range []string{
 		"src/jobs.ts",
 		"app/api/strait/route.ts",
+		"strait.json",
 		"README.md",
 		".gitignore",
 	} {
 		if _, err := os.Stat(filepath.Join(dest, rel)); err != nil {
 			t.Fatalf("missing %s: %v", rel, err)
 		}
+	}
+	rawConfig, err := os.ReadFile(filepath.Join(dest, "strait.json"))
+	if err != nil {
+		t.Fatalf("read strait.json: %v", err)
+	}
+	if !strings.Contains(string(rawConfig), `"$schema": "https://schemas.strait.dev/v1/strait.json"`) {
+		t.Fatalf("strait.json missing $schema: %s", rawConfig)
 	}
 }
 
@@ -143,7 +151,7 @@ func TestInitCommand_ScaffoldsGoTemplateRenamesTmpl(t *testing.T) {
 	}
 
 	dest := filepath.Join(tmp, "my-worker")
-	for _, rel := range []string{"go.mod", "main.go", "README.md"} {
+	for _, rel := range []string{"go.mod", "main.go", "README.md", "strait.json"} {
 		if _, err := os.Stat(filepath.Join(dest, rel)); err != nil {
 			t.Fatalf("missing %s after .tmpl rename: %v", rel, err)
 		}

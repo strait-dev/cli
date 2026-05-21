@@ -27,21 +27,21 @@ Show workflow details and step dependency view.
 strait workflows describe <workflow-id-or-slug>
 ```
 
-## strait create workflow
+## strait workflows create
 
 Create a new workflow via flags, JSON stdin, or interactive wizard.
 
 <CodeGroup>
 ```bash Flags
-strait create workflow --name data-pipeline --project proj_1 --steps-json '[{"step_ref":"s1","job_ref":"extract"}]'
+strait workflows create --name data-pipeline --project proj_1 --steps-json '[{"step_ref":"s1","job_ref":"extract"}]'
 ```
 
 ```bash Interactive wizard (TTY)
-strait create workflow
+strait workflows create
 ```
 
 ```bash JSON from stdin
-echo '{"name":"pipeline","steps":[...]}' | strait create workflow --json
+echo '{"name":"pipeline","steps":[...]}' | strait workflows create --json
 ```
 </CodeGroup>
 
@@ -85,8 +85,10 @@ Render the workflow DAG as ASCII art.
 ```bash
 strait workflows visualize <workflow-id-or-slug>
 strait workflows visualize <workflow-id-or-slug> --run wfr_abc123
+strait workflows visualize <workflow-id-or-slug> --format json
 ```
 
 | Flag | Description |
 |---|---|
 | `--run` | Overlay run status on DAG nodes |
+| `--format json` | Output raw workflow DAG data, status overlay, and rendered text |
