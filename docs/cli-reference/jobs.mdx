@@ -53,7 +53,7 @@ echo '{"name":"my-job","endpoint_url":"http://localhost:3000"}' | strait jobs cr
 | `--json` | Read job definition from stdin as JSON | `false` |
 
 <Info>
-  `strait jobs create` also works as an alias for `strait create job` with the same flags (except `--description` instead of wizard, and `--timeout-secs`/`--run-ttl-secs` naming).
+  In TTY mode, `strait jobs create` can prompt for missing fields. In CI or scripts, pass the required flags explicitly.
 </Info>
 
 ## strait jobs trigger
@@ -73,7 +73,7 @@ strait jobs trigger <job-id-or-slug> --payload '{"key": "value"}'
 | `--idempotency-key` | Prevents duplicate triggers |
 
 <Info>
-  `strait trigger <slug>` is a top-level shortcut for `strait jobs trigger`.
+  Use `strait jobs trigger <slug>` to trigger a job by slug.
 </Info>
 
 ## strait jobs clone

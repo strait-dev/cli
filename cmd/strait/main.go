@@ -97,7 +97,7 @@ func formatCLIError(err error) string {
 			case strings.Contains(detail, "not found"):
 				hint = "\n  " + styles.MutedStyle.Render("Check the ID or slug with `strait jobs list` or `strait runs list`.")
 			case strings.Contains(detail, "invalid or missing"):
-				hint = "\n  " + styles.MutedStyle.Render("Run `strait login` to authenticate or check your API key.")
+				hint = "\n  " + styles.MutedStyle.Render("Run `strait auth login` to authenticate or check your API key.")
 			case strings.Contains(detail, "unauthorized") || strings.Contains(detail, "permission"):
 				hint = "\n  " + styles.MutedStyle.Render("Your API key may lack the required scope. Check with `strait api-keys list`.")
 			}

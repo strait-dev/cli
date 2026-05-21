@@ -57,7 +57,11 @@ func TestDev_RegistersAndRestoresEndpoints(t *testing.T) {
 	jobs := []types.Job{{ID: "job-existing", ProjectID: "proj-test", Slug: "existing", EndpointURL: "https://app.example.com/existing"}}
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
+		"GET /v1/jobs": func(w http.ResponseWriter, r *http.Request) {
+			if got := r.URL.Query().Get("project_id"); got != "proj-test" {
+				http.Error(w, "missing project_id", http.StatusBadRequest)
+				return
+			}
 			mu.Lock()
 			listCalls++
 			mu.Unlock()

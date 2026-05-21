@@ -18,8 +18,8 @@ Credentials are stored under the service name `strait` with the context name as 
 ### Store a credential
 
 ```bash
-strait login                          # Browser flow, stores automatically
-strait login --token strait_abc123    # Direct token, stores automatically
+strait auth login                          # Browser flow, stores automatically
+strait auth login --token strait_abc123    # Direct token, stores automatically
 ```
 
 ### View stored contexts
@@ -49,7 +49,7 @@ The CLI resolves credentials in this order:
 For CI/CD and non-interactive environments, pipe the API key via stdin:
 
 ```bash
-echo "$STRAIT_API_KEY" | strait login --with-token
+echo "$STRAIT_API_KEY" | strait auth login --with-token
 ```
 
 The key is read from stdin, validated against the server, then stored in the keyring.
@@ -67,7 +67,7 @@ The key is read from stdin, validated against the server, then stored in the key
 
 ## API key validation
 
-When you run `strait login`, the CLI validates the key before storing it:
+When you run `strait auth login`, the CLI validates the key before storing it:
 
 ```bash
 # Key is validated against /v1/stats
@@ -86,7 +86,7 @@ strait api-keys rotate key_abc123
 strait api-keys revoke key_abc123
 
 # Re-authenticate with the new key
-strait login --token <new-key>
+strait auth login --token <new-key>
 ```
 
 ## Scoped keys

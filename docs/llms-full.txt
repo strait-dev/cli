@@ -12,12 +12,12 @@ Upgrade: `strait upgrade`
 
 ## Authentication
 
-Login (browser): `strait login`
-Login (token): `strait login --token <api-key>`
-Login (stdin): `echo $KEY | strait login --with-token`
+Login (browser): `strait auth login`
+Login (token): `strait auth login --token <api-key>`
+Login (stdin): `echo $KEY | strait auth login --with-token`
 Login flags: --token, --with-token, --api-key (deprecated), --context, --server, --browser, --no-browser
 Logout: `strait logout [--context C]`
-Verify: `strait whoami`
+Verify: `strait auth whoami`
 Status: `strait auth status`
 
 ## Contexts
@@ -48,8 +48,8 @@ Get: `strait jobs get <slug-or-id>`
 
 Create: `strait jobs create --name N --slug S --endpoint URL --project ID [--description ""] [--cron ""] [--timeout-secs 60] [--max-attempts 3] [--run-ttl-secs 0]`
 
-Trigger: `strait trigger <slug> [--payload '{}'] [--payload-file f] [--priority 0] [--scheduled-at RFC3339] [--idempotency-key K]`
-`strait trigger` is a top-level shortcut for `strait jobs trigger`.
+Trigger: `strait jobs trigger <slug> [--payload '{}'] [--payload-file f] [--priority 0] [--scheduled-at RFC3339] [--idempotency-key K]`
+Use `strait jobs trigger` to trigger a job run.
 
 Clone: `strait jobs clone <slug> [--name N] [--slug S]`
 Health: `strait jobs health <slug>`
@@ -186,7 +186,7 @@ Run: `strait run [--context C] -- command args`
 Setup: `strait ci setup [--provider github|gitlab|generic] [--env E] [--project ID] [--dry-run]`
 Check: `strait ci check`
 CI mode: `--ci` flag on any command
-Auth: `echo $STRAIT_API_KEY | strait login --with-token`
+Auth: `echo $STRAIT_API_KEY | strait auth login --with-token`
 
 ## Monitoring
 

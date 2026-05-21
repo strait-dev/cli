@@ -3,12 +3,13 @@ title: "Quickstart"
 description: "Go from zero to your first running job in 5 minutes"
 ---
 
-Six commands. That is all it takes to log in, create a job, trigger it, and watch it run.
+This path logs you in, scaffolds a project, syncs its orchestration
+definitions, triggers a job, and watches it run.
 
 <Steps>
   <Step title="Log in">
     ```bash
-    strait login
+    strait auth login
     ```
 
     Your browser opens, you confirm a one-time code, and you are in. The API key is stored in your system keyring — you will not need to paste it again.
@@ -16,7 +17,7 @@ Six commands. That is all it takes to log in, create a job, trigger it, and watc
 
   <Step title="Confirm you are authenticated">
     ```bash
-    strait whoami
+    strait auth whoami
     ```
 
     You should see your user, context, server, and project.
@@ -24,27 +25,24 @@ Six commands. That is all it takes to log in, create a job, trigger it, and watc
 
   <Step title="Set up your project">
     ```bash
-    strait init
+    strait init --template vercel --name my-app
+    cd my-app
     ```
 
-    This scaffolds a `strait.config.yaml` in the current directory with your project structure.
+    This scaffolds a starter runtime and a canonical `strait.json` orchestration file.
   </Step>
 
-  <Step title="Create a job">
+  <Step title="Sync orchestration definitions">
     ```bash
-    strait jobs create \
-      --name "My First Job" \
-      --slug my-first-job \
-      --endpoint https://example.com/api/process \
-      --project proj_abc123
+    strait sync
     ```
 
-    Prefer a guided walkthrough? Run `strait create job` and the interactive wizard handles the rest.
+    `strait sync` registers jobs and workflows from `strait.json`. Your code still runs on your infrastructure.
   </Step>
 
   <Step title="Trigger it">
     ```bash
-    strait trigger my-first-job --payload '{"hello": "world"}'
+    strait jobs trigger hello --payload '{"hello": "world"}'
     ```
 
     The CLI returns a run ID. Hold on to it for the next step.

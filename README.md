@@ -105,6 +105,25 @@ strait dev
 
 Each scaffold ships a starter `strait.json` so `strait sync` works immediately.
 
+Example `strait.json`:
+
+```json
+{
+  "$schema": "https://schemas.strait.dev/v1/strait.json",
+  "version": "1",
+  "jobs": [
+    {
+      "slug": "hello",
+      "name": "Hello",
+      "endpoint_url": "https://my-app.example.com/api/strait",
+      "max_attempts": 3,
+      "timeout_secs": 30
+    }
+  ],
+  "workflows": []
+}
+```
+
 ## Commands
 
 `strait --help` shows the full tree. Canonical groups:
@@ -137,6 +156,8 @@ Each scaffold ships a starter `strait.json` so `strait sync` works immediately.
 | Dashboard       | `tui` (interactive jobs/runs/workflows pane switcher)                 |
 | Diagnostics     | `debug bundle/profile/request`, `version`, `upgrade`                  |
 | Extensions      | `extension list/install/run/create/remove`                            |
+
+`strait deploy push` is deprecated and currently delegates to `strait sync` for compatibility. New scripts should use `strait sync`.
 
 ## Configuration
 

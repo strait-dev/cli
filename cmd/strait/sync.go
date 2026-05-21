@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
+	"github.com/strait-dev/cli/internal/types"
 
 	"github.com/spf13/cobra"
 )
@@ -141,7 +143,7 @@ func addSyncFlags(cmd *cobra.Command, opts *syncOptions, legacy bool) {
 		cmd.Flags().StringVar(&opts.file, "manifest", "", "deprecated alias for --file")
 	}
 	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "print the sync plan without making changes")
-	cmd.Flags().BoolVar(&opts.prune, "prune", false, "delete jobs not present in strait.json (destructive)")
+	cmd.Flags().BoolVar(&opts.prune, "prune", false, "delete jobs and workflows not present in strait.json (destructive)")
 	cmd.Flags().BoolVar(&opts.yes, "yes", false, "skip the confirmation prompt for --prune")
 }
 
@@ -181,7 +183,7 @@ func runSyncCommand(cmd *cobra.Command, state *appState, opts syncOptions) error
 	}
 
 	if opts.prune {
-		if err := requireConfirmation(state, "Pruning removes jobs not in strait.json. Continue?", opts.yes); err != nil {
+		if err := requireConfirmation(state, "Pruning removes jobs and workflows not in strait.json. Continue?", opts.yes); err != nil {
 			return err
 		}
 	}
@@ -269,36 +271,50 @@ func planSync(ctx context.Context, cli *client.Client, projectID string, cfg *Pr
 	if err != nil {
 		return nil, fmt.Errorf("list existing jobs: %w", err)
 	}
-	bySlug := make(map[string]string, len(existing))
-	endpointBySlug := make(map[string]string, len(existing))
+	bySlug := make(map[string]types.Job, len(existing))
 	for _, j := range existing {
-		bySlug[j.Slug] = j.ID
-		endpointBySlug[j.Slug] = j.EndpointURL
+		bySlug[j.Slug] = j
 	}
 
 	summary := &SyncSummary{}
 	for _, job := range cfg.Jobs {
 		res := SyncResult{Kind: "job", Slug: job.Slug}
-		id, ok := bySlug[job.Slug]
+		existingJob, ok := bySlug[job.Slug]
 		switch {
 		case !ok:
 			res.Action = "create"
 			summary.Created++
-		case endpointBySlug[job.Slug] == job.EndpointURL:
+		case !projectJobNeedsUpdate(job, existingJob):
 			res.Action = "skip"
-			res.ID = id
+			res.ID = existingJob.ID
 			summary.Skipped++
 		default:
 			res.Action = "update"
-			res.ID = id
+			res.ID = existingJob.ID
 			summary.Updated++
 		}
 		summary.Results = append(summary.Results, res)
 	}
 
+	existingWorkflows, err := cli.ListWorkflows(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("list existing workflows: %w", err)
+	}
+	workflowBySlug := make(map[string]types.Workflow, len(existingWorkflows))
+	for _, wf := range existingWorkflows {
+		workflowBySlug[wf.Slug] = wf
+	}
 	for _, wf := range cfg.Workflows {
-		res := SyncResult{Kind: "workflow", Slug: wf.Slug, Action: "create"}
-		summary.Created++
+		res := SyncResult{Kind: "workflow", Slug: wf.Slug}
+		existingWorkflow, ok := workflowBySlug[wf.Slug]
+		if !ok {
+			res.Action = "create"
+			summary.Created++
+		} else {
+			res.Action = "update"
+			res.ID = existingWorkflow.ID
+			summary.Updated++
+		}
 		summary.Results = append(summary.Results, res)
 	}
 
@@ -316,6 +332,10 @@ func applySync(ctx context.Context, cli *client.Client, projectID string, cfg *P
 	jobBySlug := map[string]ProjectJob{}
 	for _, j := range cfg.Jobs {
 		jobBySlug[j.Slug] = j
+	}
+	workflowBySlug := map[string]ProjectWorkflow{}
+	for _, w := range cfg.Workflows {
+		workflowBySlug[w.Slug] = w
 	}
 	jobIDBySlug := map[string]string{}
 	existingJobs, err := cli.ListJobs(ctx, projectID)
@@ -357,7 +377,7 @@ func applySync(ctx context.Context, cli *client.Client, projectID string, cfg *P
 				out.Skipped++
 			}
 		case "workflow":
-			wf := findProjectWorkflow(cfg.Workflows, res.Slug)
+			wf := workflowBySlug[res.Slug]
 			steps, err := workflowStepRequests(wf.Steps, jobIDBySlug)
 			if err != nil {
 				res.Error = err.Error()
@@ -365,21 +385,34 @@ func applySync(ctx context.Context, cli *client.Client, projectID string, cfg *P
 				out.Results = append(out.Results, res)
 				continue
 			}
-			req := client.CreateWorkflowRequest{
-				ProjectID:   projectID,
-				Slug:        wf.Slug,
-				Name:        wf.Name,
-				Description: wf.Description,
-				Enabled:     wf.Enabled,
-				Steps:       steps,
-			}
-			created, err := cli.CreateWorkflow(ctx, req, "")
-			if err != nil {
-				res.Error = err.Error()
-				out.Failed++
-			} else {
-				res.ID = created.ID
-				out.Created++
+			switch res.Action {
+			case "create":
+				req := client.CreateWorkflowRequest{
+					ProjectID:   projectID,
+					Slug:        wf.Slug,
+					Name:        firstNonEmpty(wf.Name, wf.Slug),
+					Description: wf.Description,
+					Enabled:     wf.Enabled,
+					Steps:       steps,
+				}
+				created, err := cli.CreateWorkflow(ctx, req, "")
+				if err != nil {
+					res.Error = err.Error()
+					out.Failed++
+				} else {
+					res.ID = created.ID
+					out.Created++
+				}
+			case "update":
+				req := workflowUpdateRequest(wf, steps)
+				updated, err := cli.UpdateWorkflow(ctx, res.ID, req)
+				if err != nil {
+					res.Error = err.Error()
+					out.Failed++
+				} else {
+					res.ID = updated.ID
+					out.Updated++
+				}
 			}
 		}
 		out.Results = append(out.Results, res)
@@ -400,6 +433,27 @@ func applySync(ctx context.Context, cli *client.Client, projectID string, cfg *P
 			}
 			res := SyncResult{Kind: "job", Slug: j.Slug, ID: j.ID, Action: "delete"}
 			if err := cli.DeleteJob(ctx, j.ID); err != nil {
+				res.Error = err.Error()
+				out.Failed++
+			} else {
+				out.Updated++
+			}
+			out.Results = append(out.Results, res)
+		}
+		existingWorkflows, err := cli.ListWorkflows(ctx, projectID)
+		if err != nil {
+			return out, fmt.Errorf("list workflows for prune: %w", err)
+		}
+		wantWorkflow := map[string]bool{}
+		for _, wf := range cfg.Workflows {
+			wantWorkflow[wf.Slug] = true
+		}
+		for _, wf := range existingWorkflows {
+			if wantWorkflow[wf.Slug] {
+				continue
+			}
+			res := SyncResult{Kind: "workflow", Slug: wf.Slug, ID: wf.ID, Action: "delete"}
+			if err := cli.DeleteWorkflow(ctx, wf.ID); err != nil {
 				res.Error = err.Error()
 				out.Failed++
 			} else {
@@ -479,13 +533,58 @@ func jobUpdateRequest(job ProjectJob) client.UpdateJobRequest {
 	return req
 }
 
-func findProjectWorkflow(workflows []ProjectWorkflow, slug string) ProjectWorkflow {
-	for _, w := range workflows {
-		if w.Slug == slug {
-			return w
-		}
+func workflowUpdateRequest(wf ProjectWorkflow, steps []client.WorkflowStepRequest) client.UpdateWorkflowRequest {
+	name := firstNonEmpty(wf.Name, wf.Slug)
+	description := wf.Description
+	return client.UpdateWorkflowRequest{
+		Name:        &name,
+		Slug:        &wf.Slug,
+		Description: &description,
+		Enabled:     wf.Enabled,
+		Steps:       &steps,
 	}
-	return ProjectWorkflow{}
+}
+
+func projectJobNeedsUpdate(job ProjectJob, existing types.Job) bool {
+	if existing.EndpointURL != job.EndpointURL {
+		return true
+	}
+	if job.Name != "" && existing.Name != job.Name {
+		return true
+	}
+	if job.Description != "" && existing.Description != job.Description {
+		return true
+	}
+	if job.Cron != "" && existing.Cron != job.Cron {
+		return true
+	}
+	if job.MaxAttempts != 0 && existing.MaxAttempts != job.MaxAttempts {
+		return true
+	}
+	if job.TimeoutSecs != 0 && existing.TimeoutSecs != job.TimeoutSecs {
+		return true
+	}
+	if job.RunTTLSecs != 0 && existing.RunTTLSecs != job.RunTTLSecs {
+		return true
+	}
+	return len(job.Schema) > 0 && !rawJSONEqual(job.Schema, existing.PayloadSchema)
+}
+
+func rawJSONEqual(a, b json.RawMessage) bool {
+	a = compactRawJSON(a)
+	b = compactRawJSON(b)
+	return bytes.Equal(a, b)
+}
+
+func compactRawJSON(in json.RawMessage) json.RawMessage {
+	if len(in) == 0 {
+		return nil
+	}
+	var out bytes.Buffer
+	if err := json.Compact(&out, in); err != nil {
+		return in
+	}
+	return out.Bytes()
 }
 
 func renderSyncPlan(s *SyncSummary) {

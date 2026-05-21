@@ -90,7 +90,7 @@ pointing at the tunnel).`,
 			if !keepEndpoint {
 				restoreCtx, cancelRestore := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancelRestore()
-				restoreDevEndpoints(restoreCtx, cli, loaded.Config, previous)
+				restoreDevEndpoints(restoreCtx, cli, projectID, loaded.Config, previous)
 			}
 
 			return nil
@@ -206,8 +206,8 @@ func registerDevEndpoints(ctx context.Context, cli *client.Client, projectID str
 // restoreDevEndpoints reverts each configured job's endpoint_url to its
 // pre-dev-session value. Failures are logged but not fatal; the caller is in
 // shutdown.
-func restoreDevEndpoints(ctx context.Context, cli *client.Client, cfg *ProjectConfig, previous map[string]string) {
-	existing, err := cli.ListJobs(ctx, "")
+func restoreDevEndpoints(ctx context.Context, cli *client.Client, projectID string, cfg *ProjectConfig, previous map[string]string) {
+	existing, err := cli.ListJobs(ctx, projectID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "restore endpoints: list jobs failed: %v\n", err)
 		return

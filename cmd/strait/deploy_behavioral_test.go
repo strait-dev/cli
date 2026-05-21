@@ -32,13 +32,13 @@ func TestSync_PlansCreateUpdateSkip(t *testing.T) {
 
 	existing := []types.Job{
 		{ID: "job-keep", ProjectID: "proj-test", Slug: "keep", EndpointURL: "https://app.example.com/keep"},
-		{ID: "job-change", ProjectID: "proj-test", Slug: "change", EndpointURL: "https://app.example.com/old"},
+		{ID: "job-change", ProjectID: "proj-test", Slug: "change", EndpointURL: "https://app.example.com/change", MaxAttempts: 1},
 	}
 	config := ProjectConfig{
 		Version: "1",
 		Jobs: []ProjectJob{
 			{Slug: "keep", EndpointURL: "https://app.example.com/keep"},
-			{Slug: "change", EndpointURL: "https://app.example.com/new"},
+			{Slug: "change", EndpointURL: "https://app.example.com/change", MaxAttempts: 3},
 			{Slug: "fresh", EndpointURL: "https://app.example.com/fresh"},
 		},
 	}
@@ -47,6 +47,9 @@ func TestSync_PlansCreateUpdateSkip(t *testing.T) {
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
 			respondPaginated(t, w, http.StatusOK, existing)
+		},
+		"GET /v1/workflows": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []types.Workflow{})
 		},
 	})
 	state := newTestState(t, srv)
@@ -72,12 +75,12 @@ func TestSync_AppliesCreateAndUpdate(t *testing.T) {
 	t.Parallel()
 
 	existing := []types.Job{
-		{ID: "job-change", ProjectID: "proj-test", Slug: "change", EndpointURL: "https://app.example.com/old"},
+		{ID: "job-change", ProjectID: "proj-test", Slug: "change", EndpointURL: "https://app.example.com/change", MaxAttempts: 1},
 	}
 	config := ProjectConfig{
 		Version: "1",
 		Jobs: []ProjectJob{
-			{Slug: "change", EndpointURL: "https://app.example.com/new"},
+			{Slug: "change", EndpointURL: "https://app.example.com/change", MaxAttempts: 5},
 			{Slug: "fresh", EndpointURL: "https://app.example.com/fresh"},
 		},
 	}
@@ -91,6 +94,9 @@ func TestSync_AppliesCreateAndUpdate(t *testing.T) {
 		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
 			respondPaginated(t, w, http.StatusOK, existing)
 		},
+		"GET /v1/workflows": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []types.Workflow{})
+		},
 		"POST /v1/jobs": func(w http.ResponseWriter, r *http.Request) {
 			var req client.CreateJobRequest
 			readJSONBody(t, r, &req)
@@ -102,10 +108,13 @@ func TestSync_AppliesCreateAndUpdate(t *testing.T) {
 		"PATCH /v1/jobs/job-change": func(w http.ResponseWriter, r *http.Request) {
 			var req client.UpdateJobRequest
 			readJSONBody(t, r, &req)
+			if req.MaxAttempts == nil || *req.MaxAttempts != 5 {
+				t.Fatalf("expected max_attempts update, got %#v", req.MaxAttempts)
+			}
 			mu.Lock()
 			updated++
 			mu.Unlock()
-			respondJSON(t, w, http.StatusOK, types.Job{ID: "job-change", ProjectID: "proj-test", Slug: "change", EndpointURL: *req.EndpointURL})
+			respondJSON(t, w, http.StatusOK, types.Job{ID: "job-change", ProjectID: "proj-test", Slug: "change", EndpointURL: *req.EndpointURL, MaxAttempts: *req.MaxAttempts})
 		},
 	})
 
@@ -136,6 +145,84 @@ func TestSync_AppliesCreateAndUpdate(t *testing.T) {
 	}
 }
 
+func TestSync_AppliesWorkflowCreateUpdateAndPrune(t *testing.T) {
+	t.Parallel()
+
+	config := ProjectConfig{
+		Version: "1",
+		Workflows: []ProjectWorkflow{
+			{Slug: "existing-flow", Name: "Existing Flow"},
+			{Slug: "fresh-flow", Name: "Fresh Flow"},
+		},
+	}
+	configPath := writeProjectConfig(t, config)
+
+	existingWorkflows := []types.Workflow{
+		{ID: "wf-existing", ProjectID: "proj-test", Slug: "existing-flow", Name: "Old Existing Flow", Enabled: true},
+		{ID: "wf-stale", ProjectID: "proj-test", Slug: "stale-flow", Name: "Stale Flow", Enabled: true},
+	}
+
+	var mu sync.Mutex
+	created := 0
+	updated := 0
+	deleted := 0
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []types.Job{})
+		},
+		"GET /v1/workflows": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, existingWorkflows)
+		},
+		"POST /v1/workflows": func(w http.ResponseWriter, r *http.Request) {
+			var req client.CreateWorkflowRequest
+			readJSONBody(t, r, &req)
+			if req.Slug != "fresh-flow" {
+				t.Fatalf("unexpected workflow create slug: %s", req.Slug)
+			}
+			mu.Lock()
+			created++
+			mu.Unlock()
+			respondJSON(t, w, http.StatusCreated, client.WorkflowResponse{Workflow: types.Workflow{ID: "wf-fresh", ProjectID: req.ProjectID, Slug: req.Slug, Name: req.Name}})
+		},
+		"PATCH /v1/workflows/wf-existing": func(w http.ResponseWriter, r *http.Request) {
+			var req client.UpdateWorkflowRequest
+			readJSONBody(t, r, &req)
+			if req.Name == nil || *req.Name != "Existing Flow" {
+				t.Fatalf("unexpected workflow update name: %#v", req.Name)
+			}
+			if req.Steps == nil {
+				t.Fatal("expected workflow update to send steps")
+			}
+			mu.Lock()
+			updated++
+			mu.Unlock()
+			respondJSON(t, w, http.StatusOK, client.WorkflowResponse{Workflow: types.Workflow{ID: "wf-existing", ProjectID: "proj-test", Slug: "existing-flow", Name: *req.Name}})
+		},
+		"DELETE /v1/workflows/wf-stale": func(w http.ResponseWriter, _ *http.Request) {
+			mu.Lock()
+			deleted++
+			mu.Unlock()
+			respondJSON(t, w, http.StatusOK, map[string]string{"id": "wf-stale"})
+		},
+	})
+
+	state := newTestState(t, srv)
+	cmd := newSyncCommand(state)
+	cmd.SetArgs([]string{"--file", configPath, "--prune", "--yes"})
+
+	out, err := captureRun(t, state, cmd)
+	if err != nil {
+		t.Fatalf("unexpected error: %v\n%s", err, out)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if created != 1 || updated != 1 || deleted != 1 {
+		t.Fatalf("expected create/update/delete workflow once, got created=%d updated=%d deleted=%d", created, updated, deleted)
+	}
+}
+
 func TestSync_PruneRequiresYes(t *testing.T) {
 	t.Parallel()
 
@@ -145,6 +232,9 @@ func TestSync_PruneRequiresYes(t *testing.T) {
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
 			respondPaginated(t, w, http.StatusOK, []types.Job{})
+		},
+		"GET /v1/workflows": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []types.Workflow{})
 		},
 	})
 	state := newTestState(t, srv)
@@ -174,6 +264,9 @@ func TestSync_PruneDeletesExtras(t *testing.T) {
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"GET /v1/jobs": func(w http.ResponseWriter, _ *http.Request) {
 			respondPaginated(t, w, http.StatusOK, existing)
+		},
+		"GET /v1/workflows": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []types.Workflow{})
 		},
 		"DELETE /v1/jobs/job-stale": func(w http.ResponseWriter, _ *http.Request) {
 			mu.Lock()

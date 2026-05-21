@@ -61,7 +61,7 @@ func exitCodeName(code int) string {
 func errorSuggestion(code int) string {
 	switch code {
 	case ExitAuthError:
-		return "Run `strait login` to authenticate, or set the STRAIT_API_KEY environment variable."
+		return "Run `strait auth login` to authenticate, or set the STRAIT_API_KEY environment variable."
 	case ExitNotFound:
 		return "Check the resource ID or slug with `strait jobs list` or `strait runs list`."
 	case ExitConflict:
