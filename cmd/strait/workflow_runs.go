@@ -29,6 +29,10 @@ func newWorkflowRunsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newWorkflowRunsPauseCommand(state))
 	cmd.AddCommand(newWorkflowRunsResumeCommand(state))
 	cmd.AddCommand(newWorkflowRunsRetryCommand(state))
+	cmd.AddCommand(newWorkflowRunsApproveStepAliasCommand(state))
+	cmd.AddCommand(newWorkflowRunsRetryStepAliasCommand(state))
+	cmd.AddCommand(newWorkflowRunsSkipStepAliasCommand(state))
+	cmd.AddCommand(newWorkflowRunsForceCompleteStepAliasCommand(state))
 
 	return cmd
 }

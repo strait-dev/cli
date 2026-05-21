@@ -28,7 +28,11 @@ strait workflow-runs get <workflow-run-id>
 Show step-by-step status for a workflow run.
 
 ```bash
-strait workflow-runs steps <workflow-run-id>
+strait workflow-runs steps list <workflow-run-id>
+strait workflow-runs steps approve <workflow-run-id> <step-ref>
+strait workflow-runs steps retry <workflow-run-id> <step-ref>
+strait workflow-runs steps skip <workflow-run-id> <step-ref>
+strait workflow-runs steps force-complete <workflow-run-id> <step-ref> --yes
 ```
 
 ## strait workflow-runs watch
@@ -51,4 +55,25 @@ Cancel a workflow run.
 
 ```bash
 strait workflow-runs cancel <workflow-run-id>
+```
+
+## strait workflow-runs pause/resume/retry
+
+Pause, resume, or retry a workflow run.
+
+```bash
+strait workflow-runs pause <workflow-run-id>
+strait workflow-runs resume <workflow-run-id>
+strait workflow-runs retry <workflow-run-id>
+```
+
+## strait workflow-runs step shortcuts
+
+Top-level shortcuts for individual step actions.
+
+```bash
+strait workflow-runs approve-step <workflow-run-id> <step-ref>
+strait workflow-runs retry-step <workflow-run-id> <step-ref>
+strait workflow-runs skip-step <workflow-run-id> <step-ref>
+strait workflow-runs force-complete-step <workflow-run-id> <step-ref> --yes
 ```

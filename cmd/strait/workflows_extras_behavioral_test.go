@@ -21,6 +21,10 @@ func testWorkflowForExtras() client.WorkflowResponse {
 			CreatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
 			UpdatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
 		},
+		Steps: []types.WorkflowStep{
+			{ID: "step-1", WorkflowID: "wf-1", StepRef: "extract"},
+			{ID: "step-2", WorkflowID: "wf-1", StepRef: "load", DependsOn: []string{"extract"}},
+		},
 	}
 }
 
@@ -268,5 +272,60 @@ func TestWorkflowsPolicy_Set(t *testing.T) {
 
 	if err := captureAndExec(t, state, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestWorkflowsVisualize_TableOutput(t *testing.T) {
+	t.Parallel()
+
+	wf := testWorkflowForExtras()
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/workflows/pipeline": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, wf)
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.outputFormat = "table"
+	cmd := newWorkflowsVisualizeCommand(state)
+	cmd.SetArgs([]string{"pipeline"})
+
+	out := captureStateOutput(t, state, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "extract") || !strings.Contains(out, "load") {
+		t.Fatalf("expected rendered DAG in output: %s", out)
+	}
+}
+
+func TestWorkflowsVisualize_JSONIncludesRawDAGData(t *testing.T) {
+	t.Parallel()
+
+	wf := testWorkflowForExtras()
+	stepRuns := []types.WorkflowStepRun{{ID: "step-run-1", WorkflowRunID: "wfr-1", StepRef: "extract", Status: types.StepCompleted}}
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/workflows/pipeline": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, wf)
+		},
+		"GET /v1/workflow-runs/wfr-1/steps": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, stepRuns)
+		},
+	})
+
+	state := newTestState(t, srv)
+	cmd := newWorkflowsVisualizeCommand(state)
+	cmd.SetArgs([]string{"pipeline", "--run", "wfr-1"})
+
+	out := captureStateOutput(t, state, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, `"steps"`) || !strings.Contains(out, `"statuses"`) || !strings.Contains(out, "completed") {
+		t.Fatalf("expected raw DAG data in JSON output: %s", out)
 	}
 }

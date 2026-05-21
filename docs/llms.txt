@@ -37,14 +37,16 @@ Strait CLI is the primary interface for the Strait job orchestration platform. 5
 - [API Scopes](cli-reference/scopes.mdx): all permission scopes for API keys
 - [Cron Expressions](cli-reference/cron.mdx): cheatsheet for --cron schedules
 - [auth](cli-reference/auth.mdx): login, logout, whoami, auth status
-- [jobs](cli-reference/jobs.mdx): list, get, create, trigger, trigger-bulk, edit, describe, versions, delete
-- [runs](cli-reference/runs.mdx): list, get, last, watch, cancel, replay, logs, diff
-- [workflows](cli-reference/workflows.mdx): list, get, create, describe, update, delete, trigger, visualize
-- [workflow-runs](cli-reference/workflow-runs.mdx): list, get, steps, watch, cancel
+- [jobs](cli-reference/jobs.mdx): list, get, create, update, delete, clone, trigger, health, versions, dependencies, add-dependency, batch
+- [job-groups](cli-reference/job-groups.mdx): list, get, create, update, delete, jobs, pause, resume, stats
+- [runs](cli-reference/runs.mdx): list, get, watch, cancel, replay, logs, reschedule, dlq, dlq-replay, outputs, tool-calls, checkpoints
+- [workflows](cli-reference/workflows.mdx): list, get, create, update, delete, clone, trigger, dry-run, plan, simulate, versions, diff, policy, visualize
+- [workflow-runs](cli-reference/workflow-runs.mdx): list, get, steps, watch, cancel, pause, resume, retry, step actions
 - [deploy](cli-reference/deploy.mdx): deploy, create, finalize, promote, rollback, list
 - [secrets](cli-reference/secrets.mdx): list, create, delete, local set, local get
 - [api-keys](cli-reference/api-keys.mdx): list, create, rotate, revoke
 - [triggers](cli-reference/triggers.mdx): list, get, send, purge
+- [notifications](cli-reference/notifications.mdx): list, get, create, update, delete
 - [team](cli-reference/team.mdx): list, add, remove, roles
 - [audit](cli-reference/audit.mdx): view audit log events
 - [config](cli-reference/config.mdx): edit, path

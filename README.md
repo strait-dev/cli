@@ -117,18 +117,20 @@ Each scaffold ships a starter `strait.deploy.json` so `strait deploy push` works
 | Endpoint        | `endpoint set/get/verify`                                             |
 | Worker          | `worker status/drain` (workers run on customer infra via `strait-go/worker`) |
 | Dev             | `dev` (Cloudflare Tunnel + auto-register)                             |
-| Jobs            | `jobs list/get/create/update/delete/clone/trigger/health/versions/dependencies/batch` |
-| Runs            | `runs list/get/logs/cancel/replay/reschedule/dlq-replay/outputs/checkpoints/events/watch` |
-| Workflows       | `workflows list/get/create/update/delete/clone/trigger/dry-run/plan/simulate/versions/diff/policy` |
-| Workflow runs   | `workflow-runs list/get/pause/resume/retry`, `workflow-runs steps {list\|approve\|retry\|skip\|force-complete}` |
+| Jobs            | `jobs list/get/create/update/delete/clone/trigger/health/versions/dependencies/add-dependency/batch` |
+| Job groups      | `job-groups list/get/create/update/delete/jobs/pause/resume/stats` |
+| Runs            | `runs list/get/logs/cancel/replay/reschedule/dlq/dlq-replay/outputs/tool-calls/checkpoints/watch` |
+| Workflows       | `workflows list/get/create/update/delete/clone/trigger/dry-run/plan/simulate/versions/diff/policy/visualize` |
+| Workflow runs   | `workflow-runs list/get/pause/resume/retry/approve-step/retry-step/skip-step/force-complete-step`, `workflow-runs steps {list\|approve\|retry\|skip\|force-complete}` |
 | Triggers        | `triggers list/get/send/stream/purge`                                 |
 | Webhooks        | `webhooks list/get/create/delete/deliveries/retry/test`               |
 | Event sources   | `event-sources list/get/create/update/delete`                         |
+| Notifications   | `notifications list/get/create/update/delete`                          |
 | Log drains      | `log-drains list/get/create/update/delete`                            |
 | Logs            | `logs`                                                                |
 | Secrets         | `secrets list/create/delete`, `api-keys list/create/rotate/revoke`    |
 | Team            | `team list/add/remove/roles/policies/audit`                           |
-| Projects / Env  | `projects list/switch/get/create/delete/export/import`, `env list/get/create/update/delete/variables` |
+| Projects / Env  | `projects list/switch/get/create/delete/export/import`, `env`/`environments list/get/create/update/delete/variables` |
 | Analytics       | `analytics costs/reliability/top-failing/performance`                 |
 | Billing         | `usage current/history/forecast`                                      |
 | Auth            | `auth login/logout/whoami`, `context`, `alias`, `completion`, `config` |

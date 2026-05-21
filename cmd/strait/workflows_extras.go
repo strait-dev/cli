@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	"github.com/strait-dev/cli/internal/client"
+	"github.com/strait-dev/cli/internal/dag"
 	"github.com/strait-dev/cli/internal/styles"
+	"github.com/strait-dev/cli/internal/validate"
 
 	"github.com/spf13/cobra"
 )
@@ -262,5 +264,67 @@ func newWorkflowsPolicyCommand(state *appState) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&setInline, "set", "", "inline JSON policy to apply")
 	cmd.Flags().StringVar(&setFile, "set-file", "", "path to JSON policy file")
+	return cmd
+}
+
+func newWorkflowsVisualizeCommand(state *appState) *cobra.Command {
+	var runID string
+	cmd := &cobra.Command{
+		Use:   "visualize <workflow-id-or-slug>",
+		Short: "Render the workflow DAG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cli, err := newAPIClient(state)
+			if err != nil {
+				return err
+			}
+			id, err := resolveWorkflowIdentifier(cmd.Context(), cli, state, args[0])
+			if err != nil {
+				return err
+			}
+			workflow, err := cli.GetWorkflow(cmd.Context(), id)
+			if err != nil {
+				return err
+			}
+
+			statusMap := map[string]string(nil)
+			if strings.TrimSpace(runID) != "" {
+				if err := validate.SlugOrID(runID); err != nil {
+					return fmt.Errorf("invalid workflow run id: %w", err)
+				}
+				stepRuns, err := cli.ListWorkflowStepRuns(cmd.Context(), runID)
+				if err != nil {
+					return err
+				}
+				statusMap = make(map[string]string, len(stepRuns))
+				for _, stepRun := range stepRuns {
+					statusMap[stepRun.StepRef] = string(stepRun.Status)
+				}
+			}
+
+			steps := make([]dag.Step, 0, len(workflow.Steps))
+			for _, step := range workflow.Steps {
+				steps = append(steps, dag.Step{
+					StepRef:   step.StepRef,
+					DependsOn: step.DependsOn,
+				})
+			}
+			rendered := dag.RenderDAG(steps, statusMap)
+			payload := map[string]any{
+				"workflow_id": workflow.ID,
+				"workflow":    workflow,
+				"steps":       workflow.Steps,
+				"statuses":    statusMap,
+				"rendered":    rendered,
+			}
+
+			if state.opts.outputFormat == "table" || state.opts.outputFormat == "wide" || (state.opts.outputFormat == "" && isTTYRich(state)) {
+				_, err = fmt.Fprintln(state.out(), rendered)
+				return err
+			}
+			return printData(state, payload)
+		},
+	}
+	cmd.Flags().StringVar(&runID, "run", "", "workflow run ID to overlay step status")
 	return cmd
 }

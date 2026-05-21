@@ -1,6 +1,6 @@
 ---
 title: "runs"
-description: "List, inspect, watch, cancel, replay, and diff runs"
+description: "List, inspect, watch, cancel, replay, and inspect run artifacts"
 ---
 
 ## strait runs list
@@ -24,20 +24,6 @@ Get a run by ID.
 ```bash
 strait runs get <run-id>
 ```
-
-## strait runs last
-
-Show the most recent run.
-
-```bash
-strait runs last --project proj_1
-strait runs last --open
-```
-
-| Flag | Description |
-|---|---|
-| `--project` | Project ID |
-| `--open` | Open the run in the browser |
 
 ## strait runs watch
 
@@ -97,16 +83,43 @@ strait runs replay <run-id> --wait
 |---|---|
 | `--wait` | Wait for replayed run to reach terminal state |
 
-## strait runs diff
+## strait runs reschedule
 
-Compare two runs side by side.
+Reschedule a run for a future execution time.
 
 ```bash
-strait runs diff <run1> <run2>
+strait runs reschedule <run-id> --at 2026-12-01T00:00:00Z
 ```
 
-| Flag | Description | Default |
-|---|---|---|
-| `--show-payload` | Include payload diff | `false` |
-| `--show-events` | Include events diff | `false` |
-| `--event-limit` | Max events per run to compare | `50` |
+## strait runs dlq
+
+List runs in the dead-letter queue.
+
+```bash
+strait runs dlq --project proj_1
+strait runs dlq-replay <dlq-id>
+```
+
+## strait runs outputs
+
+List structured outputs produced by a run.
+
+```bash
+strait runs outputs <run-id>
+```
+
+## strait runs tool-calls
+
+List tool calls made during a run.
+
+```bash
+strait runs tool-calls <run-id>
+```
+
+## strait runs checkpoints
+
+List checkpoints recorded during a run.
+
+```bash
+strait runs checkpoints <run-id>
+```

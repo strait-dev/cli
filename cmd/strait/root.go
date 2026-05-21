@@ -210,6 +210,8 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newEnvCommand(state))
 	cmd.AddCommand(newWebhooksCommand(state))
 	cmd.AddCommand(newEventSourcesCommand(state))
+	cmd.AddCommand(newJobGroupsCommand(state))
+	cmd.AddCommand(newNotificationsCommand(state))
 	cmd.AddCommand(newLogDrainsCommand(state))
 	cmd.AddCommand(newUsageCommand(state))
 	cmd.AddCommand(newAnalyticsCommand(state))

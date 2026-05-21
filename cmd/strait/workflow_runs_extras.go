@@ -205,3 +205,27 @@ func newWorkflowRunsForceCompleteStepCommand(state *appState) *cobra.Command {
 	cmd.Flags().BoolVar(&yes, "yes", false, "skip confirmation prompt")
 	return cmd
 }
+
+func newWorkflowRunsApproveStepAliasCommand(state *appState) *cobra.Command {
+	cmd := newWorkflowRunsApproveStepCommand(state)
+	cmd.Use = "approve-step <workflow-run-id> <step-ref>"
+	return cmd
+}
+
+func newWorkflowRunsRetryStepAliasCommand(state *appState) *cobra.Command {
+	cmd := newWorkflowRunsRetryStepCommand(state)
+	cmd.Use = "retry-step <workflow-run-id> <step-ref>"
+	return cmd
+}
+
+func newWorkflowRunsSkipStepAliasCommand(state *appState) *cobra.Command {
+	cmd := newWorkflowRunsSkipStepCommand(state)
+	cmd.Use = "skip-step <workflow-run-id> <step-ref>"
+	return cmd
+}
+
+func newWorkflowRunsForceCompleteStepAliasCommand(state *appState) *cobra.Command {
+	cmd := newWorkflowRunsForceCompleteStepCommand(state)
+	cmd.Use = "force-complete-step <workflow-run-id> <step-ref>"
+	return cmd
+}

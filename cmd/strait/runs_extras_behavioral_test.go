@@ -142,6 +142,31 @@ func TestRunsOutputs_Success(t *testing.T) {
 	}
 }
 
+func TestRunsToolCalls_Success(t *testing.T) {
+	t.Parallel()
+
+	calls := []types.RunToolCall{{ID: "call-1", RunID: "run-1", Tool: "search", DurationMS: 42}}
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/runs/run-1/tool-calls": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, calls)
+		},
+	})
+
+	state := newTestState(t, srv)
+	cmd := newRunsToolCallsCommand(state)
+	cmd.SetArgs([]string{"run-1"})
+
+	out := captureStateOutput(t, state, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "search") {
+		t.Fatalf("expected tool call in result: %s", out)
+	}
+}
+
 func TestRunsCheckpoints_Success(t *testing.T) {
 	t.Parallel()
 

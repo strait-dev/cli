@@ -65,6 +65,7 @@
             "pages": [
               "cli-reference/auth",
               "cli-reference/jobs",
+              "cli-reference/job-groups",
               "cli-reference/runs",
               "cli-reference/workflows",
               "cli-reference/workflow-runs",
@@ -72,6 +73,7 @@
               "cli-reference/secrets",
               "cli-reference/api-keys",
               "cli-reference/triggers",
+              "cli-reference/notifications",
               "cli-reference/team",
               "cli-reference/audit",
               "cli-reference/config",

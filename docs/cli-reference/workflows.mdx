@@ -85,8 +85,10 @@ Render the workflow DAG as ASCII art.
 ```bash
 strait workflows visualize <workflow-id-or-slug>
 strait workflows visualize <workflow-id-or-slug> --run wfr_abc123
+strait workflows visualize <workflow-id-or-slug> --format json
 ```
 
 | Flag | Description |
 |---|---|
 | `--run` | Overlay run status on DAG nodes |
+| `--format json` | Output raw workflow DAG data, status overlay, and rendered text |

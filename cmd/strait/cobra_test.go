@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -17,7 +18,7 @@ func TestRootCommand_HasExpectedSubcommands(t *testing.T) {
 		"wait", "logs", "triggers", "secrets", "extension",
 		"upgrade", "projects", "debug", "team", "config",
 		"env", "webhooks", "event-sources", "log-drains",
-		"usage", "analytics", "init", "migrate", "tui",
+		"job-groups", "notifications", "usage", "analytics", "init", "migrate", "tui",
 	}
 
 	subs := make(map[string]bool)
@@ -84,7 +85,7 @@ func TestJobsCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	jobs := findSubcommand(t, cmd, "jobs")
 
-	expected := []string{"list", "get", "create", "update", "delete", "clone", "trigger", "health", "versions", "dependencies", "batch"}
+	expected := []string{"list", "get", "create", "update", "delete", "clone", "trigger", "health", "versions", "dependencies", "add-dependency", "batch"}
 	assertSubcommands(t, jobs, expected)
 }
 
@@ -106,7 +107,7 @@ func TestRunsCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	runs := findSubcommand(t, cmd, "runs")
 
-	expected := []string{"list", "get", "cancel", "logs", "watch", "replay"}
+	expected := []string{"list", "get", "cancel", "logs", "watch", "replay", "reschedule", "dlq", "dlq-replay", "outputs", "tool-calls", "checkpoints"}
 	assertSubcommands(t, runs, expected)
 }
 
@@ -149,8 +150,51 @@ func TestWorkflowsCommand_HasSubcommands(t *testing.T) {
 	cmd := newRootCommand()
 	wf := findSubcommand(t, cmd, "workflows")
 
-	expected := []string{"list", "get", "create", "update", "delete", "clone", "trigger", "dry-run", "plan", "simulate", "versions", "diff", "policy"}
+	expected := []string{"list", "get", "create", "update", "delete", "clone", "trigger", "dry-run", "plan", "simulate", "versions", "diff", "policy", "visualize"}
 	assertSubcommands(t, wf, expected)
+}
+
+func TestWorkflowRunsCommand_HasSTR408Subcommands(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCommand()
+	wfr := findSubcommand(t, cmd, "workflow-runs")
+
+	expected := []string{"list", "get", "cancel", "steps", "watch", "pause", "resume", "retry", "approve-step", "retry-step", "skip-step", "force-complete-step"}
+	assertSubcommands(t, wfr, expected)
+}
+
+func TestJobGroupsCommand_HasSubcommands(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCommand()
+	groups := findSubcommand(t, cmd, "job-groups")
+
+	expected := []string{"list", "get", "create", "update", "delete", "jobs", "pause", "resume", "stats"}
+	assertSubcommands(t, groups, expected)
+}
+
+func TestNotificationsCommand_HasSubcommands(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCommand()
+	notifications := findSubcommand(t, cmd, "notifications")
+
+	expected := []string{"list", "get", "create", "update", "delete"}
+	assertSubcommands(t, notifications, expected)
+}
+
+func TestEnvironmentsCommand_HasAlias(t *testing.T) {
+	t.Parallel()
+
+	cmd := newRootCommand()
+	env := findSubcommand(t, cmd, "env")
+
+	for _, want := range []string{"environments", "environment"} {
+		if !slices.Contains(env.Aliases, want) {
+			t.Errorf("env missing alias %q", want)
+		}
+	}
 }
 
 func TestVersionCommand_Flags(t *testing.T) {

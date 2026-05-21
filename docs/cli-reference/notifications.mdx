@@ -1,0 +1,51 @@
+---
+title: "notifications"
+description: "Manage Slack, email, PagerDuty, and other notification channels"
+---
+
+## strait notifications list
+
+List notification channels for a project.
+
+```bash
+strait notifications list --project proj_1
+```
+
+## strait notifications get
+
+Get notification channel details. Config is masked unless `--reveal` is set.
+
+```bash
+strait notifications get <channel-id>
+strait notifications get <channel-id> --reveal
+```
+
+## strait notifications create
+
+Create a notification channel.
+
+```bash
+strait notifications create \
+  --project proj_1 \
+  --name ops \
+  --type slack \
+  --config-json '{"webhook_url":"https://hooks.slack.com/..."}'
+```
+
+| Flag | Description |
+|---|---|
+| `--project` | Project ID |
+| `--name` | Channel name |
+| `--type` | Channel type (`slack`, `email`, `pagerduty`, etc.) |
+| `--config-json` | Channel config as JSON |
+| `--enabled` | Whether the channel is enabled |
+
+## strait notifications update/delete
+
+Update or delete a notification channel.
+
+```bash
+strait notifications update <channel-id> --name ops-critical
+strait notifications update <channel-id> --config-json '{"routing_key":"..."}'
+strait notifications delete <channel-id> --yes
+```
