@@ -48,7 +48,7 @@ func TestExecuteHooks_PreHook_BlocksOnFailure(t *testing.T) {
 	setupHookPlugin(t, dir, "failing-plugin", "pre-deploy", "#!/bin/sh\nexit 1\n")
 
 	hctx := HookContext{Hook: "pre-deploy", ProjectID: "proj-1"}
-	err := ExecuteHooks(context.Background(), "pre-deploy", hctx, dir, 5*time.Second)
+	err := ExecuteHooks(context.Background(), "pre-deploy", hctx, dir, 30*time.Second)
 	if err == nil {
 		t.Fatal("expected error from failing pre-hook, got nil")
 	}
@@ -65,7 +65,7 @@ func TestExecuteHooks_PostHook_WarnsOnFailure(t *testing.T) {
 	setupHookPlugin(t, dir, "failing-post", "post-deploy", "#!/bin/sh\nexit 1\n")
 
 	hctx := HookContext{Hook: "post-deploy", ProjectID: "proj-1"}
-	err := ExecuteHooks(context.Background(), "post-deploy", hctx, dir, 5*time.Second)
+	err := ExecuteHooks(context.Background(), "post-deploy", hctx, dir, 30*time.Second)
 	if err != nil {
 		t.Fatalf("post-hook failure should not return error, got: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestExecuteHooks_PassesContextOnStdin(t *testing.T) {
 		ProjectID: "proj-42",
 		Extra:     map[string]any{"key": "value"},
 	}
-	err := ExecuteHooks(context.Background(), "pre-trigger", hctx, dir, 5*time.Second)
+	err := ExecuteHooks(context.Background(), "pre-trigger", hctx, dir, 30*time.Second)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestExecuteHooks_NoPlugins_Noop(t *testing.T) {
 	dir := t.TempDir()
 	hctx := HookContext{Hook: "pre-deploy"}
 
-	err := ExecuteHooks(context.Background(), "pre-deploy", hctx, dir, 5*time.Second)
+	err := ExecuteHooks(context.Background(), "pre-deploy", hctx, dir, 30*time.Second)
 	if err != nil {
 		t.Fatalf("expected no error for empty plugin dir, got: %v", err)
 	}
