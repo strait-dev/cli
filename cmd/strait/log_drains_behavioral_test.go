@@ -116,7 +116,7 @@ func TestLogDrainsCreate_RequiresName(t *testing.T) {
 
 	state := newTestState(t, srv)
 	cmd := newLogDrainsCreateCommand(state)
-	cmd.SetArgs([]string{"--project", "proj-test", "--type", "datadog", "--config-json", `{"api_key":"x"}`})
+	cmd.SetArgs([]string{"--project", "proj-test", "--type", "datadog", "--endpoint-url", "https://e", "--auth-type", "none"})
 
 	err := cmd.Execute()
 	if err == nil || !strings.Contains(err.Error(), "--name is required") {
@@ -124,7 +124,7 @@ func TestLogDrainsCreate_RequiresName(t *testing.T) {
 	}
 }
 
-func TestLogDrainsCreate_RejectsInvalidConfigJSON(t *testing.T) {
+func TestLogDrainsCreate_RejectsInvalidAuthConfigJSON(t *testing.T) {
 	t.Parallel()
 
 	srv := newTestServer(t, http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
@@ -133,7 +133,7 @@ func TestLogDrainsCreate_RejectsInvalidConfigJSON(t *testing.T) {
 
 	state := newTestState(t, srv)
 	cmd := newLogDrainsCreateCommand(state)
-	cmd.SetArgs([]string{"--project", "proj-test", "--name", "x", "--type", "datadog", "--config-json", "nope"})
+	cmd.SetArgs([]string{"--project", "proj-test", "--name", "x", "--type", "datadog", "--endpoint-url", "https://e", "--auth-type", "api_key", "--auth-config", "nope"})
 
 	err := cmd.Execute()
 	if err == nil || !strings.Contains(err.Error(), "valid JSON") {
@@ -148,15 +148,20 @@ func TestLogDrainsCreate_Success(t *testing.T) {
 		"POST /v1/log-drains": func(w http.ResponseWriter, r *http.Request) {
 			assertAuth(t, r, "test-key")
 			var got struct {
-				Name string `json:"name"`
-				Type string `json:"type"`
+				Name        string `json:"name"`
+				Type        string `json:"drain_type"`
+				EndpointURL string `json:"endpoint_url"`
+				AuthType    string `json:"auth_type"`
 			}
 			readJSONBody(t, r, &got)
 			if got.Name != "prod-dd" {
 				t.Errorf("name: got %q, want %q", got.Name, "prod-dd")
 			}
 			if got.Type != "datadog" {
-				t.Errorf("type: got %q, want %q", got.Type, "datadog")
+				t.Errorf("drain_type: got %q, want %q", got.Type, "datadog")
+			}
+			if got.EndpointURL == "" || got.AuthType == "" {
+				t.Errorf("endpoint_url/auth_type missing: %+v", got)
 			}
 			respondJSON(t, w, http.StatusCreated, testDrainFixture())
 		},
@@ -168,7 +173,9 @@ func TestLogDrainsCreate_Success(t *testing.T) {
 		"--project", "proj-test",
 		"--name", "prod-dd",
 		"--type", "datadog",
-		"--config-json", `{"api_key":"x","site":"us"}`,
+		"--endpoint-url", "https://http-intake.logs.datadoghq.com",
+		"--auth-type", "api_key",
+		"--auth-config", `{"api_key":"x"}`,
 	})
 
 	if err := captureAndExec(t, state, cmd); err != nil {

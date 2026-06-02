@@ -34,6 +34,7 @@ func newEventSourcesCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newEventSourcesCreateCommand(state))
 	cmd.AddCommand(updateCmd)
 	cmd.AddCommand(deleteCmd)
+	registerEventSourcesCoverageCommands(cmd, state)
 
 	return cmd
 }

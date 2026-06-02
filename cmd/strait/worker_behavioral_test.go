@@ -80,7 +80,7 @@ func TestWorkerDrain_Success(t *testing.T) {
 
 	var hit bool
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"POST /v1/workers/wkr-1/disconnect": func(w http.ResponseWriter, _ *http.Request) {
+		"DELETE /v1/workers/wkr-1": func(w http.ResponseWriter, _ *http.Request) {
 			hit = true
 			respondJSON(t, w, http.StatusOK, map[string]string{"status": "draining"})
 		},

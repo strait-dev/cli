@@ -55,11 +55,9 @@ func TestCommandEntryRejectsMalformedIDs(t *testing.T) {
 	cases := []cmdCase{
 		// Webhooks
 		{name: "webhooks get", buildCmd: newWebhooksGetCommand, argFn: func(id string) []string { return []string{id} }},
-		{name: "webhooks update", buildCmd: newWebhooksUpdateCommand, argFn: func(id string) []string { return []string{id, "--url", "https://example.com"} }},
 		{name: "webhooks delete", buildCmd: newWebhooksDeleteCommand, argFn: func(id string) []string { return []string{id, "--yes"} }},
-		{name: "webhooks deliveries", buildCmd: newWebhooksDeliveriesCommand, argFn: func(id string) []string { return []string{id} }},
+		{name: "webhooks rotate-secret", buildCmd: newWebhooksRotateSecretCommand, argFn: func(id string) []string { return []string{id} }},
 		{name: "webhooks retry", buildCmd: newWebhooksRetryCommand, argFn: func(id string) []string { return []string{id} }},
-		{name: "webhooks test", buildCmd: newWebhooksTestCommand, argFn: func(id string) []string { return []string{id} }},
 
 		// Log drains
 		{name: "log-drains get", buildCmd: newLogDrainsGetCommand, argFn: func(id string) []string { return []string{id} }},

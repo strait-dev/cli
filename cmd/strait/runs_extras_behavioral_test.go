@@ -103,7 +103,7 @@ func TestRunsDLQReplay_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"POST /v1/runs/dlq/dlq-1/replay": func(w http.ResponseWriter, _ *http.Request) {
+		"POST /v1/runs/dlq-1/dlq-replay": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, testJobRunForExtras())
 		},
 	})

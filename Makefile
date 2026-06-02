@@ -1,4 +1,7 @@
-.PHONY: build test test-short lint vet fmt clean install hooks mutation mutation-dry
+.PHONY: build test test-short lint vet fmt clean install hooks mutation mutation-dry refresh-openapi e2e
+
+STRAIT_SERVER ?= http://localhost:8080
+OPENAPI_SPEC := internal/client/testdata/openapi.json
 
 BINARY := strait
 VERSION ?= 0.2.0-dev
@@ -47,6 +50,18 @@ tidy:
 	go mod tidy
 
 check: vet lint test
+
+# refresh-openapi pulls the server's published OpenAPI spec into testdata so the
+# contract test (internal/client TestEndpointsMatchOpenAPISpec) validates CLI
+# paths against the live API surface. Point at a running server via STRAIT_SERVER.
+refresh-openapi:
+	curl -fsS "$(STRAIT_SERVER)/reference/openapi.json" -o "$(OPENAPI_SPEC)"
+	@echo "updated $(OPENAPI_SPEC) from $(STRAIT_SERVER)"
+
+# e2e runs the live end-to-end suite against a running server. Requires
+# STRAIT_SERVER, STRAIT_API_KEY, and STRAIT_PROJECT to be set.
+e2e:
+	go test -tags=e2e -count=1 ./cmd/strait/... -run TestE2E
 
 hooks:
 	lefthook install

@@ -21,6 +21,7 @@ func newAPIKeysCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newAPIKeysListCommand(state))
 	cmd.AddCommand(newAPIKeysRevokeCommand(state))
 	cmd.AddCommand(newAPIKeysRotateCommand(state))
+	registerAPIKeysCoverageCommands(cmd, state)
 
 	return cmd
 }
@@ -29,6 +30,7 @@ func newAPIKeysCreateCommand(state *appState) *cobra.Command {
 	var projectID string
 	var name string
 	var scopes string
+	var expiresInDays int
 
 	cmd := &cobra.Command{
 		Use:   "create",
@@ -42,8 +44,9 @@ func newAPIKeysCreateCommand(state *appState) *cobra.Command {
 			}
 
 			req := client.CreateAPIKeyRequest{
-				ProjectID: projectID,
-				Name:      name,
+				ProjectID:     projectID,
+				Name:          name,
+				ExpiresInDays: expiresInDays,
 			}
 			if strings.TrimSpace(scopes) != "" {
 				req.Scopes = splitCSV(scopes)
@@ -70,6 +73,7 @@ func newAPIKeysCreateCommand(state *appState) *cobra.Command {
 	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
 	cmd.Flags().StringVar(&name, "name", "", "key name")
 	cmd.Flags().StringVar(&scopes, "scopes", "", "comma-separated scopes")
+	cmd.Flags().IntVar(&expiresInDays, "expires-in-days", 0, "days until the key expires (required unless the project sets a default key lifetime)")
 
 	return cmd
 }

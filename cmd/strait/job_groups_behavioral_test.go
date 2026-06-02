@@ -97,10 +97,10 @@ func TestJobGroupsActions(t *testing.T) {
 		"GET /v1/job-groups/group-1/jobs": func(w http.ResponseWriter, _ *http.Request) {
 			respondPaginated(t, w, http.StatusOK, []types.Job{{ID: "job-1", Slug: "sync"}})
 		},
-		"POST /v1/job-groups/group-1/pause": func(w http.ResponseWriter, _ *http.Request) {
+		"POST /v1/job-groups/group-1/pause-all": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, map[string]string{})
 		},
-		"POST /v1/job-groups/group-1/resume": func(w http.ResponseWriter, _ *http.Request) {
+		"POST /v1/job-groups/group-1/resume-all": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, map[string]string{})
 		},
 		"GET /v1/job-groups/group-1/stats": func(w http.ResponseWriter, _ *http.Request) {

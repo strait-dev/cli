@@ -21,6 +21,7 @@ func newSecretsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newSecretsListCommand(state))
 	cmd.AddCommand(newSecretsCreateCommand(state))
 	cmd.AddCommand(newSecretsDeleteCommand(state))
+	registerSecretsCoverageCommands(cmd, state)
 
 	return cmd
 }

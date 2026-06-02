@@ -52,6 +52,7 @@ func newJobsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(dependenciesCmd)
 	cmd.AddCommand(addDependencyCmd)
 	cmd.AddCommand(newJobsBatchCommand(state))
+	registerJobsCoverageCommands(cmd, state)
 
 	return cmd
 }

@@ -124,16 +124,19 @@ func newLogDrainsCreateCommand(state *appState) *cobra.Command {
 	var projectID string
 	var name string
 	var drainType string
-	var configJSON string
+	var endpointURL string
+	var authType string
+	var authConfigJSON string
+	var levelFilter string
 	var enabled bool
 
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a log drain",
 		Long: `Creates a log drain of type datadog, splunk, http, or other supported types.
-Pass drain-specific settings via --config-json.`,
-		Example: `  strait log-drains create --type datadog --name prod-dd --config-json '{"api_key":"xxx","site":"us"}'
-  strait log-drains create --type http --name siem --config-json '{"url":"https://siem.example.com/ingest"}'`,
+Pass the destination via --endpoint-url and authentication via --auth-type/--auth-config.`,
+		Example: `  strait log-drains create --type datadog --name prod-dd --endpoint-url https://http-intake.logs.datadoghq.com --auth-type api_key --auth-config '{"api_key":"xxx"}'
+  strait log-drains create --type http --name siem --endpoint-url https://siem.example.com/ingest --auth-type none`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			var err error
 			projectID, err = requireProjectID(state, projectID)
@@ -146,17 +149,25 @@ Pass drain-specific settings via --config-json.`,
 			if strings.TrimSpace(drainType) == "" {
 				return fmt.Errorf("--type is required")
 			}
-			if strings.TrimSpace(configJSON) == "" {
-				return fmt.Errorf("--config-json is required")
+			if strings.TrimSpace(endpointURL) == "" {
+				return fmt.Errorf("--endpoint-url is required")
 			}
-			if !json.Valid([]byte(configJSON)) {
-				return fmt.Errorf("--config-json must be valid JSON")
+			if strings.TrimSpace(authType) == "" {
+				return fmt.Errorf("--auth-type is required (e.g. none, api_key, basic, bearer)")
+			}
+			if strings.TrimSpace(authConfigJSON) != "" && !json.Valid([]byte(authConfigJSON)) {
+				return fmt.Errorf("--auth-config must be valid JSON")
 			}
 			req := client.CreateLogDrainRequest{
-				ProjectID: projectID,
-				Name:      name,
-				Type:      drainType,
-				Config:    json.RawMessage(configJSON),
+				ProjectID:   projectID,
+				Name:        name,
+				Type:        drainType,
+				EndpointURL: endpointURL,
+				AuthType:    authType,
+				LevelFilter: levelFilter,
+			}
+			if strings.TrimSpace(authConfigJSON) != "" {
+				req.AuthConfig = json.RawMessage(authConfigJSON)
 			}
 			if cmd.Flags().Changed("enabled") {
 				req.Enabled = &enabled
@@ -182,7 +193,10 @@ Pass drain-specific settings via --config-json.`,
 	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
 	cmd.Flags().StringVar(&name, "name", "", "drain name")
 	cmd.Flags().StringVar(&drainType, "type", "", "drain type (datadog, splunk, http, ...)")
-	cmd.Flags().StringVar(&configJSON, "config-json", "", "drain config as JSON")
+	cmd.Flags().StringVar(&endpointURL, "endpoint-url", "", "destination URL for the drain")
+	cmd.Flags().StringVar(&authType, "auth-type", "", "auth type (none, api_key, basic, bearer)")
+	cmd.Flags().StringVar(&authConfigJSON, "auth-config", "", "auth config as JSON (e.g. {\"api_key\":\"...\"})")
+	cmd.Flags().StringVar(&levelFilter, "level-filter", "", "minimum log level to forward")
 	cmd.Flags().BoolVar(&enabled, "enabled", true, "whether the drain is enabled")
 
 	return cmd

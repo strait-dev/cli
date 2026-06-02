@@ -21,6 +21,7 @@ func newUsageCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newUsageCurrentCommand(state))
 	cmd.AddCommand(newUsageHistoryCommand(state))
 	cmd.AddCommand(newUsageForecastCommand(state))
+	registerUsageCoverageCommands(cmd, state)
 	return cmd
 }
 

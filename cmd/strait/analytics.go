@@ -18,6 +18,7 @@ func newAnalyticsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newAnalyticsReliabilityCommand(state))
 	cmd.AddCommand(newAnalyticsTopFailingCommand(state))
 	cmd.AddCommand(newAnalyticsPerformanceCommand(state))
+	registerAnalyticsCoverageCommands(cmd, state)
 	return cmd
 }
 

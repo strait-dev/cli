@@ -152,7 +152,7 @@ func parseWaitCondition(raw string) (types.RunStatus, error) {
 	switch status {
 	case types.StatusDelayed, types.StatusQueued, types.StatusDequeued, types.StatusExecuting, types.StatusWaiting,
 		types.StatusCompleted, types.StatusFailed, types.StatusTimedOut, types.StatusCrashed, types.StatusSystemFailed,
-		types.StatusCanceled, types.StatusExpired:
+		types.StatusCanceled, types.StatusExpired, types.StatusDeadLetter, types.StatusReplayStaged, types.StatusPaused:
 		return status, nil
 	default:
 		return "", fmt.Errorf("unsupported run status %q", status)

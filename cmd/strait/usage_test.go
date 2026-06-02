@@ -31,7 +31,7 @@ func TestUsageCommand_BareInvocationCallsCurrent(t *testing.T) {
 
 	var hits atomic.Int32
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/billing/usage": func(w http.ResponseWriter, _ *http.Request) {
+		"GET /v1/usage/current": func(w http.ResponseWriter, _ *http.Request) {
 			hits.Add(1)
 			respondJSON(t, w, http.StatusOK, period)
 		},
@@ -49,7 +49,7 @@ func TestUsageCommand_BareInvocationCallsCurrent(t *testing.T) {
 	})
 
 	if hits.Load() != 1 {
-		t.Fatalf("expected exactly 1 hit on /v1/billing/usage, got %d", hits.Load())
+		t.Fatalf("expected exactly 1 hit on /v1/usage/current, got %d", hits.Load())
 	}
 
 	var got types.UsagePeriod
@@ -70,7 +70,7 @@ func TestUsageCommand_CurrentSubcommandReachesSameEndpoint(t *testing.T) {
 
 	var hits atomic.Int32
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/billing/usage": func(w http.ResponseWriter, _ *http.Request) {
+		"GET /v1/usage/current": func(w http.ResponseWriter, _ *http.Request) {
 			hits.Add(1)
 			respondJSON(t, w, http.StatusOK, period)
 		},

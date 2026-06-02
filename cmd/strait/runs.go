@@ -36,6 +36,7 @@ func newRunsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newRunsToolCallsCommand(state))
 	cmd.AddCommand(newRunsCheckpointsCommand(state))
 	cmd.AddCommand(newRunsWatchCommand(state))
+	registerRunsCoverageCommands(cmd, state)
 
 	return cmd
 }

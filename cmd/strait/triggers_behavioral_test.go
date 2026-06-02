@@ -50,8 +50,32 @@ func TestTriggersList_RequiresProject(t *testing.T) {
 	cmd := newTriggersListCommand(state)
 	cmd.SetArgs([]string{})
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "--project is required") {
+	if err == nil || !strings.Contains(err.Error(), "project ID is required") {
 		t.Fatalf("expected project required error, got: %v", err)
+	}
+}
+
+// TestTriggersList_UsesResolvedProject verifies that `triggers list` resolves
+// the project from the shared resolver (config/env/context) and no longer
+// requires an explicit --project flag.
+func TestTriggersList_UsesResolvedProject(t *testing.T) {
+	t.Parallel()
+	var hit bool
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/events": func(w http.ResponseWriter, r *http.Request) {
+			hit = true
+			assertQuery(t, r, "project_id", "proj-test")
+			respondPaginated(t, w, http.StatusOK, []types.EventTrigger{})
+		},
+	})
+	state := newTestState(t, srv) // newTestState sets project to proj-test
+	cmd := newTriggersListCommand(state)
+	cmd.SetArgs([]string{})
+	if err := captureAndExec(t, state, cmd); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hit {
+		t.Fatal("expected the events endpoint to be called with the resolved project")
 	}
 }
 
@@ -119,7 +143,7 @@ func TestTriggersSend_Raw(t *testing.T) {
 	t.Parallel()
 	var receivedBody map[string]any
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"POST /v1/events": func(w http.ResponseWriter, r *http.Request) {
+		"POST /v1/events/dispatch": func(w http.ResponseWriter, r *http.Request) {
 			readJSONBody(t, r, &receivedBody)
 			w.WriteHeader(http.StatusAccepted)
 		},
@@ -132,8 +156,8 @@ func TestTriggersSend_Raw(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
-	if receivedBody["event_key"] != "orders.created" {
-		t.Fatalf("expected event_key=orders.created, got: %v", receivedBody)
+	if receivedBody["source"] != "orders.created" {
+		t.Fatalf("expected source=orders.created, got: %v", receivedBody)
 	}
 	if receivedBody["project_id"] != "proj-test" {
 		t.Fatalf("expected project_id=proj-test, got: %v", receivedBody)

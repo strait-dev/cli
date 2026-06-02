@@ -227,7 +227,7 @@ func TestPathTraversalRejected(t *testing.T) {
 			return e
 		}},
 		{name: "DiffWorkflowVersions", fn: func(id string) error {
-			_, e := c.DiffWorkflowVersions(ctx, id, 1, 2)
+			_, e := c.DiffWorkflowVersions(ctx, id, "1", "2")
 			return e
 		}},
 		{name: "GetWorkflowPolicy", fn: func(id string) error { _, e := c.GetWorkflowPolicy(ctx, id); return e }},
@@ -260,21 +260,24 @@ func TestPathTraversalRejected(t *testing.T) {
 		}},
 
 		// Webhooks
-		{name: "GetWebhook", fn: func(id string) error { _, e := c.GetWebhook(ctx, id); return e }},
-		{name: "UpdateWebhook", fn: func(id string) error {
-			_, e := c.UpdateWebhook(ctx, id, UpdateWebhookRequest{})
+		{name: "GetWebhook", fn: func(id string) error { _, e := c.GetWebhook(ctx, "proj", id); return e }},
+		{name: "DeleteWebhook", fn: func(id string) error { return c.DeleteWebhook(ctx, id) }},
+		{name: "RotateWebhookSecret", fn: func(id string) error {
+			_, e := c.RotateWebhookSecret(ctx, id, 0)
 			return e
 		}},
-		{name: "DeleteWebhook", fn: func(id string) error { return c.DeleteWebhook(ctx, id) }},
-		{name: "ListWebhookDeliveries", fn: func(id string) error {
-			_, e := c.ListWebhookDeliveries(ctx, id, 0)
+		{name: "GetWebhookDelivery", fn: func(id string) error {
+			_, e := c.GetWebhookDelivery(ctx, id)
 			return e
 		}},
 		{name: "RetryWebhookDelivery", fn: func(id string) error {
 			_, e := c.RetryWebhookDelivery(ctx, id)
 			return e
 		}},
-		{name: "TestWebhook", fn: func(id string) error { _, e := c.TestWebhook(ctx, id); return e }},
+		{name: "ReplayWebhookDelivery", fn: func(id string) error {
+			_, e := c.ReplayWebhookDelivery(ctx, id)
+			return e
+		}},
 
 		// Event sources
 		{name: "GetEventSource", fn: func(id string) error { _, e := c.GetEventSource(ctx, id); return e }},

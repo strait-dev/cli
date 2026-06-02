@@ -1513,21 +1513,23 @@ func TestWebhookLifecycle(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/subscriptions":
 			respondPaginated(t, w, http.StatusOK, []types.Webhook{hook})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/wh-1":
-			respondJSON(t, w, http.StatusOK, hook)
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/subscriptions":
 			respondJSON(t, w, http.StatusCreated, hook)
-		case r.Method == http.MethodPatch && r.URL.Path == "/v1/webhooks/wh-1":
-			respondJSON(t, w, http.StatusOK, hook)
-		case r.Method == http.MethodDelete && r.URL.Path == "/v1/webhooks/wh-1":
-			respondJSON(t, w, http.StatusOK, map[string]string{})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/wh-1/deliveries":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/subscriptions/wh-1/rotate-secret":
+			respondJSON(t, w, http.StatusOK, types.Webhook{ID: "wh-1", Secret: "rotated"})
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/webhooks/subscriptions/wh-1":
+			w.WriteHeader(http.StatusNoContent)
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/deliveries":
 			respondPaginated(t, w, http.StatusOK, []types.WebhookDelivery{{ID: "wd-1", WebhookID: "wh-1", Status: "ok"}})
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/wh-1/test":
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/deliveries/wd-1":
+			respondJSON(t, w, http.StatusOK, types.WebhookDelivery{ID: "wd-1", WebhookID: "wh-1", Status: "ok"})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/test":
 			respondJSON(t, w, http.StatusOK, TestWebhookResponse{DeliveryID: "wd-9", Status: "queued"})
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhook-deliveries/wd-1/retry":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/deliveries/wd-1/retry":
+			respondJSON(t, w, http.StatusOK, types.WebhookDelivery{ID: "wd-1", WebhookID: "wh-1", Status: "queued"})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/deliveries/wd-1/replay":
 			respondJSON(t, w, http.StatusOK, types.WebhookDelivery{ID: "wd-1", WebhookID: "wh-1", Status: "queued"})
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
@@ -1539,27 +1541,32 @@ func TestWebhookLifecycle(t *testing.T) {
 	if got, err := c.ListWebhooks(context.Background(), "proj-1"); err != nil || len(got) != 1 {
 		t.Fatalf("ListWebhooks: %v / got=%+v", err, got)
 	}
-	if _, err := c.GetWebhook(context.Background(), "wh-1"); err != nil {
-		t.Fatalf("GetWebhook: %v", err)
+	if got, err := c.GetWebhook(context.Background(), "proj-1", "wh-1"); err != nil || got.ID != "wh-1" {
+		t.Fatalf("GetWebhook: %v / got=%+v", err, got)
 	}
 	if _, err := c.CreateWebhook(context.Background(), CreateWebhookRequest{ProjectID: "proj-1", URL: "https://example.com/hook", Events: []string{"run.completed"}}); err != nil {
 		t.Fatalf("CreateWebhook: %v", err)
 	}
-	url := "https://new.example.com"
-	if _, err := c.UpdateWebhook(context.Background(), "wh-1", UpdateWebhookRequest{URL: &url}); err != nil {
-		t.Fatalf("UpdateWebhook: %v", err)
+	if got, err := c.RotateWebhookSecret(context.Background(), "wh-1", 0); err != nil || got.Secret != "rotated" {
+		t.Fatalf("RotateWebhookSecret: %v / got=%+v", err, got)
 	}
 	if err := c.DeleteWebhook(context.Background(), "wh-1"); err != nil {
 		t.Fatalf("DeleteWebhook: %v", err)
 	}
-	if got, err := c.ListWebhookDeliveries(context.Background(), "wh-1", 10); err != nil || len(got) != 1 {
+	if got, err := c.ListWebhookDeliveries(context.Background(), "", 10); err != nil || len(got) != 1 {
 		t.Fatalf("ListWebhookDeliveries: %v / got=%+v", err, got)
 	}
-	if got, err := c.TestWebhook(context.Background(), "wh-1"); err != nil || got.DeliveryID != "wd-9" {
+	if got, err := c.GetWebhookDelivery(context.Background(), "wd-1"); err != nil || got.ID != "wd-1" {
+		t.Fatalf("GetWebhookDelivery: %v / got=%+v", err, got)
+	}
+	if got, err := c.TestWebhook(context.Background(), "https://example.com/hook", "s3cr3t"); err != nil || got.DeliveryID != "wd-9" {
 		t.Fatalf("TestWebhook: %v / got=%+v", err, got)
 	}
 	if got, err := c.RetryWebhookDelivery(context.Background(), "wd-1"); err != nil || got.ID != "wd-1" {
 		t.Fatalf("RetryWebhookDelivery: %v / got=%+v", err, got)
+	}
+	if got, err := c.ReplayWebhookDelivery(context.Background(), "wd-1"); err != nil || got.ID != "wd-1" {
+		t.Fatalf("ReplayWebhookDelivery: %v / got=%+v", err, got)
 	}
 }
 
@@ -1624,9 +1631,9 @@ func TestJobGroupLifecycle(t *testing.T) {
 			respondJSON(t, w, http.StatusOK, map[string]string{})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/job-groups/jg-1/jobs":
 			respondPaginated(t, w, http.StatusOK, []types.Job{{ID: "job-1"}})
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups/jg-1/pause":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups/jg-1/pause-all":
 			respondJSON(t, w, http.StatusOK, map[string]string{})
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups/jg-1/resume":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups/jg-1/resume-all":
 			respondJSON(t, w, http.StatusOK, map[string]string{})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/job-groups/jg-1/stats":
 			respondJSON(t, w, http.StatusOK, types.JobGroupStats{GroupID: "jg-1", JobCount: 3, RunsTotal: 100})
@@ -1742,7 +1749,9 @@ func TestLogDrainCRUD(t *testing.T) {
 		t.Fatalf("GetLogDrain: %v", err)
 	}
 	if _, err := c.CreateLogDrain(context.Background(), CreateLogDrainRequest{
-		ProjectID: "proj-1", Name: "datadog-prod", Type: "datadog", Config: json.RawMessage(`{"api_key":"x"}`),
+		ProjectID: "proj-1", Name: "datadog-prod", Type: "datadog",
+		EndpointURL: "https://http-intake.logs.datadoghq.com", AuthType: "api_key",
+		AuthConfig: json.RawMessage(`{"api_key":"x"}`),
 	}); err != nil {
 		t.Fatalf("CreateLogDrain: %v", err)
 	}
@@ -2474,28 +2483,32 @@ func TestAddJobDependency(t *testing.T) {
 	}
 }
 
-func TestBatchUpdateJobs(t *testing.T) {
+func TestBatchCreateJobs(t *testing.T) {
 	t.Parallel()
 
+	var gotBody map[string]json.RawMessage
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assertMethod(t, r, http.MethodPost)
 		assertPath(t, r, "/v1/jobs/batch")
-		respondJSON(t, w, http.StatusOK, map[string]any{
-			"updated": []string{"job-1", "job-2"},
-			"failed": []map[string]string{
-				{"id": "job-3", "reason": "not found"},
-			},
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		respondJSON(t, w, http.StatusCreated, map[string]any{
+			"created": []string{"job-1", "job-2"},
 		})
 	}))
 	defer srv.Close()
 
 	c := mustClient(t, srv.URL)
-	resp, err := c.BatchUpdateJobs(context.Background(), BatchUpdateJobsRequest{Updates: []BatchJobUpdate{{ID: "job-1"}}})
+	resp, err := c.BatchCreateJobs(context.Background(), BatchCreateJobsRequest{
+		Jobs: []json.RawMessage{json.RawMessage(`{"slug":"a","name":"a","endpoint_url":"https://e/x"}`)},
+	})
 	if err != nil {
-		t.Fatalf("BatchUpdateJobs: %v", err)
+		t.Fatalf("BatchCreateJobs: %v", err)
 	}
-	if len(resp.Updated) != 2 || len(resp.Failed) != 1 {
-		t.Fatalf("unexpected response: %+v", resp)
+	if _, ok := gotBody["jobs"]; !ok {
+		t.Fatalf("expected request body to contain 'jobs', got %v", gotBody)
+	}
+	if !strings.Contains(string(resp), "created") {
+		t.Fatalf("unexpected response: %s", resp)
 	}
 }
 
@@ -2564,16 +2577,13 @@ func TestDiffWorkflowVersions(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assertMethod(t, r, http.MethodGet)
-		assertPath(t, r, "/v1/workflows/wf-1/diff")
-		if r.URL.Query().Get("from") != "1" || r.URL.Query().Get("to") != "2" {
-			t.Fatalf("unexpected query: %q", r.URL.RawQuery)
-		}
+		assertPath(t, r, "/v1/workflows/wf-1/versions/1/diff/2")
 		respondJSON(t, w, http.StatusOK, types.WorkflowDiff{WorkflowID: "wf-1", From: 1, To: 2})
 	}))
 	defer srv.Close()
 
 	c := mustClient(t, srv.URL)
-	diff, err := c.DiffWorkflowVersions(context.Background(), "wf-1", 1, 2)
+	diff, err := c.DiffWorkflowVersions(context.Background(), "wf-1", "1", "2")
 	if err != nil {
 		t.Fatalf("DiffWorkflowVersions: %v", err)
 	}
@@ -2586,7 +2596,7 @@ func TestWorkflowPolicy(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assertPath(t, r, "/v1/workflows/wf-1/policy")
+		assertPath(t, r, "/v1/workflow-policies/proj-1")
 		switch r.Method {
 		case http.MethodGet:
 			respondJSON(t, w, http.StatusOK, types.WorkflowPolicy{WorkflowID: "wf-1", Policy: json.RawMessage(`{"max":1}`)})
@@ -2599,14 +2609,14 @@ func TestWorkflowPolicy(t *testing.T) {
 	defer srv.Close()
 
 	c := mustClient(t, srv.URL)
-	got, err := c.GetWorkflowPolicy(context.Background(), "wf-1")
+	got, err := c.GetWorkflowPolicy(context.Background(), "proj-1")
 	if err != nil {
 		t.Fatalf("GetWorkflowPolicy: %v", err)
 	}
 	if got.WorkflowID != "wf-1" {
 		t.Fatalf("unexpected: %+v", got)
 	}
-	updated, err := c.SetWorkflowPolicy(context.Background(), "wf-1", json.RawMessage(`{"max":2}`))
+	updated, err := c.SetWorkflowPolicy(context.Background(), "proj-1", json.RawMessage(`{"max":2}`))
 	if err != nil {
 		t.Fatalf("SetWorkflowPolicy: %v", err)
 	}
@@ -2718,7 +2728,7 @@ func TestDLQListAndReplay(t *testing.T) {
 				t.Fatalf("expected project_id query, got %q", r.URL.RawQuery)
 			}
 			respondPaginated(t, w, http.StatusOK, []types.DLQRun{{ID: "dlq-1", JobID: "job-1", Reason: "max attempts"}})
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/dlq/dlq-1/replay":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/runs/dlq-1/dlq-replay":
 			respondJSON(t, w, http.StatusOK, types.JobRun{ID: "run-2", Status: "queued"})
 		default:
 			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
@@ -2783,13 +2793,13 @@ func TestUsageEndpoints(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/billing/usage":
+		case "/v1/usage/current":
 			assertMethod(t, r, http.MethodGet)
 			respondJSON(t, w, http.StatusOK, types.UsagePeriod{Runs: 42, CostUSD: 12.34})
-		case "/v1/billing/usage/history":
+		case "/v1/usage/history":
 			assertMethod(t, r, http.MethodGet)
 			respondPaginated(t, w, http.StatusOK, []types.UsagePeriod{{Runs: 10}, {Runs: 20}})
-		case "/v1/billing/usage/forecast":
+		case "/v1/usage/forecast":
 			assertMethod(t, r, http.MethodGet)
 			respondJSON(t, w, http.StatusOK, types.UsagePeriod{Runs: 99, CostUSD: 50})
 		default:
@@ -2823,14 +2833,14 @@ func TestAnalyticsEndpoints(t *testing.T) {
 			if got := r.URL.Query().Get("project_id"); got != "proj-1" {
 				t.Fatalf("project_id: %q", got)
 			}
-			if got := r.URL.Query().Get("period_hours"); got != "168" {
-				t.Fatalf("period_hours: %q", got)
+			if r.URL.Query().Get("from") == "" || r.URL.Query().Get("to") == "" {
+				t.Fatalf("expected from/to params, got %q", r.URL.RawQuery)
 			}
 			respondJSON(t, w, http.StatusOK, types.CostsAnalytics{TotalUSD: 99.95, PeriodHours: 168})
-		case "/v1/analytics/reliability":
+		case "/v1/analytics/jobs/reliability":
 			assertMethod(t, r, http.MethodGet)
 			respondJSON(t, w, http.StatusOK, types.ReliabilityAnalytics{SuccessRate: 0.97, PeriodHours: 168})
-		case "/v1/analytics/top-failing":
+		case "/v1/analytics/jobs/top-failing":
 			assertMethod(t, r, http.MethodGet)
 			if got := r.URL.Query().Get("limit"); got != "5" {
 				t.Fatalf("limit: %q", got)
@@ -2862,9 +2872,9 @@ func TestTeamPolicyEndpoints(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.URL.Path == "/v1/team/policies" && r.Method == http.MethodGet:
+		case r.URL.Path == "/v1/resource-policies" && r.Method == http.MethodGet:
 			respondPaginated(t, w, http.StatusOK, []types.TeamPolicy{{ID: "pol-1", Name: "default"}})
-		case r.URL.Path == "/v1/team/policies" && r.Method == http.MethodPost:
+		case r.URL.Path == "/v1/resource-policies" && r.Method == http.MethodPost:
 			var req CreateTeamPolicyRequest
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				t.Fatalf("decode: %v", err)
@@ -2873,7 +2883,7 @@ func TestTeamPolicyEndpoints(t *testing.T) {
 				t.Fatalf("body: %+v", req)
 			}
 			respondJSON(t, w, http.StatusOK, types.TeamPolicy{ID: "pol-2", Name: req.Name, Permissions: req.Permissions})
-		case r.URL.Path == "/v1/team/policies/pol-2" && r.Method == http.MethodDelete:
+		case r.URL.Path == "/v1/resource-policies/pol-2" && r.Method == http.MethodDelete:
 			respondJSON(t, w, http.StatusOK, map[string]string{"ok": "true"})
 		default:
 			t.Fatalf("unexpected %s %s", r.Method, r.URL.Path)
