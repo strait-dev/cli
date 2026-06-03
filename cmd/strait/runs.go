@@ -264,7 +264,7 @@ func newRunsLogsCommand(state *appState) *cobra.Command {
 			ctx := cmd.Context()
 
 			if !follow {
-				rows, err := listRunEventRows(ctx, cli, args[0], level, eventType, "", time.Time{})
+				rows, err := listRunEventRows(ctx, cli, args[0], logFilter{Level: level, EventType: eventType})
 				if err != nil {
 					return err
 				}
@@ -275,7 +275,7 @@ func newRunsLogsCommand(state *appState) *cobra.Command {
 				return err
 			}
 
-			rows, err := listRunEventRows(ctx, cli, args[0], level, eventType, "", time.Time{})
+			rows, err := listRunEventRows(ctx, cli, args[0], logFilter{Level: level, EventType: eventType})
 			if err != nil {
 				return err
 			}
@@ -283,7 +283,7 @@ func newRunsLogsCommand(state *appState) *cobra.Command {
 				return err
 			}
 
-			return streamRunLogs(ctx, cli, state, args[0], level, eventType, "", time.Time{}, "")
+			return streamRunLogs(ctx, cli, state, args[0], logFilter{Level: level, EventType: eventType}, "")
 		},
 	}
 

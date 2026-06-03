@@ -175,23 +175,19 @@ func (c *Client) BulkCancelRunsByIDs(ctx context.Context, runIDs []string) (json
 	return out, nil
 }
 
+// BulkCancelAllRunsRequest holds the optional filters for BulkCancelAllRuns.
+// All fields are optional; empty fields are omitted from the request.
+type BulkCancelAllRunsRequest struct {
+	JobID       string `json:"job_id,omitempty"`
+	Status      string `json:"status,omitempty"`
+	BatchID     string `json:"batch_id,omitempty"`
+	TriggeredBy string `json:"triggered_by,omitempty"`
+}
+
 // BulkCancelAllRuns cancels all runs matching the given optional filters.
-func (c *Client) BulkCancelAllRuns(ctx context.Context, jobID, status, batchID, triggeredBy string) (json.RawMessage, error) {
-	body := map[string]any{}
-	if jobID != "" {
-		body["job_id"] = jobID
-	}
-	if status != "" {
-		body["status"] = status
-	}
-	if batchID != "" {
-		body["batch_id"] = batchID
-	}
-	if triggeredBy != "" {
-		body["triggered_by"] = triggeredBy
-	}
+func (c *Client) BulkCancelAllRuns(ctx context.Context, req BulkCancelAllRunsRequest) (json.RawMessage, error) {
 	var out json.RawMessage
-	if err := c.doJSON(ctx, http.MethodPost, "/v1/runs/bulk-cancel-all", nil, body, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/runs/bulk-cancel-all", nil, req, &out); err != nil {
 		return nil, err
 	}
 	return out, nil

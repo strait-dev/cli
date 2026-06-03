@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
 	"github.com/strait-dev/cli/internal/validate"
 
@@ -82,7 +83,12 @@ func newRolesCreateCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := cli.CreateRole(cmd.Context(), name, description, permissions, parentRoleID)
+			out, err := cli.CreateRole(cmd.Context(), client.RoleRequest{
+				Name:         name,
+				Description:  description,
+				Permissions:  permissions,
+				ParentRoleID: parentRoleID,
+			})
 			if err != nil {
 				return err
 			}
@@ -120,7 +126,12 @@ func newRolesUpdateCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := cli.UpdateRole(cmd.Context(), args[0], name, description, permissions, parentRoleID)
+			out, err := cli.UpdateRole(cmd.Context(), args[0], client.RoleRequest{
+				Name:         name,
+				Description:  description,
+				Permissions:  permissions,
+				ParentRoleID: parentRoleID,
+			})
 			if err != nil {
 				return err
 			}

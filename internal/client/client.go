@@ -67,6 +67,11 @@ func (c *Client) SetTransport(rt http.RoundTripper) {
 	c.http.Transport = rt
 }
 
+// doJSON / doJSONWithHeaders are the internal request primitives. They keep
+// positional parameters (method, endpoint, query, body[, headers], out) rather
+// than an options struct: the order mirrors a raw HTTP call, every parameter is
+// required, and these are the most-called helpers in the package — an options
+// struct here would add indirection without improving clarity.
 func (c *Client) doJSON(ctx context.Context, method, endpoint string, query url.Values, body any, out any) error {
 	return c.doJSONWithHeaders(ctx, method, endpoint, query, body, nil, out)
 }

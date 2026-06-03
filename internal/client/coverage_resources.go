@@ -108,8 +108,8 @@ func (c *Client) ListEventSourceSubscriptions(ctx context.Context, sourceID stri
 	return out, nil
 }
 
-// subscribeEventSourceRequest is the request body for SubscribeEventSource.
-type subscribeEventSourceRequest struct {
+// SubscribeEventSourceRequest is the request body for SubscribeEventSource.
+type SubscribeEventSourceRequest struct {
 	TargetType string `json:"target_type"`
 	TargetID   string `json:"target_id"`
 	Enabled    *bool  `json:"enabled,omitempty"`
@@ -117,19 +117,13 @@ type subscribeEventSourceRequest struct {
 }
 
 // SubscribeEventSource creates a subscription for an event source.
-func (c *Client) SubscribeEventSource(ctx context.Context, sourceID, targetType, targetID string, enabled *bool, filterExpr string) (json.RawMessage, error) {
+func (c *Client) SubscribeEventSource(ctx context.Context, sourceID string, req SubscribeEventSourceRequest) (json.RawMessage, error) {
 	endpoint, err := joinPath("/v1/event-sources", sourceID, "subscribe")
 	if err != nil {
 		return nil, fmt.Errorf("invalid event source id: %w", err)
 	}
-	body := subscribeEventSourceRequest{
-		TargetType: targetType,
-		TargetID:   targetID,
-		Enabled:    enabled,
-		FilterExpr: filterExpr,
-	}
 	var out json.RawMessage
-	if err := c.doJSON(ctx, http.MethodPost, endpoint, nil, body, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, endpoint, nil, req, &out); err != nil {
 		return nil, err
 	}
 	return out, nil

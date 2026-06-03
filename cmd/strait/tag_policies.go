@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
 
 	"github.com/spf13/cobra"
@@ -72,7 +73,14 @@ func newTagPoliciesCreateCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := cli.CreateTagPolicy(cmd.Context(), pid, resourceType, userID, tagKey, tagValue, actions)
+			out, err := cli.CreateTagPolicy(cmd.Context(), client.TagPolicyRequest{
+				ProjectID:    pid,
+				ResourceType: resourceType,
+				UserID:       userID,
+				TagKey:       tagKey,
+				TagValue:     tagValue,
+				Actions:      actions,
+			})
 			if err != nil {
 				return err
 			}

@@ -35,8 +35,8 @@ func (c *Client) GetRole(ctx context.Context, roleID string) (json.RawMessage, e
 	return out, nil
 }
 
-// createOrUpdateRoleBody holds the fields for role create/update requests.
-type createOrUpdateRoleBody struct {
+// RoleRequest is the request body for creating or updating a role.
+type RoleRequest struct {
 	Name         string   `json:"name"`
 	Description  string   `json:"description"`
 	Permissions  []string `json:"permissions"`
@@ -44,42 +44,22 @@ type createOrUpdateRoleBody struct {
 }
 
 // CreateRole creates a new role.
-func (c *Client) CreateRole(ctx context.Context, name, description string, permissions []string, parentRoleID string) (json.RawMessage, error) {
-	body := createOrUpdateRoleBody{
-		Name:         name,
-		Description:  description,
-		Permissions:  permissions,
-		ParentRoleID: parentRoleID,
-	}
-	encoded, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("marshal role body: %w", err)
-	}
+func (c *Client) CreateRole(ctx context.Context, req RoleRequest) (json.RawMessage, error) {
 	var out json.RawMessage
-	if err := c.doJSON(ctx, http.MethodPost, "/v1/roles", nil, json.RawMessage(encoded), &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/roles", nil, req, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
 // UpdateRole updates an existing role by ID.
-func (c *Client) UpdateRole(ctx context.Context, roleID, name, description string, permissions []string, parentRoleID string) (json.RawMessage, error) {
+func (c *Client) UpdateRole(ctx context.Context, roleID string, req RoleRequest) (json.RawMessage, error) {
 	endpoint, err := joinPath("/v1/roles", roleID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid role id: %w", err)
 	}
-	body := createOrUpdateRoleBody{
-		Name:         name,
-		Description:  description,
-		Permissions:  permissions,
-		ParentRoleID: parentRoleID,
-	}
-	encoded, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("marshal role body: %w", err)
-	}
 	var out json.RawMessage
-	if err := c.doJSON(ctx, http.MethodPatch, endpoint, nil, json.RawMessage(encoded), &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodPatch, endpoint, nil, req, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -104,8 +84,8 @@ func (c *Client) ListTagPolicies(ctx context.Context) (json.RawMessage, error) {
 	return out, nil
 }
 
-// createTagPolicyBody holds the fields for tag-policy create requests.
-type createTagPolicyBody struct {
+// TagPolicyRequest is the request body for creating a tag policy.
+type TagPolicyRequest struct {
 	ProjectID    string   `json:"project_id"`
 	ResourceType string   `json:"resource_type"`
 	UserID       string   `json:"user_id"`
@@ -115,21 +95,9 @@ type createTagPolicyBody struct {
 }
 
 // CreateTagPolicy creates a new tag policy.
-func (c *Client) CreateTagPolicy(ctx context.Context, projectID, resourceType, userID, tagKey, tagValue string, actions []string) (json.RawMessage, error) {
-	body := createTagPolicyBody{
-		ProjectID:    projectID,
-		ResourceType: resourceType,
-		UserID:       userID,
-		TagKey:       tagKey,
-		TagValue:     tagValue,
-		Actions:      actions,
-	}
-	encoded, err := json.Marshal(body)
-	if err != nil {
-		return nil, fmt.Errorf("marshal tag-policy body: %w", err)
-	}
+func (c *Client) CreateTagPolicy(ctx context.Context, req TagPolicyRequest) (json.RawMessage, error) {
 	var out json.RawMessage
-	if err := c.doJSON(ctx, http.MethodPost, "/v1/tag-policies", nil, json.RawMessage(encoded), &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/tag-policies", nil, req, &out); err != nil {
 		return nil, err
 	}
 	return out, nil

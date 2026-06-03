@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/validate"
 
 	"github.com/spf13/cobra"
@@ -331,7 +332,12 @@ func newRunsBulkCancelAllCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := cli.BulkCancelAllRuns(cmd.Context(), jobID, status, batchID, triggeredBy)
+			out, err := cli.BulkCancelAllRuns(cmd.Context(), client.BulkCancelAllRunsRequest{
+				JobID:       jobID,
+				Status:      status,
+				BatchID:     batchID,
+				TriggeredBy: triggeredBy,
+			})
 			if err != nil {
 				return err
 			}

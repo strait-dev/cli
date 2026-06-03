@@ -408,7 +408,7 @@ func TestStreamRunLogs_AppliesSearchFilter(t *testing.T) {
 	}
 
 	out := captureCommandOutput(t, func() {
-		err := streamRunLogs(context.Background(), cli, state, "run-1", "", "", "matched", time.Time{}, "ndjson")
+		err := streamRunLogs(context.Background(), cli, state, "run-1", logFilter{Level: "", EventType: "", Search: "matched", Since: time.Time{}}, "ndjson")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -489,7 +489,7 @@ func TestStreamRunLogs_IgnoresEmptyMessages(t *testing.T) {
 	}
 
 	out := captureCommandOutput(t, func() {
-		err := streamRunLogs(context.Background(), cli, state, "run-1", "", "", "", time.Time{}, "ndjson")
+		err := streamRunLogs(context.Background(), cli, state, "run-1", logFilter{Level: "", EventType: "", Search: "", Since: time.Time{}}, "ndjson")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -651,7 +651,7 @@ func TestStreamRunLogs_StatusChangeRowsPassThrough(t *testing.T) {
 	}
 
 	out := captureCommandOutput(t, func() {
-		err := streamRunLogs(context.Background(), cli, state, "run-1", "", "", "", time.Time{}, "ndjson")
+		err := streamRunLogs(context.Background(), cli, state, "run-1", logFilter{Level: "", EventType: "", Search: "", Since: time.Time{}}, "ndjson")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

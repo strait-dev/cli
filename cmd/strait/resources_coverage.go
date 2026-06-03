@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/styles"
 	"github.com/strait-dev/cli/internal/validate"
 
@@ -273,7 +274,12 @@ func newEventSourcesSubscribeCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := cli.SubscribeEventSource(cmd.Context(), args[0], targetType, targetID, enabledPtr, filterExpr)
+			out, err := cli.SubscribeEventSource(cmd.Context(), args[0], client.SubscribeEventSourceRequest{
+				TargetType: targetType,
+				TargetID:   targetID,
+				Enabled:    enabledPtr,
+				FilterExpr: filterExpr,
+			})
 			if err != nil {
 				return err
 			}
