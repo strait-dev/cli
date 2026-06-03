@@ -190,3 +190,24 @@ func TestRenderCSV_MultipleRows(t *testing.T) {
 		t.Fatalf("expected 3 lines (header + 2 rows), got %d: %s", len(lines), out)
 	}
 }
+
+// TestRenderTable_AnySliceOfMaps verifies that a []any whose elements are maps
+// (as produced by decoding a generic JSON payload) renders as a table rather
+// than erroring on the interface-kind elements.
+func TestRenderTable_AnySliceOfMaps(t *testing.T) {
+	t.Parallel()
+
+	data := []any{
+		map[string]any{"id": "a", "name": "alpha"},
+		map[string]any{"id": "b", "name": "beta"},
+	}
+	out, err := RenderToString(data, Options{Format: "table"})
+	if err != nil {
+		t.Fatalf("render table: %v", err)
+	}
+	for _, want := range []string{"id", "name", "alpha", "beta"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("table missing %q, got:\n%s", want, out)
+		}
+	}
+}

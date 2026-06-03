@@ -21,7 +21,7 @@ func TestExportJobs_Success(t *testing.T) {
 
 	state := newTestState(t, srv)
 	cmd := newExportJobsCommand(state)
-	cmd.SetArgs([]string{"--format", "json"})
+	cmd.SetArgs([]string{"--export-format", "json"})
 
 	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
@@ -69,7 +69,7 @@ func TestExportRuns_Success(t *testing.T) {
 
 	state := newTestState(t, srv)
 	cmd := newExportRunsCommand(state)
-	cmd.SetArgs([]string{"--format", "json", "--from", "2026-01-01T00:00:00Z", "--to", "2026-06-01T00:00:00Z"})
+	cmd.SetArgs([]string{"--export-format", "json", "--from", "2026-01-01T00:00:00Z", "--to", "2026-06-01T00:00:00Z"})
 
 	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
@@ -97,7 +97,7 @@ func TestExportWorkflows_Success(t *testing.T) {
 
 	state := newTestState(t, srv)
 	cmd := newExportWorkflowsCommand(state)
-	cmd.SetArgs([]string{"--format", "json"})
+	cmd.SetArgs([]string{"--export-format", "json"})
 
 	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {

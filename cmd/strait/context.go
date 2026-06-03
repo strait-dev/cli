@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -204,6 +206,23 @@ func newContextCurrentCommand(state *appState) *cobra.Command {
 }
 
 func printData(state *appState, data any) error {
+	// Commands that pass raw server JSON (json.RawMessage) must be decoded into a
+	// generic value first. Otherwise the renderers see a []byte and only
+	// --format json is correct — table/yaml/csv/jsonpath/go-template/compact and
+	// --quiet all mishandle the raw bytes. An empty payload becomes an empty
+	// list so list commands render "[]" rather than "null".
+	if raw, ok := data.(json.RawMessage); ok {
+		if trimmed := bytes.TrimSpace(raw); len(trimmed) > 0 {
+			var decoded any
+			if err := json.Unmarshal(trimmed, &decoded); err != nil {
+				return fmt.Errorf("decode response payload: %w", err)
+			}
+			data = decoded
+		} else {
+			data = []any{}
+		}
+	}
+
 	if state.opts.quiet {
 		return printQuietIDs(state, data)
 	}
@@ -226,17 +245,32 @@ func printData(state *appState, data any) error {
 	})
 }
 
-// printQuietIDs prints only the id field from each row, one per line.
+// printQuietIDs prints only the id field from each row, one per line. It accepts
+// both typed rows ([]map[string]any) and the generic shapes produced by decoding
+// a json.RawMessage payload ([]any of objects, or a single object).
 func printQuietIDs(state *appState, data any) error {
 	switch v := data.(type) {
 	case []map[string]any:
 		for _, row := range v {
-			if id, ok := row["id"]; ok {
-				fmt.Fprintln(state.out(), id)
+			printRowID(state, row)
+		}
+	case []any:
+		for _, row := range v {
+			if m, ok := row.(map[string]any); ok {
+				printRowID(state, m)
 			}
 		}
+	case map[string]any:
+		printRowID(state, v)
 	default:
 		return output.Render(state.out(), data, output.Options{Format: "json"})
 	}
 	return nil
+}
+
+// printRowID prints a row's "id" field when present.
+func printRowID(state *appState, row map[string]any) {
+	if id, ok := row["id"]; ok {
+		fmt.Fprintln(state.out(), id)
+	}
 }

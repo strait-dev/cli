@@ -77,7 +77,7 @@ func newUsageExportCommand(state *appState) *cobra.Command {
 			return printData(state, out)
 		},
 	}
-	cmd.Flags().StringVar(&format, "format", "json", "export format (e.g. json, csv)")
+	cmd.Flags().StringVar(&format, "export-format", "json", "server-side export content format (json, csv)")
 	return cmd
 }
 

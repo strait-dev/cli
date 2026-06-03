@@ -33,7 +33,7 @@ func newExportJobsCommand(state *appState) *cobra.Command {
 			return printData(state, out)
 		},
 	}
-	cmd.Flags().StringVar(&format, "format", "json", "export format (e.g. json, csv)")
+	cmd.Flags().StringVar(&format, "export-format", "json", "server-side export content format (json, csv)")
 	return cmd
 }
 
@@ -57,7 +57,7 @@ func newExportRunsCommand(state *appState) *cobra.Command {
 			return printData(state, out)
 		},
 	}
-	cmd.Flags().StringVar(&format, "format", "json", "export format (e.g. json, csv)")
+	cmd.Flags().StringVar(&format, "export-format", "json", "server-side export content format (json, csv)")
 	cmd.Flags().StringVar(&from, "from", "", "start of time range (RFC3339)")
 	cmd.Flags().StringVar(&to, "to", "", "end of time range (RFC3339)")
 	return cmd
@@ -81,6 +81,6 @@ func newExportWorkflowsCommand(state *appState) *cobra.Command {
 			return printData(state, out)
 		},
 	}
-	cmd.Flags().StringVar(&format, "format", "json", "export format (e.g. json, csv)")
+	cmd.Flags().StringVar(&format, "export-format", "json", "server-side export content format (json, csv)")
 	return cmd
 }

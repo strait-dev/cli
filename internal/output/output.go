@@ -270,7 +270,10 @@ func rowsFromData(data any) ([]string, []map[string]string, error) {
 }
 
 func toStringMap(v reflect.Value) (map[string]string, error) {
-	for v.Kind() == reflect.Pointer {
+	// Unwrap pointers and interfaces. Interface unwrapping matters for []any
+	// rows (e.g. JSON decoded into a generic value), whose elements are
+	// interface-kind values wrapping the underlying map/struct.
+	for v.Kind() == reflect.Pointer || v.Kind() == reflect.Interface {
 		if v.IsNil() {
 			return nil, fmt.Errorf("nil row")
 		}
