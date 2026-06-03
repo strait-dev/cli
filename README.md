@@ -165,10 +165,13 @@ Example `strait.json`:
 
 Strait CLI reads configuration from (in order of precedence):
 
-1. Command-line flags (`--server`, `--project`, `--api-key`)
-2. Environment variables (`STRAIT_SERVER`, `STRAIT_PROJECT`, `STRAIT_API_KEY`)
+1. Command-line flags (`--server`, `--project`, `--org`, `--api-key`)
+2. Environment variables (`STRAIT_SERVER`, `STRAIT_PROJECT`, `STRAIT_ORG`, `STRAIT_API_KEY`)
 3. Per-project file: `./.strait.yaml`
 4. User-global file: `~/.config/strait/config.yaml`
+
+Org-scoped commands (`billing`, some `usage` views) resolve the organization
+from `--org`, then `STRAIT_ORG`, then the `org` config key or active context.
 
 Credentials from `strait auth login` are stored in the OS keychain (macOS Keychain, Linux Secret Service, Windows Credential Manager).
 

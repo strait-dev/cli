@@ -42,6 +42,10 @@ func newBillingSpendingLimitGetCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			orgID, err = requireOrgID(state, orgID)
+			if err != nil {
+				return err
+			}
 			out, err := cli.GetSpendingLimit(cmd.Context(), orgID)
 			if err != nil {
 				return err
@@ -49,7 +53,7 @@ func newBillingSpendingLimitGetCommand(state *appState) *cobra.Command {
 			return printData(state, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgID, "org", "", "organization ID")
+	cmd.Flags().StringVar(&orgID, "org", "", "organization ID (or set STRAIT_ORG / config org)")
 	return cmd
 }
 
@@ -69,6 +73,10 @@ func newBillingSpendingLimitSetCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			orgID, err = requireOrgID(state, orgID)
+			if err != nil {
+				return err
+			}
 			out, err := cli.SetSpendingLimit(cmd.Context(), orgID, limitMicroUSD, action)
 			if err != nil {
 				return err
@@ -76,7 +84,7 @@ func newBillingSpendingLimitSetCommand(state *appState) *cobra.Command {
 			return printData(state, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgID, "org", "", "organization ID")
+	cmd.Flags().StringVar(&orgID, "org", "", "organization ID (or set STRAIT_ORG / config org)")
 	cmd.Flags().Int64Var(&limitMicroUSD, "limit-microusd", 0, "spending limit in micro-USD")
 	cmd.Flags().StringVar(&action, "action", "", "action to take when limit is reached (required)")
 	return cmd
@@ -172,6 +180,10 @@ func newBillingAnomalyConfigGetCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			orgID, err = requireOrgID(state, orgID)
+			if err != nil {
+				return err
+			}
 			out, err := cli.GetAnomalyConfig(cmd.Context(), orgID)
 			if err != nil {
 				return err
@@ -179,7 +191,7 @@ func newBillingAnomalyConfigGetCommand(state *appState) *cobra.Command {
 			return printData(state, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgID, "org", "", "organization ID")
+	cmd.Flags().StringVar(&orgID, "org", "", "organization ID (or set STRAIT_ORG / config org)")
 	return cmd
 }
 
@@ -196,6 +208,10 @@ func newBillingAnomalyConfigSetCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			orgID, err = requireOrgID(state, orgID)
+			if err != nil {
+				return err
+			}
 			out, err := cli.SetAnomalyConfig(cmd.Context(), orgID, warning, critical)
 			if err != nil {
 				return err
@@ -203,7 +219,7 @@ func newBillingAnomalyConfigSetCommand(state *appState) *cobra.Command {
 			return printData(state, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgID, "org", "", "organization ID")
+	cmd.Flags().StringVar(&orgID, "org", "", "organization ID (or set STRAIT_ORG / config org)")
 	cmd.Flags().Float64Var(&warning, "warning", 0, "warning threshold multiplier")
 	cmd.Flags().Float64Var(&critical, "critical", 0, "critical threshold multiplier")
 	return cmd
@@ -237,13 +253,14 @@ func newBillingDowngradePreviewCommand(state *appState) *cobra.Command {
 		Short: "Preview the effects of downgrading an org to a target tier",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if strings.TrimSpace(orgID) == "" {
-				return fmt.Errorf("--org is required")
-			}
 			if strings.TrimSpace(targetTier) == "" {
 				return fmt.Errorf("--target-tier is required")
 			}
 			cli, err := newAPIClient(state)
+			if err != nil {
+				return err
+			}
+			orgID, err = requireOrgID(state, orgID)
 			if err != nil {
 				return err
 			}
@@ -254,7 +271,7 @@ func newBillingDowngradePreviewCommand(state *appState) *cobra.Command {
 			return printData(state, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgID, "org", "", "organization ID (required)")
+	cmd.Flags().StringVar(&orgID, "org", "", "organization ID (or set STRAIT_ORG / config org)")
 	cmd.Flags().StringVar(&targetTier, "target-tier", "", "target plan tier to preview (required)")
 	return cmd
 }

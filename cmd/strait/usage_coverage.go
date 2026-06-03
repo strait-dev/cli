@@ -93,6 +93,10 @@ func newUsageEmailPreferencesGetCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			orgID, err = requireOrgID(state, orgID)
+			if err != nil {
+				return err
+			}
 			out, err := cli.GetUsageEmailPreferences(cmd.Context(), orgID)
 			if err != nil {
 				return err
@@ -100,7 +104,7 @@ func newUsageEmailPreferencesGetCommand(state *appState) *cobra.Command {
 			return printData(state, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgID, "org", "", "organization ID")
+	cmd.Flags().StringVar(&orgID, "org", "", "organization ID (or set STRAIT_ORG / config org)")
 	return cmd
 }
 
@@ -117,6 +121,10 @@ func newUsageEmailPreferencesSetCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			orgID, err = requireOrgID(state, orgID)
+			if err != nil {
+				return err
+			}
 			out, err := cli.SetUsageEmailPreferences(cmd.Context(), orgID, monthly)
 			if err != nil {
 				return err
@@ -127,7 +135,7 @@ func newUsageEmailPreferencesSetCommand(state *appState) *cobra.Command {
 			return printData(state, out)
 		},
 	}
-	cmd.Flags().StringVar(&orgID, "org", "", "organization ID")
+	cmd.Flags().StringVar(&orgID, "org", "", "organization ID (or set STRAIT_ORG / config org)")
 	cmd.Flags().BoolVar(&monthly, "monthly", false, "enable monthly usage email")
 	return cmd
 }

@@ -208,7 +208,7 @@ func TestBillingAnomalyConfigGet_Success(t *testing.T) {
 
 	state := newTestState(t, srv)
 	cmd := newBillingAnomalyConfigGetCommand(state)
-	cmd.SetArgs([]string{})
+	cmd.SetArgs([]string{"--org", "org-1"})
 
 	if err := captureAndExec(t, state, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -284,8 +284,8 @@ func TestBillingDowngradePreview_RequiresOrg(t *testing.T) {
 	cmd.SetArgs([]string{"--target-tier", "starter"})
 
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "--org is required") {
-		t.Fatalf("expected --org error, got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "organization ID is required") {
+		t.Fatalf("expected org-required error, got: %v", err)
 	}
 }
 

@@ -237,3 +237,17 @@ func requireProjectID(state *appState, flagValue string) (string, error) {
 	}
 	return "", fmt.Errorf("project ID is required (use --project)")
 }
+
+// requireOrgID resolves the organization ID from the --org flag, falling back
+// to the resolved config/env value (STRAIT_ORG, config "org", or the active
+// context's "org"). Org-scoped commands (billing, some usage views) use it so
+// the org need only be set once rather than passed on every invocation.
+func requireOrgID(state *appState, flagValue string) (string, error) {
+	if flagValue != "" {
+		return flagValue, nil
+	}
+	if state.resolved.OrgID != "" {
+		return state.resolved.OrgID, nil
+	}
+	return "", fmt.Errorf("organization ID is required (use --org or set STRAIT_ORG)")
+}

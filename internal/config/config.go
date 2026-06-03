@@ -19,6 +19,7 @@ const (
 type Context struct {
 	Server  string `yaml:"server,omitempty"`
 	Project string `yaml:"project,omitempty"`
+	Org     string `yaml:"org,omitempty"`
 	Format  string `yaml:"format,omitempty"`
 }
 
@@ -26,6 +27,7 @@ type File struct {
 	ServerURL      string              `yaml:"server,omitempty"`
 	Token          string              `yaml:"api_key,omitempty"`
 	DefaultProject string              `yaml:"project,omitempty"`
+	DefaultOrg     string              `yaml:"org,omitempty"`
 	OutputFormat   string              `yaml:"format,omitempty"`
 	Aliases        map[string]string   `yaml:"aliases,omitempty"`
 	Secrets        map[string][]string `yaml:"secrets,omitempty"`
@@ -54,6 +56,7 @@ type Resolved struct {
 	ServerURL   string
 	Credential  string
 	ProjectID   string
+	OrgID       string
 	Format      string
 	ContextName string
 	NoColor     bool
@@ -155,6 +158,7 @@ func Resolve(input ResolveInput) Resolved {
 		ServerURL:   strings.TrimSpace(input.Env["STRAIT_SERVER"]),
 		Credential:  strings.TrimSpace(input.Env["STRAIT_API_KEY"]),
 		ProjectID:   strings.TrimSpace(input.Env["STRAIT_PROJECT"]),
+		OrgID:       strings.TrimSpace(input.Env["STRAIT_ORG"]),
 		Format:      strings.TrimSpace(input.Env["STRAIT_FORMAT"]),
 		ContextName: active,
 		NoColor:     input.BoolFlags["no-color"] || strings.TrimSpace(input.Env["NO_COLOR"]) != "",
@@ -172,6 +176,9 @@ func Resolve(input ResolveInput) Resolved {
 	if cfg.DefaultProject != "" {
 		resolved.ProjectID = cfg.DefaultProject
 	}
+	if cfg.DefaultOrg != "" {
+		resolved.OrgID = cfg.DefaultOrg
+	}
 	if cfg.OutputFormat != "" {
 		resolved.Format = cfg.OutputFormat
 	}
@@ -182,6 +189,9 @@ func Resolve(input ResolveInput) Resolved {
 		}
 		if ctx.Project != "" {
 			resolved.ProjectID = ctx.Project
+		}
+		if ctx.Org != "" {
+			resolved.OrgID = ctx.Org
 		}
 		if ctx.Format != "" {
 			resolved.Format = ctx.Format

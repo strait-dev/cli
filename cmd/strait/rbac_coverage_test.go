@@ -284,6 +284,7 @@ func TestUsageEmailPreferencesSet_MonthlyFalse(t *testing.T) {
 	state := newTestState(t, srv)
 	cmd := newUsageEmailPreferencesSetCommand(state)
 	// --monthly not passed, defaults to false
+	cmd.SetArgs([]string{"--org", "org-1"})
 
 	if err := captureAndExec(t, state, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)
