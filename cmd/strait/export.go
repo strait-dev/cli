@@ -30,7 +30,7 @@ func newExportJobsCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printData(state, out)
+			return printDataColumns(state, out, jobTableColumns)
 		},
 	}
 	cmd.Flags().StringVar(&format, "export-format", "json", "server-side export content format (json, csv)")
@@ -54,7 +54,7 @@ func newExportRunsCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printData(state, out)
+			return printDataColumns(state, out, runTableColumns)
 		},
 	}
 	cmd.Flags().StringVar(&format, "export-format", "json", "server-side export content format (json, csv)")
@@ -78,7 +78,7 @@ func newExportWorkflowsCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printData(state, out)
+			return printDataColumns(state, out, workflowTableColumns)
 		},
 	}
 	cmd.Flags().StringVar(&format, "export-format", "json", "server-side export content format (json, csv)")

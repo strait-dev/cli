@@ -206,6 +206,13 @@ func newContextCurrentCommand(state *appState) *cobra.Command {
 }
 
 func printData(state *appState, data any) error {
+	return printDataColumns(state, data, nil)
+}
+
+// printDataColumns renders data like printData but restricts table/wide output
+// to the given columns (in order). Other formats and --quiet are unaffected.
+// Pass nil columns for the default "show every field" behaviour.
+func printDataColumns(state *appState, data any, columns []string) error {
 	// Commands that pass raw server JSON (json.RawMessage) must be decoded into a
 	// generic value first. Otherwise the renderers see a []byte and only
 	// --format json is correct — table/yaml/csv/jsonpath/go-template/compact and
@@ -242,6 +249,7 @@ func printData(state *appState, data any) error {
 		Template:  state.opts.outputTpl,
 		JSONPath:  state.opts.outputPath,
 		TTY:       tty,
+		Columns:   columns,
 	})
 }
 

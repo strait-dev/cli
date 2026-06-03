@@ -238,6 +238,16 @@ func requireProjectID(state *appState, flagValue string) (string, error) {
 	return "", fmt.Errorf("project ID is required (use --project)")
 }
 
+// Curated table columns for raw (json.RawMessage) list payloads that share the
+// core resource shapes. They mirror the columns of the typed list commands so
+// table output is consistent. Missing fields degrade to empty cells; non-table
+// formats are unaffected.
+var (
+	jobTableColumns      = []string{"id", "slug", "name", "enabled", "cron", "source_type"}
+	runTableColumns      = []string{"id", "job_id", "status", "attempt", "triggered_by", "created_at"}
+	workflowTableColumns = []string{"id", "slug", "name", "version", "created_at"}
+)
+
 // requireOrgID resolves the organization ID from the --org flag, falling back
 // to the resolved config/env value (STRAIT_ORG, config "org", or the active
 // context's "org"). Org-scoped commands (billing, some usage views) use it so

@@ -36,7 +36,7 @@ func newOrganizationsJobsCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printData(state, out)
+			return printDataColumns(state, out, jobTableColumns)
 		},
 	}
 	cmd.Flags().IntVar(&limit, "limit", 0, "max results")
@@ -61,7 +61,7 @@ func newOrganizationsRunsCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return printData(state, out)
+			return printDataColumns(state, out, runTableColumns)
 		},
 	}
 	cmd.Flags().IntVar(&limit, "limit", 0, "max results")
