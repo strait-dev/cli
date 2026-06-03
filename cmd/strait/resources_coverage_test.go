@@ -13,6 +13,10 @@ func TestJobsPause_Success(t *testing.T) {
 
 	pauseCalled := false
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		// resolveJobIdentifier resolves the slug via GetJob before the action.
+		"GET /v1/jobs/job-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, map[string]any{"id": "job-1", "slug": "job-1"})
+		},
 		"POST /v1/jobs/job-1/pause": func(w http.ResponseWriter, r *http.Request) {
 			assertAuth(t, r, "test-key")
 			pauseCalled = true
@@ -113,6 +117,10 @@ func TestEventSourcesSubscribe_SendsBody(t *testing.T) {
 
 	var receivedBody map[string]any
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		// resolveEventSourceIdentifier resolves the slug via GetEventSource first.
+		"GET /v1/event-sources/src-1": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, map[string]any{"id": "src-1", "slug": "src-1"})
+		},
 		"POST /v1/event-sources/src-1/subscribe": func(w http.ResponseWriter, r *http.Request) {
 			assertAuth(t, r, "test-key")
 			readJSONBody(t, r, &receivedBody)

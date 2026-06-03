@@ -31,14 +31,15 @@ func newJobsPauseCommand(state *appState) *cobra.Command {
 		Short: "Pause a job",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validate.SlugOrID(args[0]); err != nil {
-				return fmt.Errorf("invalid job id: %w", err)
-			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := cli.PauseJob(cmd.Context(), args[0])
+			jobID, err := resolveJobIdentifier(cmd.Context(), cli, state, args[0])
+			if err != nil {
+				return err
+			}
+			out, err := cli.PauseJob(cmd.Context(), jobID)
 			if err != nil {
 				return err
 			}
@@ -57,14 +58,15 @@ func newJobsResumeCommand(state *appState) *cobra.Command {
 		Short: "Resume a paused job",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validate.SlugOrID(args[0]); err != nil {
-				return fmt.Errorf("invalid job id: %w", err)
-			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := cli.ResumeJob(cmd.Context(), args[0])
+			jobID, err := resolveJobIdentifier(cmd.Context(), cli, state, args[0])
+			if err != nil {
+				return err
+			}
+			out, err := cli.ResumeJob(cmd.Context(), jobID)
 			if err != nil {
 				return err
 			}
@@ -133,9 +135,6 @@ func newJobsTriggerBulkCommand(state *appState) *cobra.Command {
 		Long:  `Bulk-trigger runs for a job. Provide the body ({"items":[...]}) via --from-file.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validate.SlugOrID(args[0]); err != nil {
-				return fmt.Errorf("invalid job id: %w", err)
-			}
 			body, err := readJSONFileBody(fromFile)
 			if err != nil {
 				return err
@@ -144,7 +143,11 @@ func newJobsTriggerBulkCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := cli.BulkTriggerJobRaw(cmd.Context(), args[0], body)
+			jobID, err := resolveJobIdentifier(cmd.Context(), cli, state, args[0])
+			if err != nil {
+				return err
+			}
+			out, err := cli.BulkTriggerJobRaw(cmd.Context(), jobID, body)
 			if err != nil {
 				return err
 			}
@@ -162,9 +165,6 @@ func newJobsVersionGetCommand(state *appState) *cobra.Command {
 		Short: "Get a specific version of a job",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validate.SlugOrID(args[0]); err != nil {
-				return fmt.Errorf("invalid job id: %w", err)
-			}
 			if strings.TrimSpace(versionID) == "" {
 				return fmt.Errorf("--version is required")
 			}
@@ -172,7 +172,11 @@ func newJobsVersionGetCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := cli.GetJobVersion(cmd.Context(), args[0], versionID)
+			jobID, err := resolveJobIdentifier(cmd.Context(), cli, state, args[0])
+			if err != nil {
+				return err
+			}
+			out, err := cli.GetJobVersion(cmd.Context(), jobID, versionID)
 			if err != nil {
 				return err
 			}
@@ -190,9 +194,6 @@ func newJobsRemoveDependencyCommand(state *appState) *cobra.Command {
 		Short: "Remove a dependency from a job",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validate.SlugOrID(args[0]); err != nil {
-				return fmt.Errorf("invalid job id: %w", err)
-			}
 			if strings.TrimSpace(depID) == "" {
 				return fmt.Errorf("--dep-id is required")
 			}
@@ -200,7 +201,11 @@ func newJobsRemoveDependencyCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := cli.DeleteJobDependency(cmd.Context(), args[0], depID); err != nil {
+			jobID, err := resolveJobIdentifier(cmd.Context(), cli, state, args[0])
+			if err != nil {
+				return err
+			}
+			if err := cli.DeleteJobDependency(cmd.Context(), jobID, depID); err != nil {
 				return err
 			}
 			if isTTYRich(state) {
@@ -228,14 +233,15 @@ func newEventSourcesSubscriptionsCommand(state *appState) *cobra.Command {
 		Short: "List subscriptions for an event source",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validate.SlugOrID(args[0]); err != nil {
-				return fmt.Errorf("invalid event source id: %w", err)
-			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
 			}
-			out, err := cli.ListEventSourceSubscriptions(cmd.Context(), args[0])
+			sourceID, err := resolveEventSourceIdentifier(cmd.Context(), cli, state, args[0])
+			if err != nil {
+				return err
+			}
+			out, err := cli.ListEventSourceSubscriptions(cmd.Context(), sourceID)
 			if err != nil {
 				return err
 			}
@@ -256,9 +262,6 @@ func newEventSourcesSubscribeCommand(state *appState) *cobra.Command {
 		Short: "Subscribe a target to an event source",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validate.SlugOrID(args[0]); err != nil {
-				return fmt.Errorf("invalid event source id: %w", err)
-			}
 			if strings.TrimSpace(targetType) == "" {
 				return fmt.Errorf("--target-type is required")
 			}
@@ -274,7 +277,11 @@ func newEventSourcesSubscribeCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out, err := cli.SubscribeEventSource(cmd.Context(), args[0], client.SubscribeEventSourceRequest{
+			sourceID, err := resolveEventSourceIdentifier(cmd.Context(), cli, state, args[0])
+			if err != nil {
+				return err
+			}
+			out, err := cli.SubscribeEventSource(cmd.Context(), sourceID, client.SubscribeEventSourceRequest{
 				TargetType: targetType,
 				TargetID:   targetID,
 				Enabled:    enabledPtr,
@@ -307,9 +314,6 @@ func newEventSourcesUnsubscribeCommand(state *appState) *cobra.Command {
 		Short: "Remove a subscription from an event source",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validate.SlugOrID(args[0]); err != nil {
-				return fmt.Errorf("invalid event source id: %w", err)
-			}
 			if strings.TrimSpace(subID) == "" {
 				return fmt.Errorf("--sub-id is required")
 			}
@@ -317,7 +321,11 @@ func newEventSourcesUnsubscribeCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := cli.DeleteEventSourceSubscription(cmd.Context(), args[0], subID); err != nil {
+			sourceID, err := resolveEventSourceIdentifier(cmd.Context(), cli, state, args[0])
+			if err != nil {
+				return err
+			}
+			if err := cli.DeleteEventSourceSubscription(cmd.Context(), sourceID, subID); err != nil {
 				return err
 			}
 			if isTTYRich(state) {
