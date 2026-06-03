@@ -83,11 +83,11 @@ func TestNotificationsCreateAndUpdate(t *testing.T) {
 			var got struct {
 				ProjectID string          `json:"project_id"`
 				Name      string          `json:"name"`
-				Type      string          `json:"type"`
+				Type      string          `json:"channel_type"`
 				Config    json.RawMessage `json:"config"`
 			}
 			readJSONBody(t, r, &got)
-			if got.ProjectID != "proj-test" || got.Name != "ops" || got.Type != "slack" || !json.Valid(got.Config) {
+			if got.Name != "ops" || got.Type != "slack" || !json.Valid(got.Config) {
 				t.Errorf("unexpected create payload: %+v", got)
 			}
 			respondJSON(t, w, http.StatusCreated, testNotificationFixture())

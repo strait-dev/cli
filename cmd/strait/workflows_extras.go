@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/strait-dev/cli/internal/client"
@@ -195,13 +194,11 @@ func newWorkflowsDiffCommand(state *appState) *cobra.Command {
 		Short: "Show the diff between two workflow versions",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			from, err := strconv.Atoi(fromV)
-			if err != nil || from <= 0 {
-				return fmt.Errorf("--from must be a positive integer")
+			if strings.TrimSpace(fromV) == "" {
+				return fmt.Errorf("--from is required (version number or version ID)")
 			}
-			to, err := strconv.Atoi(toV)
-			if err != nil || to <= 0 {
-				return fmt.Errorf("--to must be a positive integer")
+			if strings.TrimSpace(toV) == "" {
+				return fmt.Errorf("--to is required (version number or version ID)")
 			}
 			cli, err := newAPIClient(state)
 			if err != nil {
@@ -211,15 +208,15 @@ func newWorkflowsDiffCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			diff, err := cli.DiffWorkflowVersions(cmd.Context(), id, from, to)
+			diff, err := cli.DiffWorkflowVersions(cmd.Context(), id, fromV, toV)
 			if err != nil {
 				return err
 			}
 			return printData(state, diff)
 		},
 	}
-	cmd.Flags().StringVar(&fromV, "from", "", "from version (required)")
-	cmd.Flags().StringVar(&toV, "to", "", "to version (required)")
+	cmd.Flags().StringVar(&fromV, "from", "", "from version number or version ID (required)")
+	cmd.Flags().StringVar(&toV, "to", "", "to version number or version ID (required)")
 	mustMarkFlagRequired(cmd, "from")
 	mustMarkFlagRequired(cmd, "to")
 	return cmd
@@ -228,16 +225,19 @@ func newWorkflowsDiffCommand(state *appState) *cobra.Command {
 func newWorkflowsPolicyCommand(state *appState) *cobra.Command {
 	var setFile string
 	var setInline string
+	var projectID string
 	cmd := &cobra.Command{
-		Use:   "policy <workflow-id-or-slug>",
-		Short: "Get or set the run-time policy for a workflow",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cli, err := newAPIClient(state)
+		Use:   "policy",
+		Short: "Get or set the workflow governance policy for the project",
+		Long: "Get or set the project-level workflow governance policy " +
+			"(max fan-out, max depth, forbidden step types, approval requirements).",
+		Args: cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			projectID, err := requireProjectID(state, projectID)
 			if err != nil {
 				return err
 			}
-			id, err := resolveWorkflowIdentifier(cmd.Context(), cli, state, args[0])
+			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
 			}
@@ -249,19 +249,20 @@ func newWorkflowsPolicyCommand(state *appState) *cobra.Command {
 				if policy == nil {
 					return fmt.Errorf("--set or --set-file must contain JSON")
 				}
-				updated, err := cli.SetWorkflowPolicy(cmd.Context(), id, policy)
+				updated, err := cli.SetWorkflowPolicy(cmd.Context(), projectID, policy)
 				if err != nil {
 					return err
 				}
 				return printData(state, updated)
 			}
-			policy, err := cli.GetWorkflowPolicy(cmd.Context(), id)
+			policy, err := cli.GetWorkflowPolicy(cmd.Context(), projectID)
 			if err != nil {
 				return err
 			}
 			return printData(state, policy)
 		},
 	}
+	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
 	cmd.Flags().StringVar(&setInline, "set", "", "inline JSON policy to apply")
 	cmd.Flags().StringVar(&setFile, "set-file", "", "path to JSON policy file")
 	return cmd

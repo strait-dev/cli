@@ -134,24 +134,26 @@ Example `strait.json`:
 | Migration       | `migrate inngest\|trigger\|hatchet --input <path>`                    |
 | Sync            | `sync` (`strait.json` orchestration upsert; supports `--dry-run`, `--prune`) |
 | Endpoint        | `endpoint set/get/verify`                                             |
-| Worker          | `worker status/drain` (workers run on customer infra via `strait-go/worker`) |
+| Worker          | `worker status/drain/get/tasks` (workers run on customer infra via `strait-go/worker`) |
 | Dev             | `dev` (Cloudflare Tunnel + auto-register)                             |
-| Jobs            | `jobs list/get/create/update/delete/clone/trigger/health/versions/dependencies/add-dependency/batch` |
+| Jobs            | `jobs list/get/create/update/delete/clone/trigger/health/versions/dependencies/add-dependency/remove-dependency/pause/resume/batch/batch-enable/batch-disable/trigger-bulk/version-get` |
 | Job groups      | `job-groups list/get/create/update/delete/jobs/pause/resume/stats` |
-| Runs            | `runs list/get/logs/cancel/replay/reschedule/dlq/dlq-replay/outputs/tool-calls/checkpoints/watch` |
-| Workflows       | `workflows list/get/create/update/delete/clone/trigger/dry-run/plan/simulate/versions/diff/policy/visualize` |
-| Workflow runs   | `workflow-runs list/get/pause/resume/retry/approve-step/retry-step/skip-step/force-complete-step`, `workflow-runs steps {list\|approve\|retry\|skip\|force-complete}` |
-| Triggers        | `triggers list/get/send/stream/purge`                                 |
-| Webhooks        | `webhooks list/get/create/delete/deliveries/retry/test`               |
-| Event sources   | `event-sources list/get/create/update/delete`                         |
-| Notifications   | `notifications list/get/create/update/delete`                          |
+| Runs            | `runs list/get/logs/cancel/replay/reschedule/dlq/dlq-replay/outputs/tool-calls/checkpoints/watch/children/lineage/dependency-status/restart/pause/resume/state/resources/debug-bundle/usage/debug/reset-idempotency-key/bulk-cancel/bulk-cancel-all/bulk-replay/bulk-dlq-replay` |
+| Workflows       | `workflows list/get/create/update/delete/clone/trigger/dry-run/plan/simulate/versions/diff/policy/visualize/graph/active-versions/version-get/version-impact/version-steps/canary-get/canary-set/canary-rollback` |
+| Workflow runs   | `workflow-runs list/get/pause/resume/retry/approve-step/retry-step/skip-step/force-complete-step/compare/compensate/compensation-plan/debug/explain/graph/labels/timeline/replay-subtree/bulk-cancel/bulk-replay`, `workflow-runs steps {list\|approve\|retry\|skip\|force-complete}` |
+| Deployments     | `deployments list/create/finalize/promote/rollback/canary`           |
+| Triggers        | `triggers list/get/send/stream/purge` (raw send uses `/v1/events/dispatch`) |
+| Webhooks        | `webhooks list/get/create/delete/rotate-secret/deliveries/retry/test` (subscriptions API) |
+| Event sources   | `event-sources list/get/create/update/delete/subscriptions/subscribe/unsubscribe` |
+| Notifications   | `notifications list/get/create/update/delete/deliveries`              |
 | Log drains      | `log-drains list/get/create/update/delete`                            |
 | Logs            | `logs`                                                                |
-| Secrets         | `secrets list/create/delete`, `api-keys list/create/rotate/revoke`    |
-| Team            | `team list/add/remove/roles/policies/audit`                           |
+| Secrets         | `secrets list/get/create/delete`, `api-keys list/create/rotate/revoke/expiring-soon` |
+| Team / RBAC     | `team list/add/remove/roles/policies/audit`, `roles list/get/create/update/delete`, `tag-policies list/create/delete` |
 | Projects / Env  | `projects list/switch/get/create/delete/export/import`, `env`/`environments list/get/create/update/delete/variables` |
-| Analytics       | `analytics costs/reliability/top-failing/performance`                 |
-| Billing         | `usage current/history/forecast`                                      |
+| Analytics       | `analytics costs/reliability/top-failing/performance/approvals/cost-insights/cost-trends/cost-top/cost-by-trigger/cost-forecast`, `analytics {runs\|jobs\|tags\|webhooks\|workflows\|events} ...` (cloud edition) |
+| Billing / Usage | `usage current/history/forecast/anomalies/projects/export/email-preferences-get/email-preferences-set`, `billing spending-limit/project-budget/anomaly-config/regions/downgrade-preview/check-org-limit` |
+| Export / Stats  | `export jobs/runs/workflows`, `stats`, `batch-operations list/get`, `organizations jobs/runs` |
 | Auth            | `auth login/logout/whoami`, `context`, `alias`, `completion`, `config` |
 | Dashboard       | `tui` (interactive jobs/runs/workflows pane switcher)                 |
 | Diagnostics     | `debug bundle/profile/request`, `version`, `upgrade`                  |
@@ -163,10 +165,13 @@ Example `strait.json`:
 
 Strait CLI reads configuration from (in order of precedence):
 
-1. Command-line flags (`--server`, `--project`, `--api-key`)
-2. Environment variables (`STRAIT_SERVER`, `STRAIT_PROJECT`, `STRAIT_API_KEY`)
+1. Command-line flags (`--server`, `--project`, `--org`, `--api-key`)
+2. Environment variables (`STRAIT_SERVER`, `STRAIT_PROJECT`, `STRAIT_ORG`, `STRAIT_API_KEY`)
 3. Per-project file: `./.strait.yaml`
 4. User-global file: `~/.config/strait/config.yaml`
+
+Org-scoped commands (`billing`, some `usage` views) resolve the organization
+from `--org`, then `STRAIT_ORG`, then the `org` config key or active context.
 
 Credentials from `strait auth login` are stored in the OS keychain (macOS Keychain, Linux Secret Service, Windows Credential Manager).
 
@@ -182,9 +187,20 @@ make check         # vet + lint + test
 make hooks         # install lefthook pre-commit hooks
 make mutation-dry  # run Gremlins coverage analysis without mutating code
 make mutation      # run Gremlins mutation testing → bin/gremlins-report.json
+make refresh-openapi  # vendor the server OpenAPI spec into internal/client/testdata
+make e2e           # live end-to-end suite (needs STRAIT_SERVER/STRAIT_API_KEY/STRAIT_PROJECT)
 ```
 
 Mutation testing is pinned to `go-gremlins/gremlins` `v0.6.0` via `go run`, so no separate install step is needed. Scope local runs with `MUTATION_ARGS`, e.g. `make mutation MUTATION_ARGS="--diff origin/main"`.
+
+### API contract
+
+The CLI's request paths are validated against the server's OpenAPI spec
+(vendored at `internal/client/testdata/openapi.json`). `TestEndpointsMatchOpenAPISpec`
+in `internal/client` statically extracts every endpoint the client calls and
+fails the build if any path is missing from the spec — so CLI/server drift is
+caught in CI. After a server API change, run `make refresh-openapi` (against a
+running server) to update the vendored spec.
 
 See [`AGENTS.md`](AGENTS.md) for the contributor operating guide.
 

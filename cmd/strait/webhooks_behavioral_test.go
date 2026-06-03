@@ -28,7 +28,7 @@ func TestWebhooksList_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/webhooks": func(w http.ResponseWriter, r *http.Request) {
+		"GET /v1/webhooks/subscriptions": func(w http.ResponseWriter, r *http.Request) {
 			assertAuth(t, r, "test-key")
 			assertQuery(t, r, "project_id", "proj-test")
 			respondPaginated(t, w, http.StatusOK, []types.Webhook{testWebhookFixture()})
@@ -72,14 +72,14 @@ func TestWebhooksGet_ByID(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/webhooks/webhook-1": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, testWebhookFixture())
+		"GET /v1/webhooks/subscriptions": func(w http.ResponseWriter, _ *http.Request) {
+			respondPaginated(t, w, http.StatusOK, []types.Webhook{testWebhookFixture()})
 		},
 	})
 
 	state := newTestState(t, srv)
 	cmd := newWebhooksGetCommand(state)
-	cmd.SetArgs([]string{"webhook-1"})
+	cmd.SetArgs([]string{"webhook-1", "--project", "proj-test"})
 
 	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
@@ -96,19 +96,19 @@ func TestWebhooksCreate_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"POST /v1/webhooks": func(w http.ResponseWriter, r *http.Request) {
+		"POST /v1/webhooks/subscriptions": func(w http.ResponseWriter, r *http.Request) {
 			assertMethod(t, r, w, "POST")
 			assertAuth(t, r, "test-key")
 			var got struct {
-				URL    string   `json:"url"`
-				Events []string `json:"events"`
+				URL    string   `json:"webhook_url"`
+				Events []string `json:"event_types"`
 			}
 			readJSONBody(t, r, &got)
 			if got.URL != "https://example.com/hook" {
-				t.Errorf("url: got %q, want %q", got.URL, "https://example.com/hook")
+				t.Errorf("webhook_url: got %q, want %q", got.URL, "https://example.com/hook")
 			}
 			if len(got.Events) != 1 || got.Events[0] != "job.run.completed" {
-				t.Errorf("events: got %v, want [job.run.completed]", got.Events)
+				t.Errorf("event_types: got %v, want [job.run.completed]", got.Events)
 			}
 			respondJSON(t, w, http.StatusCreated, testWebhookFixture())
 		},
@@ -157,35 +157,18 @@ func TestWebhooksCreate_RequiresEvent(t *testing.T) {
 	}
 }
 
-func TestWebhooksUpdate_RequiresAtLeastOneFlag(t *testing.T) {
-	t.Parallel()
-
-	srv := newTestServer(t, http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
-		t.Fatal("should not reach the server")
-	}))
-
-	state := newTestState(t, srv)
-	cmd := newWebhooksUpdateCommand(state)
-	cmd.SetArgs([]string{"webhook-1"})
-
-	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "at least one update flag") {
-		t.Fatalf("expected update flag error, got: %v", err)
-	}
-}
-
-func TestWebhooksUpdate_PatchURL(t *testing.T) {
+func TestWebhooksRotateSecret_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"PATCH /v1/webhooks/webhook-1": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, testWebhookFixture())
+		"POST /v1/webhooks/subscriptions/webhook-1/rotate-secret": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, types.Webhook{ID: "webhook-1", Secret: "new-secret"})
 		},
 	})
 
 	state := newTestState(t, srv)
-	cmd := newWebhooksUpdateCommand(state)
-	cmd.SetArgs([]string{"webhook-1", "--url", "https://new.example.com/hook"})
+	cmd := newWebhooksRotateSecretCommand(state)
+	cmd.SetArgs([]string{"webhook-1"})
 
 	if err := captureAndExec(t, state, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -213,8 +196,8 @@ func TestWebhooksDelete_WithYes(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"DELETE /v1/webhooks/webhook-1": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, map[string]string{})
+		"DELETE /v1/webhooks/subscriptions/webhook-1": func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
 		},
 	})
 
@@ -241,14 +224,14 @@ func TestWebhooksDeliveries_Success(t *testing.T) {
 	}
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/webhooks/webhook-1/deliveries": func(w http.ResponseWriter, _ *http.Request) {
+		"GET /v1/webhooks/deliveries": func(w http.ResponseWriter, _ *http.Request) {
 			respondPaginated(t, w, http.StatusOK, []types.WebhookDelivery{delivery})
 		},
 	})
 
 	state := newTestState(t, srv)
 	cmd := newWebhooksDeliveriesCommand(state)
-	cmd.SetArgs([]string{"webhook-1"})
+	cmd.SetArgs([]string{})
 
 	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
@@ -265,7 +248,7 @@ func TestWebhooksRetry_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"POST /v1/webhook-deliveries/delivery-1/retry": func(w http.ResponseWriter, _ *http.Request) {
+		"POST /v1/webhooks/deliveries/delivery-1/retry": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, types.WebhookDelivery{
 				ID: "delivery-1", WebhookID: "webhook-1", Status: "succeeded",
 			})
@@ -285,14 +268,14 @@ func TestWebhooksTest_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"POST /v1/webhooks/webhook-1/test": func(w http.ResponseWriter, _ *http.Request) {
+		"POST /v1/webhooks/test": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, map[string]any{"ok": true})
 		},
 	})
 
 	state := newTestState(t, srv)
 	cmd := newWebhooksTestCommand(state)
-	cmd.SetArgs([]string{"webhook-1"})
+	cmd.SetArgs([]string{"--url", "https://example.com/hook"})
 
 	if err := captureAndExec(t, state, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)

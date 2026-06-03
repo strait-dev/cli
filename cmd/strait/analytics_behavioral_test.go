@@ -23,7 +23,9 @@ func TestAnalyticsCosts_Success(t *testing.T) {
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"GET /v1/analytics/costs": func(w http.ResponseWriter, r *http.Request) {
 			assertQuery(t, r, "project_id", "proj-test")
-			assertQuery(t, r, "period_hours", "168")
+			if r.URL.Query().Get("from") == "" || r.URL.Query().Get("to") == "" {
+				t.Errorf("expected from/to query params, got %q", r.URL.RawQuery)
+			}
 			respondJSON(t, w, http.StatusOK, costs)
 		},
 	})
@@ -70,7 +72,7 @@ func TestAnalyticsReliability_Success(t *testing.T) {
 	}
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/analytics/reliability": func(w http.ResponseWriter, r *http.Request) {
+		"GET /v1/analytics/jobs/reliability": func(w http.ResponseWriter, r *http.Request) {
 			assertQuery(t, r, "period_hours", "168")
 			respondJSON(t, w, http.StatusOK, rel)
 		},
@@ -129,7 +131,7 @@ func TestAnalyticsTopFailing_Success(t *testing.T) {
 	}
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/analytics/top-failing": func(w http.ResponseWriter, r *http.Request) {
+		"GET /v1/analytics/jobs/top-failing": func(w http.ResponseWriter, r *http.Request) {
 			assertQuery(t, r, "limit", "5")
 			respondPaginated(t, w, http.StatusOK, items)
 		},

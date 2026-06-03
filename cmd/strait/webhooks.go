@@ -22,23 +22,19 @@ func newWebhooksCommand(state *appState) *cobra.Command {
 
 	getCmd := newWebhooksGetCommand(state)
 	getCmd.ValidArgsFunction = completeWebhookIDs(state)
-	updateCmd := newWebhooksUpdateCommand(state)
-	updateCmd.ValidArgsFunction = completeWebhookIDs(state)
 	deleteCmd := newWebhooksDeleteCommand(state)
 	deleteCmd.ValidArgsFunction = completeWebhookIDs(state)
-	deliveriesCmd := newWebhooksDeliveriesCommand(state)
-	deliveriesCmd.ValidArgsFunction = completeWebhookIDs(state)
-	testCmd := newWebhooksTestCommand(state)
-	testCmd.ValidArgsFunction = completeWebhookIDs(state)
+	rotateCmd := newWebhooksRotateSecretCommand(state)
+	rotateCmd.ValidArgsFunction = completeWebhookIDs(state)
 
 	cmd.AddCommand(newWebhooksListCommand(state))
 	cmd.AddCommand(getCmd)
 	cmd.AddCommand(newWebhooksCreateCommand(state))
-	cmd.AddCommand(updateCmd)
 	cmd.AddCommand(deleteCmd)
-	cmd.AddCommand(deliveriesCmd)
+	cmd.AddCommand(rotateCmd)
+	cmd.AddCommand(newWebhooksDeliveriesCommand(state))
 	cmd.AddCommand(newWebhooksRetryCommand(state))
-	cmd.AddCommand(testCmd)
+	cmd.AddCommand(newWebhooksTestCommand(state))
 
 	return cmd
 }
@@ -100,6 +96,7 @@ func newWebhooksListCommand(state *appState) *cobra.Command {
 
 func newWebhooksGetCommand(state *appState) *cobra.Command {
 	var reveal bool
+	var projectID string
 	cmd := &cobra.Command{
 		Use:   "get <webhook-id>",
 		Short: "Get webhook subscription details",
@@ -108,11 +105,15 @@ func newWebhooksGetCommand(state *appState) *cobra.Command {
 			if err := validate.SlugOrID(args[0]); err != nil {
 				return fmt.Errorf("invalid webhook id: %w", err)
 			}
+			projectID, err := requireProjectID(state, projectID)
+			if err != nil {
+				return err
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
 			}
-			hook, err := cli.GetWebhook(cmd.Context(), args[0])
+			hook, err := cli.GetWebhook(cmd.Context(), projectID, args[0])
 			if err != nil {
 				return err
 			}
@@ -133,6 +134,7 @@ func newWebhooksGetCommand(state *appState) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&reveal, "reveal", false, "show webhook secret in plaintext")
+	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
 	return cmd
 }
 
@@ -196,59 +198,35 @@ func newWebhooksCreateCommand(state *appState) *cobra.Command {
 	return cmd
 }
 
-func newWebhooksUpdateCommand(state *appState) *cobra.Command {
-	var hookURL string
-	var events []string
-	var secret string
-	var active bool
-
+func newWebhooksRotateSecretCommand(state *appState) *cobra.Command {
+	var gracePeriodMinutes int
 	cmd := &cobra.Command{
-		Use:   "update <webhook-id>",
-		Short: "Update a webhook subscription",
+		Use:   "rotate-secret <webhook-id>",
+		Short: "Rotate a webhook subscription's signing secret",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := validate.SlugOrID(args[0]); err != nil {
 				return fmt.Errorf("invalid webhook id: %w", err)
 			}
-			req := client.UpdateWebhookRequest{}
-			if cmd.Flags().Changed("url") {
-				req.URL = &hookURL
-			}
-			if cmd.Flags().Changed("event") {
-				req.Events = &events
-			}
-			if cmd.Flags().Changed("secret") {
-				req.Secret = &secret
-			}
-			if cmd.Flags().Changed("active") {
-				req.Active = &active
-			}
-			if req.URL == nil && req.Events == nil && req.Secret == nil && req.Active == nil {
-				return fmt.Errorf("at least one update flag is required")
-			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
 			}
-			hook, err := cli.UpdateWebhook(cmd.Context(), args[0], req)
+			hook, err := cli.RotateWebhookSecret(cmd.Context(), args[0], gracePeriodMinutes)
 			if err != nil {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Updated webhook "+styles.Bold.Render(styles.SafeText(hook.ID))))
+				fmt.Fprintln(os.Stderr, styles.Success("Rotated secret for webhook "+styles.Bold.Render(styles.SafeText(hook.ID))))
+				if hook.Secret != "" {
+					fmt.Fprintln(os.Stderr, "new secret: "+hook.Secret)
+				}
 				return nil
 			}
-			masked := *hook
-			masked.Secret = maskWebhookSecret(hook.Secret, false)
-			return printData(state, &masked)
+			return printData(state, hook)
 		},
 	}
-
-	cmd.Flags().StringVar(&hookURL, "url", "", "webhook target URL")
-	cmd.Flags().StringArrayVar(&events, "event", nil, "event types (replaces existing list)")
-	cmd.Flags().StringVar(&secret, "secret", "", "shared secret used for HMAC signing")
-	cmd.Flags().BoolVar(&active, "active", true, "whether the webhook is active")
-
+	cmd.Flags().IntVar(&gracePeriodMinutes, "grace-period-minutes", 0, "minutes the old secret remains valid")
 	return cmd
 }
 
@@ -285,19 +263,17 @@ func newWebhooksDeleteCommand(state *appState) *cobra.Command {
 
 func newWebhooksDeliveriesCommand(state *appState) *cobra.Command {
 	var limit int
+	var status string
 	cmd := &cobra.Command{
-		Use:   "deliveries <webhook-id>",
-		Short: "List webhook delivery attempts",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validate.SlugOrID(args[0]); err != nil {
-				return fmt.Errorf("invalid webhook id: %w", err)
-			}
+		Use:   "deliveries",
+		Short: "List webhook delivery attempts for the project",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
 			}
-			deliveries, err := cli.ListWebhookDeliveries(cmd.Context(), args[0], limit)
+			deliveries, err := cli.ListWebhookDeliveries(cmd.Context(), status, limit)
 			if err != nil {
 				return err
 			}
@@ -316,6 +292,7 @@ func newWebhooksDeliveriesCommand(state *appState) *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVar(&limit, "limit", 50, "max deliveries to return")
+	cmd.Flags().StringVar(&status, "status", "", "filter by delivery status (e.g. failed, delivered)")
 	return cmd
 }
 
@@ -347,19 +324,21 @@ func newWebhooksRetryCommand(state *appState) *cobra.Command {
 }
 
 func newWebhooksTestCommand(state *appState) *cobra.Command {
+	var hookURL string
+	var secret string
 	cmd := &cobra.Command{
-		Use:   "test <webhook-id>",
-		Short: "Send a synthetic test event to a webhook",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := validate.SlugOrID(args[0]); err != nil {
-				return fmt.Errorf("invalid webhook id: %w", err)
+		Use:   "test",
+		Short: "Send a synthetic test delivery to a webhook URL",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if strings.TrimSpace(hookURL) == "" {
+				return fmt.Errorf("--url is required")
 			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
 			}
-			resp, err := cli.TestWebhook(cmd.Context(), args[0])
+			resp, err := cli.TestWebhook(cmd.Context(), hookURL, secret)
 			if err != nil {
 				return err
 			}
@@ -370,5 +349,7 @@ func newWebhooksTestCommand(state *appState) *cobra.Command {
 			return printData(state, resp)
 		},
 	}
+	cmd.Flags().StringVar(&hookURL, "url", "", "target URL to test")
+	cmd.Flags().StringVar(&secret, "secret", "", "optional signing secret for the test delivery")
 	return cmd
 }

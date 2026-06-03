@@ -67,6 +67,11 @@ func (c *Client) SetTransport(rt http.RoundTripper) {
 	c.http.Transport = rt
 }
 
+// doJSON / doJSONWithHeaders are the internal request primitives. They keep
+// positional parameters (method, endpoint, query, body[, headers], out) rather
+// than an options struct: the order mirrors a raw HTTP call, every parameter is
+// required, and these are the most-called helpers in the package — an options
+// struct here would add indirection without improving clarity.
 func (c *Client) doJSON(ctx context.Context, method, endpoint string, query url.Values, body any, out any) error {
 	return c.doJSONWithHeaders(ctx, method, endpoint, query, body, nil, out)
 }
@@ -78,11 +83,34 @@ type paginatedResponse struct {
 	HasMore    bool            `json:"has_more"`
 }
 
-// doListJSON performs a GET request and unwraps the paginated response envelope.
+// doListJSON performs a GET request and decodes a list response into out.
+//
+// The Strait API is inconsistent: some list endpoints return a paginated
+// envelope ({"data":[...],"has_more":...}) while others return a bare JSON
+// array ([...]). This helper accepts either shape so list commands work
+// against every endpoint regardless of which form the server uses.
 func (c *Client) doListJSON(ctx context.Context, endpoint string, query url.Values, out any) error {
-	var envelope paginatedResponse
-	if err := c.doJSON(ctx, http.MethodGet, endpoint, query, nil, &envelope); err != nil {
+	var raw json.RawMessage
+	if err := c.doJSON(ctx, http.MethodGet, endpoint, query, nil, &raw); err != nil {
 		return err
+	}
+	return unmarshalListBody(raw, out)
+}
+
+// unmarshalListBody decodes either a bare JSON array or a paginated envelope's
+// data field into out. An absent/empty envelope data field leaves out at its
+// zero value (an empty slice).
+func unmarshalListBody(raw json.RawMessage, out any) error {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) > 0 && trimmed[0] == '[' {
+		return json.Unmarshal(trimmed, out)
+	}
+	var envelope paginatedResponse
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return err
+	}
+	if len(envelope.Data) == 0 {
+		return nil
 	}
 	return json.Unmarshal(envelope.Data, out)
 }
@@ -98,16 +126,34 @@ func (c *Client) doListAllJSON(ctx context.Context, endpoint string, query url.V
 	var allData []json.RawMessage
 	var pages int
 	for range maxPages {
-		var envelope paginatedResponse
-		if err := c.doJSON(ctx, http.MethodGet, endpoint, q, nil, &envelope); err != nil {
+		var raw json.RawMessage
+		if err := c.doJSON(ctx, http.MethodGet, endpoint, q, nil, &raw); err != nil {
 			return err
 		}
 
-		var items []json.RawMessage
-		if err := json.Unmarshal(envelope.Data, &items); err != nil {
-			return fmt.Errorf("decode paginated data: %w", err)
+		// A bare array response is unpaginated: collect it and stop.
+		if trimmed := bytes.TrimSpace(raw); len(trimmed) > 0 && trimmed[0] == '[' {
+			var items []json.RawMessage
+			if err := json.Unmarshal(trimmed, &items); err != nil {
+				return fmt.Errorf("decode list data: %w", err)
+			}
+			allData = append(allData, items...)
+			pages++
+			break
 		}
-		allData = append(allData, items...)
+
+		var envelope paginatedResponse
+		if err := json.Unmarshal(raw, &envelope); err != nil {
+			return err
+		}
+
+		if len(envelope.Data) > 0 {
+			var items []json.RawMessage
+			if err := json.Unmarshal(envelope.Data, &items); err != nil {
+				return fmt.Errorf("decode paginated data: %w", err)
+			}
+			allData = append(allData, items...)
+		}
 		pages++
 
 		if !envelope.HasMore || envelope.NextCursor == nil {
@@ -125,6 +171,40 @@ func (c *Client) doListAllJSON(ctx context.Context, endpoint string, query url.V
 		return fmt.Errorf("merge paginated data: %w", err)
 	}
 	return json.Unmarshal(merged, out)
+}
+
+// parseErrorBody extracts a human-readable message and machine-readable code
+// from a non-2xx response body. The Strait API returns errors as
+// {"error":{"code":"...","message":"..."}} (object form); older/edge responses
+// may use {"error":"..."} (string form). Falls back to the trimmed raw body
+// when nothing structured is found.
+func parseErrorBody(body []byte) (message, code string) {
+	message = strings.TrimSpace(string(body))
+
+	var envelope struct {
+		Error json.RawMessage `json:"error"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil || len(envelope.Error) == 0 {
+		return message, ""
+	}
+
+	var obj struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(envelope.Error, &obj); err == nil && (obj.Message != "" || obj.Code != "") {
+		if obj.Message != "" {
+			message = obj.Message
+		}
+		return message, obj.Code
+	}
+
+	var s string
+	if err := json.Unmarshal(envelope.Error, &s); err == nil && s != "" {
+		return s, ""
+	}
+
+	return message, ""
 }
 
 func (c *Client) doJSONWithHeaders(ctx context.Context, method, endpoint string, query url.Values, body any, headers map[string]string, out any) error {
@@ -194,17 +274,14 @@ func (c *Client) doJSONWithHeaders(ctx context.Context, method, endpoint string,
 
 		if resp.StatusCode >= http.StatusBadRequest {
 			errBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-			msg := strings.TrimSpace(string(errBody))
-			var apiErr map[string]any
-			if err := json.Unmarshal(errBody, &apiErr); err == nil {
-				if m, ok := apiErr["error"].(string); ok && m != "" {
-					msg = m
-				}
-			}
-			return &APIError{StatusCode: resp.StatusCode, Message: msg, Op: "request"}
+			msg, code := parseErrorBody(errBody)
+			return &APIError{StatusCode: resp.StatusCode, Message: msg, Code: code, Op: "request"}
 		}
 
-		if out == nil {
+		// 204 No Content (and any empty-body success) has nothing to decode.
+		// Decoding an empty body returns io.EOF, which previously surfaced as a
+		// spurious "EOF" error on every delete/update/action endpoint.
+		if out == nil || resp.StatusCode == http.StatusNoContent {
 			return nil
 		}
 		// Cap decoded response to 50 MB to prevent unbounded memory allocation

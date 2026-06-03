@@ -13,6 +13,10 @@ import (
 type APIError struct {
 	StatusCode int
 	Message    string
+	// Code is the machine-readable error code from the server's error envelope
+	// (e.g. "bad_request", "not_found", "validation_error"). Empty when the
+	// response body carried no structured code.
+	Code string
 	// Op identifies the operation that failed, e.g. "request", "upload",
 	// "run stream". Used as the prefix of Error so errors stringify the same
 	// way they did before this type was introduced.

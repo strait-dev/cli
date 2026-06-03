@@ -174,7 +174,7 @@ func TestWorkflowsVersions_Success(t *testing.T) {
 	}
 }
 
-func TestWorkflowsDiff_RejectsInvalidVersion(t *testing.T) {
+func TestWorkflowsDiff_RejectsEmptyVersion(t *testing.T) {
 	t.Parallel()
 
 	srv := newTestServer(t, http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
@@ -183,10 +183,10 @@ func TestWorkflowsDiff_RejectsInvalidVersion(t *testing.T) {
 
 	state := newTestState(t, srv)
 	cmd := newWorkflowsDiffCommand(state)
-	cmd.SetArgs([]string{"pipeline", "--from", "abc", "--to", "2"})
+	cmd.SetArgs([]string{"pipeline", "--from", "", "--to", "2"})
 
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "--from must be a positive integer") {
+	if err == nil || !strings.Contains(err.Error(), "--from is required") {
 		t.Fatalf("expected --from error, got: %v", err)
 	}
 }
@@ -201,9 +201,7 @@ func TestWorkflowsDiff_Success(t *testing.T) {
 		"GET /v1/workflows/pipeline": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, wf)
 		},
-		"GET /v1/workflows/pipeline/diff": func(w http.ResponseWriter, r *http.Request) {
-			assertQuery(t, r, "from", "1")
-			assertQuery(t, r, "to", "2")
+		"GET /v1/workflows/pipeline/versions/1/diff/2": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, diff)
 		},
 	})
@@ -220,7 +218,6 @@ func TestWorkflowsDiff_Success(t *testing.T) {
 func TestWorkflowsPolicy_Get(t *testing.T) {
 	t.Parallel()
 
-	wf := testWorkflowForExtras()
 	policy := types.WorkflowPolicy{
 		WorkflowID: "wf-1",
 		Policy:     json.RawMessage(`{"max_concurrency":1}`),
@@ -228,17 +225,14 @@ func TestWorkflowsPolicy_Get(t *testing.T) {
 	}
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/workflows/pipeline": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, wf)
-		},
-		"GET /v1/workflows/pipeline/policy": func(w http.ResponseWriter, _ *http.Request) {
+		"GET /v1/workflow-policies/proj-test": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, policy)
 		},
 	})
 
 	state := newTestState(t, srv)
 	cmd := newWorkflowsPolicyCommand(state)
-	cmd.SetArgs([]string{"pipeline"})
+	cmd.SetArgs([]string{"--project", "proj-test"})
 
 	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
@@ -254,21 +248,17 @@ func TestWorkflowsPolicy_Get(t *testing.T) {
 func TestWorkflowsPolicy_Set(t *testing.T) {
 	t.Parallel()
 
-	wf := testWorkflowForExtras()
 	policy := types.WorkflowPolicy{WorkflowID: "wf-1", Policy: json.RawMessage(`{"max_concurrency":2}`)}
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/workflows/pipeline": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, wf)
-		},
-		"PUT /v1/workflows/pipeline/policy": func(w http.ResponseWriter, _ *http.Request) {
+		"PUT /v1/workflow-policies/proj-test": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, policy)
 		},
 	})
 
 	state := newTestState(t, srv)
 	cmd := newWorkflowsPolicyCommand(state)
-	cmd.SetArgs([]string{"pipeline", "--set", `{"max_concurrency":2}`})
+	cmd.SetArgs([]string{"--project", "proj-test", "--set", `{"max_concurrency":2}`})
 
 	if err := captureAndExec(t, state, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)

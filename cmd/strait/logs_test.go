@@ -15,7 +15,7 @@ func TestMatchesLogRow_NoFilters(t *testing.T) {
 		"type":      "log",
 		"message":   "hello world",
 	}
-	if !matchesLogRow(row, "", "", "", time.Time{}) {
+	if !matchesLogRow(row, logFilter{Level: "", EventType: "", Search: "", Since: time.Time{}}) {
 		t.Fatal("expected match with no filters")
 	}
 }
@@ -31,7 +31,7 @@ func TestMatchesLogRow_SinceFilter(t *testing.T) {
 		"type":      "log",
 		"message":   "old",
 	}
-	if matchesLogRow(old, "", "", "", sinceTime) {
+	if matchesLogRow(old, logFilter{Level: "", EventType: "", Search: "", Since: sinceTime}) {
 		t.Fatal("expected old row to be filtered out")
 	}
 
@@ -41,7 +41,7 @@ func TestMatchesLogRow_SinceFilter(t *testing.T) {
 		"type":      "log",
 		"message":   "recent",
 	}
-	if !matchesLogRow(recent, "", "", "", sinceTime) {
+	if !matchesLogRow(recent, logFilter{Level: "", EventType: "", Search: "", Since: sinceTime}) {
 		t.Fatal("expected recent row to match")
 	}
 }
@@ -55,7 +55,7 @@ func TestMatchesLogRow_SearchFilter(t *testing.T) {
 		"type":      "log",
 		"message":   "Payment Error occurred",
 	}
-	if !matchesLogRow(row, "", "", "error", time.Time{}) {
+	if !matchesLogRow(row, logFilter{Level: "", EventType: "", Search: "error", Since: time.Time{}}) {
 		t.Fatal("expected case-insensitive search match")
 	}
 
@@ -65,7 +65,7 @@ func TestMatchesLogRow_SearchFilter(t *testing.T) {
 		"type":      "log",
 		"message":   "Success",
 	}
-	if matchesLogRow(row2, "", "", "error", time.Time{}) {
+	if matchesLogRow(row2, logFilter{Level: "", EventType: "", Search: "error", Since: time.Time{}}) {
 		t.Fatal("expected no match for non-matching search")
 	}
 }
@@ -79,10 +79,10 @@ func TestMatchesLogRow_LevelFilter(t *testing.T) {
 		"type":      "log",
 		"message":   "test",
 	}
-	if !matchesLogRow(row, "info", "", "", time.Time{}) {
+	if !matchesLogRow(row, logFilter{Level: "info", EventType: "", Search: "", Since: time.Time{}}) {
 		t.Fatal("expected match for matching level")
 	}
-	if matchesLogRow(row, "warn", "", "", time.Time{}) {
+	if matchesLogRow(row, logFilter{Level: "warn", EventType: "", Search: "", Since: time.Time{}}) {
 		t.Fatal("expected no match for non-matching level")
 	}
 }
@@ -96,10 +96,10 @@ func TestMatchesLogRow_LevelFilter_CaseInsensitive(t *testing.T) {
 		"type":      "log",
 		"message":   "something broke",
 	}
-	if !matchesLogRow(row, "error", "", "", time.Time{}) {
+	if !matchesLogRow(row, logFilter{Level: "error", EventType: "", Search: "", Since: time.Time{}}) {
 		t.Fatal("expected case-insensitive level match: ERROR should match --level=error")
 	}
-	if !matchesLogRow(row, "Error", "", "", time.Time{}) {
+	if !matchesLogRow(row, logFilter{Level: "Error", EventType: "", Search: "", Since: time.Time{}}) {
 		t.Fatal("expected case-insensitive level match: ERROR should match --level=Error")
 	}
 
@@ -109,7 +109,7 @@ func TestMatchesLogRow_LevelFilter_CaseInsensitive(t *testing.T) {
 		"type":      "log",
 		"message":   "all good",
 	}
-	if !matchesLogRow(row2, "INFO", "", "", time.Time{}) {
+	if !matchesLogRow(row2, logFilter{Level: "INFO", EventType: "", Search: "", Since: time.Time{}}) {
 		t.Fatal("expected case-insensitive level match: info should match --level=INFO")
 	}
 }
@@ -125,7 +125,7 @@ func TestMatchesLogRow_CombinedFilters(t *testing.T) {
 		"type":      "log",
 		"message":   "Payment failed",
 	}
-	if !matchesLogRow(row, "error", "", "payment", sinceTime) {
+	if !matchesLogRow(row, logFilter{Level: "error", EventType: "", Search: "payment", Since: sinceTime}) {
 		t.Fatal("expected match for all filters")
 	}
 
@@ -135,7 +135,7 @@ func TestMatchesLogRow_CombinedFilters(t *testing.T) {
 		"type":      "log",
 		"message":   "Payment failed",
 	}
-	if matchesLogRow(row2, "error", "", "payment", sinceTime) {
+	if matchesLogRow(row2, logFilter{Level: "error", EventType: "", Search: "payment", Since: sinceTime}) {
 		t.Fatal("expected no match when level filter fails")
 	}
 }

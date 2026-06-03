@@ -57,6 +57,7 @@ func newLogsCommand(state *appState) *cobra.Command {
 				}
 				sinceTime = logsTimeNow().Add(-d)
 			}
+			filter := logFilter{Level: level, EventType: eventType, Search: search, Since: sinceTime}
 
 			if follow {
 				if group {
@@ -69,14 +70,14 @@ func newLogsCommand(state *appState) *cobra.Command {
 					return err
 				}
 
-				rows, err := listRunEventRows(ctx, cli, runID, level, eventType, search, sinceTime)
+				rows, err := listRunEventRows(ctx, cli, runID, filter)
 				if err != nil {
 					return err
 				}
 				if err := printLogRows(state, rows, false, outputFmt, tail); err != nil {
 					return err
 				}
-				return streamRunLogs(ctx, cli, state, runID, level, eventType, search, sinceTime, outputFmt)
+				return streamRunLogs(ctx, cli, state, runID, filter, outputFmt)
 			}
 
 			var matchedJobIDs map[string]string
@@ -106,7 +107,7 @@ func newLogsCommand(state *appState) *cobra.Command {
 
 			rows := make([]map[string]any, 0)
 			if runID != "" {
-				rows, err = listRunEventRows(ctx, cli, runID, level, eventType, search, sinceTime)
+				rows, err = listRunEventRows(ctx, cli, runID, filter)
 				if err != nil {
 					return err
 				}
@@ -161,7 +162,7 @@ func newLogsCommand(state *appState) *cobra.Command {
 						if matchedJobIDs != nil {
 							row["job_slug"] = matchedJobIDs[re.jobID]
 						}
-						if !matchesLogRow(row, level, eventType, search, sinceTime) {
+						if !matchesLogRow(row, filter) {
 							continue
 						}
 						rows = append(rows, row)
@@ -244,8 +245,18 @@ func printGroupedLogs(state *appState, rows []map[string]any) error {
 	return printData(state, summary)
 }
 
-func listRunEventRows(ctx context.Context, cli *client.Client, runID, level, eventType, search string, sinceTime time.Time) ([]map[string]any, error) {
-	events, err := cli.ListRunEvents(ctx, runID, level, eventType)
+// logFilter holds the optional filters applied to run log/event rows. Grouping
+// these related fields keeps the log helper signatures within Go's small-arg
+// guidance and makes call sites read intent-first.
+type logFilter struct {
+	Level     string
+	EventType string
+	Search    string
+	Since     time.Time
+}
+
+func listRunEventRows(ctx context.Context, cli *client.Client, runID string, filter logFilter) ([]map[string]any, error) {
+	events, err := cli.ListRunEvents(ctx, runID, filter.Level, filter.EventType)
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +264,7 @@ func listRunEventRows(ctx context.Context, cli *client.Client, runID, level, eve
 	rows := make([]map[string]any, 0, len(events))
 	for _, event := range events {
 		row := runEventRow(runID, event)
-		if !matchesLogRow(row, level, eventType, search, sinceTime) {
+		if !matchesLogRow(row, filter) {
 			continue
 		}
 		rows = append(rows, row)
@@ -313,25 +324,25 @@ func logRowTimestamp(row map[string]any) time.Time {
 	return timestamp
 }
 
-func matchesLogRow(row map[string]any, level, eventType, search string, sinceTime time.Time) bool {
-	if !sinceTime.IsZero() && logRowTimestamp(row).Before(sinceTime) {
+func matchesLogRow(row map[string]any, filter logFilter) bool {
+	if !filter.Since.IsZero() && logRowTimestamp(row).Before(filter.Since) {
 		return false
 	}
-	if level != "" {
+	if filter.Level != "" {
 		rowLevel, _ := row["level"].(string)
-		if !strings.EqualFold(rowLevel, level) {
+		if !strings.EqualFold(rowLevel, filter.Level) {
 			return false
 		}
 	}
-	if eventType != "" {
+	if filter.EventType != "" {
 		rowType, _ := row["type"].(string)
-		if rowType != eventType {
+		if rowType != filter.EventType {
 			return false
 		}
 	}
-	if search != "" {
+	if filter.Search != "" {
 		message, _ := row["message"].(string)
-		if !strings.Contains(strings.ToLower(message), strings.ToLower(search)) {
+		if !strings.Contains(strings.ToLower(message), strings.ToLower(filter.Search)) {
 			return false
 		}
 	}
@@ -349,13 +360,13 @@ func ensureRunStreamable(ctx context.Context, cli *client.Client, runID string) 
 	return nil
 }
 
-func streamRunLogs(ctx context.Context, cli *client.Client, state *appState, runID, level, eventType, search string, sinceTime time.Time, outputFmt string) error {
+func streamRunLogs(ctx context.Context, cli *client.Client, state *appState, runID string, filter logFilter, outputFmt string) error {
 	return cli.StreamRunEvents(ctx, runID, func(msg client.RunStreamMessage) error {
 		row, ok := runStreamRow(runID, msg)
 		if !ok {
 			return nil
 		}
-		if !matchesLogRow(row, level, eventType, search, sinceTime) {
+		if !matchesLogRow(row, filter) {
 			return nil
 		}
 		return renderFollowLogRow(state, outputFmt, row)

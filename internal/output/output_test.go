@@ -190,3 +190,55 @@ func TestRenderCSV_MultipleRows(t *testing.T) {
 		t.Fatalf("expected 3 lines (header + 2 rows), got %d: %s", len(lines), out)
 	}
 }
+
+// TestRenderTable_AnySliceOfMaps verifies that a []any whose elements are maps
+// (as produced by decoding a generic JSON payload) renders as a table rather
+// than erroring on the interface-kind elements.
+func TestRenderTable_AnySliceOfMaps(t *testing.T) {
+	t.Parallel()
+
+	data := []any{
+		map[string]any{"id": "a", "name": "alpha"},
+		map[string]any{"id": "b", "name": "beta"},
+	}
+	out, err := RenderToString(data, Options{Format: "table"})
+	if err != nil {
+		t.Fatalf("render table: %v", err)
+	}
+	for _, want := range []string{"id", "name", "alpha", "beta"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("table missing %q, got:\n%s", want, out)
+		}
+	}
+}
+
+// TestRenderTable_Columns verifies that Options.Columns restricts and orders
+// table columns, with unknown columns rendering as empty cells.
+func TestRenderTable_Columns(t *testing.T) {
+	t.Parallel()
+
+	data := []any{
+		map[string]any{"id": "a", "name": "alpha", "secret": "x", "created_at": "t1"},
+		map[string]any{"id": "b", "name": "beta", "secret": "y", "created_at": "t2"},
+	}
+	out, err := RenderToString(data, Options{Format: "table", Columns: []string{"id", "name", "missing"}})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	// Selected columns and their values appear; unselected ones do not.
+	for _, want := range []string{"id", "name", "missing", "alpha", "beta"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected %q in output:\n%s", want, out)
+		}
+	}
+	for _, notWant := range []string{"secret", "created_at", "x", "y", "t1"} {
+		if strings.Contains(out, notWant) {
+			t.Fatalf("did not expect %q in projected output:\n%s", notWant, out)
+		}
+	}
+	// Header order is preserved.
+	headerLine := strings.SplitN(out, "\n", 2)[0]
+	if strings.Index(headerLine, "id") > strings.Index(headerLine, "name") {
+		t.Fatalf("expected id before name in header: %q", headerLine)
+	}
+}

@@ -33,6 +33,7 @@ func newWorkflowRunsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newWorkflowRunsRetryStepAliasCommand(state))
 	cmd.AddCommand(newWorkflowRunsSkipStepAliasCommand(state))
 	cmd.AddCommand(newWorkflowRunsForceCompleteStepAliasCommand(state))
+	registerWorkflowRunsCoverageCommands(cmd, state)
 
 	return cmd
 }

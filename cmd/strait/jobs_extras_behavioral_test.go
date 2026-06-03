@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/types"
 )
 
@@ -186,7 +185,7 @@ func TestJobsBatch_RejectsInvalidJSON(t *testing.T) {
 
 	dir := t.TempDir()
 	bad := filepath.Join(dir, "batch.json")
-	if err := os.WriteFile(bad, []byte("not-json"), 0o600); err != nil {
+	if err := os.WriteFile(bad, []byte("{not-json"), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 
@@ -209,15 +208,14 @@ func TestJobsBatch_Success(t *testing.T) {
 
 	dir := t.TempDir()
 	good := filepath.Join(dir, "batch.json")
-	body := `{"updates":[{"id":"job-1","patch":{"name":"Renamed"}}]}`
+	body := `{"jobs":[{"slug":"job-a","name":"Job A","endpoint_url":"https://example.com/x"}]}`
 	if err := os.WriteFile(good, []byte(body), 0o600); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 
-	resp := client.BatchUpdateJobsResponse{Updated: []string{"job-1"}}
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"POST /v1/jobs/batch": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, resp)
+			respondJSON(t, w, http.StatusCreated, map[string]any{"created": []string{"job-a"}})
 		},
 	})
 

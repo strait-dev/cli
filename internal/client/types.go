@@ -148,9 +148,10 @@ type TriggerWorkflowRequest struct {
 
 // CreateAPIKeyRequest is the request body for creating an API key.
 type CreateAPIKeyRequest struct {
-	ProjectID string   `json:"project_id"`
-	Name      string   `json:"name"`
-	Scopes    []string `json:"scopes,omitempty"`
+	ProjectID     string   `json:"project_id"`
+	Name          string   `json:"name"`
+	Scopes        []string `json:"scopes,omitempty"`
+	ExpiresInDays int      `json:"expires_in_days,omitempty"`
 }
 
 // APIKeyCreateResponse is the response from creating an API key.
@@ -206,7 +207,7 @@ type ServerSecret struct {
 type CreateServerSecretRequest struct {
 	ProjectID   string `json:"project_id"`
 	SecretKey   string `json:"secret_key"`
-	SecretValue string `json:"secret_value"`
+	SecretValue string `json:"value"`
 	Environment string `json:"environment"`
 	JobID       string `json:"job_id,omitempty"`
 }
@@ -343,21 +344,15 @@ type UpdateEnvironmentRequest struct {
 }
 
 // CreateWebhookRequest is the request body for creating a webhook subscription.
+// Field names mirror the server's CreateWebhookSubscriptionRequest schema
+// (webhook_url / event_types).
 type CreateWebhookRequest struct {
 	ProjectID  string   `json:"project_id"`
-	URL        string   `json:"url"`
-	Events     []string `json:"events"`
+	URL        string   `json:"webhook_url"`
+	Events     []string `json:"event_types"`
 	Secret     string   `json:"secret,omitempty"`
 	Active     *bool    `json:"active,omitempty"`
 	HeadersRaw string   `json:"-"`
-}
-
-// UpdateWebhookRequest is the request body for updating a webhook.
-type UpdateWebhookRequest struct {
-	URL    *string   `json:"url,omitempty"`
-	Events *[]string `json:"events,omitempty"`
-	Secret *string   `json:"secret,omitempty"`
-	Active *bool     `json:"active,omitempty"`
 }
 
 // TestWebhookResponse is the response from a webhook test ping.
@@ -401,9 +396,9 @@ type UpdateJobGroupRequest struct {
 
 // CreateNotificationChannelRequest is the request body for creating a notification channel.
 type CreateNotificationChannelRequest struct {
-	ProjectID string          `json:"project_id"`
+	ProjectID string          `json:"project_id,omitempty"`
 	Name      string          `json:"name"`
-	Type      string          `json:"type"`
+	Type      string          `json:"channel_type"`
 	Config    json.RawMessage `json:"config"`
 	Enabled   *bool           `json:"enabled,omitempty"`
 }
@@ -415,13 +410,17 @@ type UpdateNotificationChannelRequest struct {
 	Enabled *bool            `json:"enabled,omitempty"`
 }
 
-// CreateLogDrainRequest is the request body for creating a log drain.
+// CreateLogDrainRequest is the request body for creating a log drain. Field
+// names mirror the server schema (drain_type / endpoint_url / auth_type).
 type CreateLogDrainRequest struct {
-	ProjectID string          `json:"project_id"`
-	Name      string          `json:"name"`
-	Type      string          `json:"type"`
-	Config    json.RawMessage `json:"config"`
-	Enabled   *bool           `json:"enabled,omitempty"`
+	ProjectID   string          `json:"project_id"`
+	Name        string          `json:"name"`
+	Type        string          `json:"drain_type"`
+	EndpointURL string          `json:"endpoint_url"`
+	AuthType    string          `json:"auth_type"`
+	AuthConfig  json.RawMessage `json:"auth_config,omitempty"`
+	LevelFilter string          `json:"level_filter,omitempty"`
+	Enabled     *bool           `json:"enabled,omitempty"`
 }
 
 // UpdateLogDrainRequest is the request body for updating a log drain.
@@ -439,28 +438,14 @@ type CloneJobRequest struct {
 
 // AddJobDependencyRequest is the request body for adding a job dependency.
 type AddJobDependencyRequest struct {
-	DependsOn string `json:"depends_on"`
-	Type      string `json:"type,omitempty"`
+	DependsOn string `json:"depends_on_job_id"`
+	Type      string `json:"condition,omitempty"`
 }
 
-// BatchUpdateJobsRequest is the request body for batch-updating jobs.
-type BatchUpdateJobsRequest struct {
-	Updates []BatchJobUpdate `json:"updates"`
-}
-
-// BatchJobUpdate is a single update entry in a batch.
-type BatchJobUpdate struct {
-	ID    string           `json:"id"`
-	Patch UpdateJobRequest `json:"patch"`
-}
-
-// BatchUpdateJobsResponse summarises a batch update.
-type BatchUpdateJobsResponse struct {
-	Updated []string `json:"updated"`
-	Failed  []struct {
-		ID     string `json:"id"`
-		Reason string `json:"reason"`
-	} `json:"failed,omitempty"`
+// BatchCreateJobsRequest is the request body for batch-creating jobs. Each entry
+// is a job specification matching the single-create job schema.
+type BatchCreateJobsRequest struct {
+	Jobs []json.RawMessage `json:"jobs"`
 }
 
 // CloneWorkflowRequest is the request body for cloning a workflow.

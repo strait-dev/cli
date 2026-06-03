@@ -306,8 +306,11 @@ func newAuthCommand(state *appState) *cobra.Command {
 				targetContext = "default"
 			}
 
-			_, err := authLoadAPIKey(targetContext)
-			authed := err == nil
+			// Authenticated when a credential is resolvable from any source: the
+			// keychain for this context, or a credential already resolved from
+			// --api-key / STRAIT_API_KEY / config (state.opts.apiKey).
+			key, err := authLoadAPIKey(targetContext)
+			authed := (err == nil && strings.TrimSpace(key) != "") || strings.TrimSpace(state.opts.apiKey) != ""
 
 			if isTTYRich(state) {
 				if authed {

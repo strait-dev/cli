@@ -100,8 +100,8 @@ func TestSecretsCreate_Success(t *testing.T) {
 	if receivedBody["secret_key"] != "DB_PASSWORD" {
 		t.Fatalf("expected secret_key=DB_PASSWORD in body, got: %v", receivedBody)
 	}
-	if receivedBody["secret_value"] != "s3cret" {
-		t.Fatalf("expected secret_value=s3cret in body, got: %v", receivedBody)
+	if receivedBody["value"] != "s3cret" {
+		t.Fatalf("expected value=s3cret in body, got: %v", receivedBody)
 	}
 	if !strings.Contains(out, "DB_PASSWORD") {
 		t.Fatalf("expected DB_PASSWORD in output, got: %s", out)

@@ -23,6 +23,10 @@ type Options struct {
 	Template  string
 	JSONPath  string
 	TTY       bool
+	// Columns, when set, restricts and orders the columns shown in table/wide
+	// output. Unknown columns render as empty cells; other formats are
+	// unaffected. Empty means "show every field" (the default behaviour).
+	Columns []string
 }
 
 func Render(w io.Writer, data any, opts Options) error {
@@ -37,7 +41,7 @@ func Render(w io.Writer, data any, opts Options) error {
 
 	switch format {
 	case "table", "wide":
-		return renderTable(w, data, opts.NoHeaders)
+		return renderTable(w, data, opts.NoHeaders, opts.Columns)
 	case "json":
 		enc := json.NewEncoder(w)
 		enc.SetIndent("", "  ")
@@ -147,10 +151,15 @@ func isZero(v any) bool {
 	return false
 }
 
-func renderTable(w io.Writer, data any, noHeaders bool) error {
+func renderTable(w io.Writer, data any, noHeaders bool, columns []string) error {
 	headers, rows, err := rowsFromData(data)
 	if err != nil {
 		return err
+	}
+	// An explicit column set overrides the discovered headers: it restricts and
+	// orders the visible columns. Missing keys fall through to empty cells.
+	if len(columns) > 0 {
+		headers = columns
 	}
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
@@ -270,7 +279,10 @@ func rowsFromData(data any) ([]string, []map[string]string, error) {
 }
 
 func toStringMap(v reflect.Value) (map[string]string, error) {
-	for v.Kind() == reflect.Pointer {
+	// Unwrap pointers and interfaces. Interface unwrapping matters for []any
+	// rows (e.g. JSON decoded into a generic value), whose elements are
+	// interface-kind values wrapping the underlying map/struct.
+	for v.Kind() == reflect.Pointer || v.Kind() == reflect.Interface {
 		if v.IsNil() {
 			return nil, fmt.Errorf("nil row")
 		}

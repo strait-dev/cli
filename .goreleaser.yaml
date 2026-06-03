@@ -50,8 +50,11 @@ release:
     owner: strait-dev
     name: cli
 
-brews:
-  - repository:
+homebrew_casks:
+  - name: strait
+    binaries:
+      - strait
+    repository:
       owner: strait-dev
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
@@ -60,7 +63,11 @@ brews:
       email: bot@strait.dev
     homepage: https://github.com/strait-dev/cli
     description: "Strait CLI -- manage jobs, runs, and workflows"
-    install: |
-      bin.install "strait"
-    test: |
-      system "#{bin}/strait", "version", "--short"
+    # The released binaries are unsigned; remove the macOS quarantine flag so
+    # the cask does not trip Gatekeeper's "damaged and cannot be opened" error.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/strait"]
+          end

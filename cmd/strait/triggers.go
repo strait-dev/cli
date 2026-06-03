@@ -38,8 +38,10 @@ func newTriggersListCommand(state *appState) *cobra.Command {
 		Use:   "list",
 		Short: "List event triggers for a project",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if projectID == "" {
-				return fmt.Errorf("--project is required")
+			var err error
+			projectID, err = requireProjectID(state, projectID)
+			if err != nil {
+				return err
 			}
 			if status != "" {
 				validStatuses := map[string]bool{"waiting": true, "received": true, "timed_out": true, "canceled": true}

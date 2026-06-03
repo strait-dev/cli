@@ -111,6 +111,7 @@ func TestParseWaitCondition_AllStatuses(t *testing.T) {
 		types.StatusExecuting, types.StatusWaiting, types.StatusCompleted,
 		types.StatusFailed, types.StatusTimedOut, types.StatusCrashed,
 		types.StatusSystemFailed, types.StatusCanceled, types.StatusExpired,
+		types.StatusDeadLetter, types.StatusReplayStaged, types.StatusPaused,
 	}
 	for _, s := range valid {
 		got, err := parseWaitCondition("status=" + string(s))

@@ -60,6 +60,7 @@ func newWorkflowsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(diffCmd)
 	cmd.AddCommand(policyCmd)
 	cmd.AddCommand(visualizeCmd)
+	registerWorkflowsCoverageCommands(cmd, state)
 
 	return cmd
 }

@@ -160,7 +160,9 @@ func newJobsBatchCommand(state *appState) *cobra.Command {
 	var fromFile string
 	cmd := &cobra.Command{
 		Use:   "batch",
-		Short: "Apply multiple job updates in one call",
+		Short: "Create multiple jobs in one call",
+		Long: "Batch-create jobs from a JSON file. The file may be a JSON array of " +
+			"job specs, or an object of the form {\"jobs\": [ ... ]}.",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if strings.TrimSpace(fromFile) == "" {
 				return fmt.Errorf("--from-file is required")
@@ -169,25 +171,48 @@ func newJobsBatchCommand(state *appState) *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("read %s: %w", fromFile, err)
 			}
-			var req client.BatchUpdateJobsRequest
-			if err := json.Unmarshal(data, &req); err != nil {
-				return fmt.Errorf("invalid batch JSON: %w", err)
+			req, err := parseBatchJobsFile(data)
+			if err != nil {
+				return err
 			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err
 			}
-			resp, err := cli.BatchUpdateJobs(cmd.Context(), req)
+			resp, err := cli.BatchCreateJobs(cmd.Context(), req)
 			if err != nil {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintf(os.Stderr, "%s updated, %d failed\n", styles.Success(fmt.Sprintf("%d", len(resp.Updated))), len(resp.Failed))
+				fmt.Fprintln(os.Stderr, styles.Success(fmt.Sprintf("Batch-created %d job(s)", len(req.Jobs))))
 				return nil
 			}
 			return printData(state, resp)
 		},
 	}
-	cmd.Flags().StringVar(&fromFile, "from-file", "", "JSON file containing the batch update payload")
+	cmd.Flags().StringVar(&fromFile, "from-file", "", "JSON file containing the jobs to create")
 	return cmd
+}
+
+// parseBatchJobsFile accepts either a bare JSON array of job specs or an object
+// of the form {"jobs": [ ... ]} and returns a BatchCreateJobsRequest.
+func parseBatchJobsFile(data []byte) (client.BatchCreateJobsRequest, error) {
+	var req client.BatchCreateJobsRequest
+	trimmed := strings.TrimSpace(string(data))
+	switch {
+	case strings.HasPrefix(trimmed, "["):
+		if err := json.Unmarshal([]byte(trimmed), &req.Jobs); err != nil {
+			return req, fmt.Errorf("invalid batch JSON array: %w", err)
+		}
+	case strings.HasPrefix(trimmed, "{"):
+		if err := json.Unmarshal([]byte(trimmed), &req); err != nil {
+			return req, fmt.Errorf("invalid batch JSON: %w", err)
+		}
+	default:
+		return req, fmt.Errorf("batch file must be a JSON array or an object with a \"jobs\" field")
+	}
+	if len(req.Jobs) == 0 {
+		return req, fmt.Errorf("batch file contains no jobs")
+	}
+	return req, nil
 }

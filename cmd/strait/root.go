@@ -222,7 +222,15 @@ func newRootCommand() *cobra.Command {
 	cmd.AddCommand(newEndpointCommand(state))
 	cmd.AddCommand(newWorkerCommand(state))
 	cmd.AddCommand(newDeployCommand(state))
+	cmd.AddCommand(newDeploymentsCommand(state))
 	cmd.AddCommand(newDevCommand(state))
+	cmd.AddCommand(newBillingCommand(state))
+	cmd.AddCommand(newExportCommand(state))
+	cmd.AddCommand(newStatsCommand(state))
+	cmd.AddCommand(newBatchOperationsCommand(state))
+	cmd.AddCommand(newOrganizationsCommand(state))
+	cmd.AddCommand(newRolesCommand(state))
+	cmd.AddCommand(newTagPoliciesCommand(state))
 
 	rawArgs := os.Args[1:]
 	configPath := extractConfigPath(rawArgs)
@@ -396,6 +404,7 @@ func cliEnv() map[string]string {
 		"STRAIT_SERVER":          strings.TrimSpace(os.Getenv("STRAIT_SERVER")),
 		"STRAIT_API_KEY":         strings.TrimSpace(os.Getenv("STRAIT_API_KEY")),
 		"STRAIT_PROJECT":         strings.TrimSpace(os.Getenv("STRAIT_PROJECT")),
+		"STRAIT_ORG":             strings.TrimSpace(os.Getenv("STRAIT_ORG")),
 		"STRAIT_FORMAT":          strings.TrimSpace(os.Getenv("STRAIT_FORMAT")),
 		"STRAIT_CONTEXT":         strings.TrimSpace(os.Getenv("STRAIT_CONTEXT")),
 		"NO_COLOR":               strings.TrimSpace(os.Getenv("NO_COLOR")),

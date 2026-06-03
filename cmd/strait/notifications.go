@@ -32,6 +32,7 @@ func newNotificationsCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newNotificationsCreateCommand(state))
 	cmd.AddCommand(updateCmd)
 	cmd.AddCommand(deleteCmd)
+	registerNotificationsCoverageCommands(cmd, state)
 
 	return cmd
 }
