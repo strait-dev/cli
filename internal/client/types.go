@@ -463,7 +463,7 @@ type UpdateJobGroupRequest struct {
 type CreateNotificationChannelRequest struct {
 	ProjectID string          `json:"project_id"`
 	Name      string          `json:"name"`
-	Type      string          `json:"type"`
+	Type      string          `json:"channel_type"`
 	Config    json.RawMessage `json:"config"`
 	Enabled   *bool           `json:"enabled,omitempty"`
 }
@@ -477,18 +477,26 @@ type UpdateNotificationChannelRequest struct {
 
 // CreateLogDrainRequest is the request body for creating a log drain.
 type CreateLogDrainRequest struct {
-	ProjectID string          `json:"project_id"`
-	Name      string          `json:"name"`
-	Type      string          `json:"type"`
-	Config    json.RawMessage `json:"config"`
-	Enabled   *bool           `json:"enabled,omitempty"`
+	ProjectID   string            `json:"project_id"`
+	Name        string            `json:"name"`
+	Type        string            `json:"drain_type"`
+	EndpointURL string            `json:"endpoint_url"`
+	AuthType    string            `json:"auth_type"`
+	AuthConfig  map[string]string `json:"auth_config,omitempty"`
+	LevelFilter []string          `json:"level_filter,omitempty"`
+	Config      json.RawMessage   `json:"-"`
+	Enabled     *bool             `json:"enabled,omitempty"`
 }
 
 // UpdateLogDrainRequest is the request body for updating a log drain.
 type UpdateLogDrainRequest struct {
-	Name    *string          `json:"name,omitempty"`
-	Config  *json.RawMessage `json:"config,omitempty"`
-	Enabled *bool            `json:"enabled,omitempty"`
+	Name        *string           `json:"name,omitempty"`
+	EndpointURL *string           `json:"endpoint_url,omitempty"`
+	AuthType    *string           `json:"auth_type,omitempty"`
+	AuthConfig  map[string]string `json:"auth_config,omitempty"`
+	LevelFilter []string          `json:"level_filter,omitempty"`
+	Config      *json.RawMessage  `json:"-"`
+	Enabled     *bool             `json:"enabled,omitempty"`
 }
 
 // CloneJobRequest is the request body for cloning a job.

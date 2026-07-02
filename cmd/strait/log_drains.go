@@ -130,10 +130,10 @@ func newLogDrainsCreateCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a log drain",
-		Long: `Creates a log drain of type datadog, splunk, http, or other supported types.
-Pass drain-specific settings via --config-json.`,
-		Example: `  strait log-drains create --type datadog --name prod-dd --config-json '{"api_key":"xxx","site":"us"}'
-  strait log-drains create --type http --name siem --config-json '{"url":"https://siem.example.com/ingest"}'`,
+		Long: `Creates a log drain. Pass endpoint_url or url, auth_type, optional auth_config,
+and optional level_filter via --config-json.`,
+		Example: `  strait log-drains create --type http --name siem --config-json '{"url":"https://siem.example.com/ingest","auth_type":"none"}'
+  strait log-drains create --type http --name secure-siem --config-json '{"endpoint_url":"https://siem.example.com/ingest","auth_type":"header","auth_config":{"X-API-Key":"xxx"}}'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			var err error
 			projectID, err = requireProjectID(state, projectID)
@@ -152,11 +152,19 @@ Pass drain-specific settings via --config-json.`,
 			if !json.Valid([]byte(configJSON)) {
 				return fmt.Errorf("--config-json must be valid JSON")
 			}
+			drainConfig, err := parseLogDrainConfig(configJSON)
+			if err != nil {
+				return err
+			}
 			req := client.CreateLogDrainRequest{
-				ProjectID: projectID,
-				Name:      name,
-				Type:      drainType,
-				Config:    json.RawMessage(configJSON),
+				ProjectID:   projectID,
+				Name:        name,
+				Type:        drainType,
+				EndpointURL: drainConfig.endpointURL,
+				AuthType:    drainConfig.authType,
+				AuthConfig:  drainConfig.authConfig,
+				LevelFilter: drainConfig.levelFilter,
+				Config:      json.RawMessage(configJSON),
 			}
 			if cmd.Flags().Changed("enabled") {
 				req.Enabled = &enabled
@@ -181,7 +189,7 @@ Pass drain-specific settings via --config-json.`,
 
 	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
 	cmd.Flags().StringVar(&name, "name", "", "drain name")
-	cmd.Flags().StringVar(&drainType, "type", "", "drain type (datadog, splunk, http, ...)")
+	cmd.Flags().StringVar(&drainType, "type", "", "drain type")
 	cmd.Flags().StringVar(&configJSON, "config-json", "", "drain config as JSON")
 	cmd.Flags().BoolVar(&enabled, "enabled", true, "whether the drain is enabled")
 
@@ -209,6 +217,14 @@ func newLogDrainsUpdateCommand(state *appState) *cobra.Command {
 				if strings.TrimSpace(configJSON) != "" && !json.Valid([]byte(configJSON)) {
 					return fmt.Errorf("--config-json must be valid JSON")
 				}
+				drainConfig, err := parseLogDrainConfig(configJSON)
+				if err != nil {
+					return err
+				}
+				req.EndpointURL = &drainConfig.endpointURL
+				req.AuthType = &drainConfig.authType
+				req.AuthConfig = drainConfig.authConfig
+				req.LevelFilter = drainConfig.levelFilter
 				raw := json.RawMessage(configJSON)
 				req.Config = &raw
 			}
@@ -241,6 +257,70 @@ func newLogDrainsUpdateCommand(state *appState) *cobra.Command {
 	cmd.Flags().BoolVar(&enabled, "enabled", true, "whether the drain is enabled")
 
 	return cmd
+}
+
+type parsedLogDrainConfig struct {
+	endpointURL string
+	authType    string
+	authConfig  map[string]string
+	levelFilter []string
+}
+
+func parseLogDrainConfig(raw string) (parsedLogDrainConfig, error) {
+	var cfg map[string]any
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		return parsedLogDrainConfig{}, fmt.Errorf("--config-json must be valid JSON: %w", err)
+	}
+
+	endpointURL, _ := cfg["endpoint_url"].(string)
+	if endpointURL == "" {
+		endpointURL, _ = cfg["url"].(string)
+	}
+	if strings.TrimSpace(endpointURL) == "" {
+		return parsedLogDrainConfig{}, fmt.Errorf("--config-json must include endpoint_url or url")
+	}
+
+	authType, _ := cfg["auth_type"].(string)
+	if strings.TrimSpace(authType) == "" {
+		authType = "none"
+	}
+
+	authConfig := map[string]string{}
+	if rawAuth, ok := cfg["auth_config"]; ok {
+		authMap, ok := rawAuth.(map[string]any)
+		if !ok {
+			return parsedLogDrainConfig{}, fmt.Errorf("--config-json auth_config must be an object")
+		}
+		for k, v := range authMap {
+			value, ok := v.(string)
+			if !ok {
+				return parsedLogDrainConfig{}, fmt.Errorf("--config-json auth_config values must be strings")
+			}
+			authConfig[k] = value
+		}
+	}
+
+	var levelFilter []string
+	if rawLevels, ok := cfg["level_filter"]; ok {
+		levels, ok := rawLevels.([]any)
+		if !ok {
+			return parsedLogDrainConfig{}, fmt.Errorf("--config-json level_filter must be an array of strings")
+		}
+		for _, rawLevel := range levels {
+			level, ok := rawLevel.(string)
+			if !ok {
+				return parsedLogDrainConfig{}, fmt.Errorf("--config-json level_filter must be an array of strings")
+			}
+			levelFilter = append(levelFilter, level)
+		}
+	}
+
+	return parsedLogDrainConfig{
+		endpointURL: strings.TrimSpace(endpointURL),
+		authType:    strings.TrimSpace(authType),
+		authConfig:  authConfig,
+		levelFilter: levelFilter,
+	}, nil
 }
 
 func newLogDrainsDeleteCommand(state *appState) *cobra.Command {

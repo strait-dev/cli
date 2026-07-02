@@ -33,7 +33,7 @@ func TestNotificationsList_Success(t *testing.T) {
 		"GET /v1/notification-channels": func(w http.ResponseWriter, r *http.Request) {
 			assertAuth(t, r, "test-key")
 			assertQuery(t, r, "project_id", "proj-test")
-			respondPaginated(t, w, http.StatusOK, []types.NotificationChannel{testChannelFixture()})
+			respondJSON(t, w, http.StatusOK, []types.NotificationChannel{testChannelFixture()})
 		},
 	})
 
@@ -165,16 +165,16 @@ func TestNotificationsCreate_Success(t *testing.T) {
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"POST /v1/notification-channels": func(w http.ResponseWriter, r *http.Request) {
 			assertAuth(t, r, "test-key")
-			var got struct {
-				Name string `json:"name"`
-				Type string `json:"type"`
-			}
+			var got map[string]any
 			readJSONBody(t, r, &got)
-			if got.Name != "oncall" {
-				t.Errorf("name: got %q, want %q", got.Name, "oncall")
+			if got["name"] != "oncall" {
+				t.Errorf("name: got %q, want %q", got["name"], "oncall")
 			}
-			if got.Type != "slack" {
-				t.Errorf("type: got %q, want %q", got.Type, "slack")
+			if got["channel_type"] != "slack" {
+				t.Errorf("channel_type: got %q, want %q", got["channel_type"], "slack")
+			}
+			if _, ok := got["type"]; ok {
+				t.Errorf("request included legacy type field: %#v", got)
 			}
 			respondJSON(t, w, http.StatusCreated, testChannelFixture())
 		},

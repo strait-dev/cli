@@ -130,10 +130,10 @@ func newNotificationsCreateCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a notification channel",
-		Long: `Creates a notification channel of type slack, email, pagerduty, or other supported types.
-Pass channel-specific settings via --config-json (e.g. webhook URL for slack, email address for email).`,
+		Long: `Creates a notification channel of type slack, discord, or webhook.
+Pass channel-specific settings via --config-json.`,
 		Example: `  strait notifications create --type slack --name oncall --config-json '{"webhook_url":"https://hooks.slack.com/..."}'
-  strait notifications create --type email --name release --config-json '{"to":"team@example.com"}'`,
+  strait notifications create --type webhook --name release --config-json '{"url":"https://example.com/notify"}'`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			var err error
 			projectID, err = requireProjectID(state, projectID)
@@ -181,7 +181,7 @@ Pass channel-specific settings via --config-json (e.g. webhook URL for slack, em
 
 	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
 	cmd.Flags().StringVar(&name, "name", "", "channel name")
-	cmd.Flags().StringVar(&channelType, "type", "", "channel type (slack, email, pagerduty, ...)")
+	cmd.Flags().StringVar(&channelType, "type", "", "channel type (slack, discord, webhook)")
 	cmd.Flags().StringVar(&configJSON, "config-json", "", "channel config as JSON")
 	cmd.Flags().BoolVar(&enabled, "enabled", true, "whether the channel is enabled")
 

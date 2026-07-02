@@ -728,7 +728,7 @@ type NotificationChannel struct {
 	ID        string          `json:"id"`
 	ProjectID string          `json:"project_id"`
 	Name      string          `json:"name"`
-	Type      string          `json:"type"`
+	Type      string          `json:"channel_type"`
 	Config    json.RawMessage `json:"config,omitempty"`
 	Enabled   bool            `json:"enabled"`
 	CreatedAt time.Time       `json:"created_at"`
@@ -737,14 +737,18 @@ type NotificationChannel struct {
 
 // LogDrain represents a destination for streaming logs.
 type LogDrain struct {
-	ID        string          `json:"id"`
-	ProjectID string          `json:"project_id"`
-	Name      string          `json:"name"`
-	Type      string          `json:"type"`
-	Config    json.RawMessage `json:"config,omitempty"`
-	Enabled   bool            `json:"enabled"`
-	CreatedAt time.Time       `json:"created_at"`
-	UpdatedAt time.Time       `json:"updated_at"`
+	ID          string            `json:"id"`
+	ProjectID   string            `json:"project_id"`
+	Name        string            `json:"name"`
+	Type        string            `json:"drain_type"`
+	EndpointURL string            `json:"endpoint_url"`
+	AuthType    string            `json:"auth_type"`
+	AuthConfig  map[string]string `json:"auth_config,omitempty"`
+	LevelFilter []string          `json:"level_filter,omitempty"`
+	Config      json.RawMessage   `json:"config,omitempty"`
+	Enabled     bool              `json:"enabled"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 // JobHealth captures health status for a job.

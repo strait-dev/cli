@@ -14,14 +14,16 @@ import (
 // share the same backing array for Config (json.RawMessage is a []byte slice).
 func testDrainFixture() types.LogDrain {
 	return types.LogDrain{
-		ID:        "drain-1",
-		ProjectID: "proj-test",
-		Name:      "prod-dd",
-		Type:      "datadog",
-		Config:    json.RawMessage(`{"api_key":"secret"}`),
-		Enabled:   true,
-		CreatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
-		UpdatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
+		ID:          "drain-1",
+		ProjectID:   "proj-test",
+		Name:        "prod-dd",
+		Type:        "http",
+		EndpointURL: "https://logs.example/ingest",
+		AuthType:    "none",
+		Config:      json.RawMessage(`{"url":"https://logs.example/ingest","token":"secret"}`),
+		Enabled:     true,
+		CreatedAt:   time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
+		UpdatedAt:   time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
 	}
 }
 
@@ -32,7 +34,7 @@ func TestLogDrainsList_Success(t *testing.T) {
 		"GET /v1/log-drains": func(w http.ResponseWriter, r *http.Request) {
 			assertAuth(t, r, "test-key")
 			assertQuery(t, r, "project_id", "proj-test")
-			respondPaginated(t, w, http.StatusOK, []types.LogDrain{testDrainFixture()})
+			respondJSON(t, w, http.StatusOK, []types.LogDrain{testDrainFixture()})
 		},
 	})
 
@@ -147,16 +149,22 @@ func TestLogDrainsCreate_Success(t *testing.T) {
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"POST /v1/log-drains": func(w http.ResponseWriter, r *http.Request) {
 			assertAuth(t, r, "test-key")
-			var got struct {
-				Name string `json:"name"`
-				Type string `json:"type"`
-			}
+			var got map[string]any
 			readJSONBody(t, r, &got)
-			if got.Name != "prod-dd" {
-				t.Errorf("name: got %q, want %q", got.Name, "prod-dd")
+			if got["name"] != "prod-dd" {
+				t.Errorf("name: got %q, want %q", got["name"], "prod-dd")
 			}
-			if got.Type != "datadog" {
-				t.Errorf("type: got %q, want %q", got.Type, "datadog")
+			if got["drain_type"] != "http" {
+				t.Errorf("drain_type: got %q, want %q", got["drain_type"], "http")
+			}
+			if _, ok := got["type"]; ok {
+				t.Errorf("request included legacy type field: %#v", got)
+			}
+			if got["endpoint_url"] != "https://logs.example/ingest" {
+				t.Errorf("endpoint_url: got %q", got["endpoint_url"])
+			}
+			if got["auth_type"] != "none" {
+				t.Errorf("auth_type: got %q, want none", got["auth_type"])
 			}
 			respondJSON(t, w, http.StatusCreated, testDrainFixture())
 		},
@@ -167,8 +175,8 @@ func TestLogDrainsCreate_Success(t *testing.T) {
 	cmd.SetArgs([]string{
 		"--project", "proj-test",
 		"--name", "prod-dd",
-		"--type", "datadog",
-		"--config-json", `{"api_key":"x","site":"us"}`,
+		"--type", "http",
+		"--config-json", `{"url":"https://logs.example/ingest","auth_type":"none"}`,
 	})
 
 	if err := captureAndExec(t, state, cmd); err != nil {

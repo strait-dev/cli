@@ -1723,10 +1723,20 @@ func TestNotificationChannelCRUD(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/notification-channels":
-			respondPaginated(t, w, http.StatusOK, []types.NotificationChannel{channel})
+			respondJSON(t, w, http.StatusOK, []types.NotificationChannel{channel})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/notification-channels/nc-1":
 			respondJSON(t, w, http.StatusOK, channel)
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/notification-channels":
+			var req map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			if req["channel_type"] != "slack" {
+				t.Fatalf("unexpected request: %+v", req)
+			}
+			if _, ok := req["type"]; ok {
+				t.Fatalf("unexpected legacy type field: %+v", req)
+			}
 			respondJSON(t, w, http.StatusCreated, channel)
 		case r.Method == http.MethodPatch && r.URL.Path == "/v1/notification-channels/nc-1":
 			respondJSON(t, w, http.StatusOK, channel)
@@ -1767,10 +1777,20 @@ func TestLogDrainCRUD(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/log-drains":
-			respondPaginated(t, w, http.StatusOK, []types.LogDrain{drain})
+			respondJSON(t, w, http.StatusOK, []types.LogDrain{drain})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/log-drains/ld-1":
 			respondJSON(t, w, http.StatusOK, drain)
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/log-drains":
+			var req map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			if req["drain_type"] != "datadog" {
+				t.Fatalf("unexpected request: %+v", req)
+			}
+			if _, ok := req["type"]; ok {
+				t.Fatalf("unexpected legacy type field: %+v", req)
+			}
 			respondJSON(t, w, http.StatusCreated, drain)
 		case r.Method == http.MethodPatch && r.URL.Path == "/v1/log-drains/ld-1":
 			respondJSON(t, w, http.StatusOK, drain)
@@ -1790,7 +1810,7 @@ func TestLogDrainCRUD(t *testing.T) {
 		t.Fatalf("GetLogDrain: %v", err)
 	}
 	if _, err := c.CreateLogDrain(context.Background(), CreateLogDrainRequest{
-		ProjectID: "proj-1", Name: "datadog-prod", Type: "datadog", Config: json.RawMessage(`{"api_key":"x"}`),
+		ProjectID: "proj-1", Name: "datadog-prod", Type: "datadog", EndpointURL: "https://logs.example", AuthType: "none",
 	}); err != nil {
 		t.Fatalf("CreateLogDrain: %v", err)
 	}

@@ -1025,7 +1025,7 @@ func (c *Client) ListNotificationChannels(ctx context.Context, projectID string)
 	query := url.Values{}
 	query.Set("project_id", projectID)
 	var out []types.NotificationChannel
-	if err := c.doListJSON(ctx, "/v1/notification-channels", query, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/notification-channels", query, nil, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -1077,7 +1077,7 @@ func (c *Client) ListLogDrains(ctx context.Context, projectID string) ([]types.L
 	query := url.Values{}
 	query.Set("project_id", projectID)
 	var out []types.LogDrain
-	if err := c.doListJSON(ctx, "/v1/log-drains", query, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/log-drains", query, nil, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
