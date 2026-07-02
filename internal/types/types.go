@@ -676,15 +676,24 @@ type Webhook struct {
 
 // WebhookDelivery represents a single webhook delivery attempt.
 type WebhookDelivery struct {
-	ID           string     `json:"id"`
-	WebhookID    string     `json:"webhook_id"`
-	EventType    string     `json:"event_type"`
-	Status       string     `json:"status"`
-	StatusCode   int        `json:"status_code,omitempty"`
-	AttemptCount int        `json:"attempt_count"`
-	Error        string     `json:"error,omitempty"`
-	RequestedAt  time.Time  `json:"requested_at"`
-	DeliveredAt  *time.Time `json:"delivered_at,omitempty"`
+	ID             string     `json:"id"`
+	RunID          string     `json:"run_id,omitempty"`
+	JobID          string     `json:"job_id,omitempty"`
+	EventTriggerID string     `json:"event_trigger_id,omitempty"`
+	SubscriptionID string     `json:"subscription_id,omitempty"`
+	ProjectID      string     `json:"project_id,omitempty"`
+	OrgID          string     `json:"org_id,omitempty"`
+	WebhookURL     string     `json:"webhook_url,omitempty"`
+	RetryPolicy    string     `json:"webhook_retry_policy,omitempty"`
+	Status         string     `json:"status"`
+	Attempts       int        `json:"attempts"`
+	MaxAttempts    int        `json:"max_attempts"`
+	LastStatusCode *int       `json:"last_status_code,omitempty"`
+	LastError      string     `json:"last_error,omitempty"`
+	NextRetryAt    *time.Time `json:"next_retry_at,omitempty"`
+	DeliveredAt    *time.Time `json:"delivered_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 // EventSource represents an external event source feeding the project.

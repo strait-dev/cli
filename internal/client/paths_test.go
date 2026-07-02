@@ -258,21 +258,13 @@ func TestPathTraversalRejected(t *testing.T) {
 		}},
 
 		// Webhooks
-		{name: "GetWebhook", fn: func(id string) error { _, e := c.GetWebhook(ctx, id); return e }},
-		{name: "UpdateWebhook", fn: func(id string) error {
-			_, e := c.UpdateWebhook(ctx, id, UpdateWebhookRequest{})
-			return e
-		}},
+		{name: "GetWebhook", fn: func(id string) error { _, e := c.GetWebhook(ctx, "proj-1", id); return e }},
 		{name: "DeleteWebhook", fn: func(id string) error { return c.DeleteWebhook(ctx, id) }},
-		{name: "ListWebhookDeliveries", fn: func(id string) error {
-			_, e := c.ListWebhookDeliveries(ctx, id, 0)
-			return e
-		}},
+		{name: "RotateWebhookSecret", fn: func(id string) error { _, e := c.RotateWebhookSecret(ctx, id, RotateWebhookSecretRequest{}); return e }},
 		{name: "RetryWebhookDelivery", fn: func(id string) error {
 			_, e := c.RetryWebhookDelivery(ctx, id)
 			return e
 		}},
-		{name: "TestWebhook", fn: func(id string) error { _, e := c.TestWebhook(ctx, id); return e }},
 
 		// Event sources
 		{name: "GetEventSource", fn: func(id string) error { _, e := c.GetEventSource(ctx, id); return e }},

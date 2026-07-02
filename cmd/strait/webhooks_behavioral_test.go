@@ -18,7 +18,7 @@ func testWebhookFixture() types.Webhook {
 		ID:        "webhook-1",
 		ProjectID: "proj-test",
 		URL:       "https://example.com/hook",
-		Events:    []string{"job.run.completed"},
+		Events:    []string{"run.completed"},
 		Active:    true,
 		CreatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
 		UpdatedAt: time.Date(2026, 4, 1, 10, 0, 0, 0, time.UTC),
@@ -73,8 +73,9 @@ func TestWebhooksGet_ByID(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/webhooks/webhook-1": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, testWebhookFixture())
+		"GET /v1/webhooks/subscriptions": func(w http.ResponseWriter, r *http.Request) {
+			assertQuery(t, r, "project_id", "proj-test")
+			respondJSON(t, w, http.StatusOK, []types.Webhook{testWebhookFixture()})
 		},
 	})
 
@@ -108,8 +109,8 @@ func TestWebhooksCreate_Success(t *testing.T) {
 			if got.URL != "https://example.com/hook" {
 				t.Errorf("url: got %q, want %q", got.URL, "https://example.com/hook")
 			}
-			if len(got.Events) != 1 || got.Events[0] != "job.run.completed" {
-				t.Errorf("events: got %v, want [job.run.completed]", got.Events)
+			if len(got.Events) != 1 || got.Events[0] != "run.completed" {
+				t.Errorf("events: got %v, want [run.completed]", got.Events)
 			}
 			respondJSON(t, w, http.StatusCreated, client.CreateWebhookResponse{
 				Subscription:  testWebhookFixture(),
@@ -120,7 +121,7 @@ func TestWebhooksCreate_Success(t *testing.T) {
 
 	state := newTestState(t, srv)
 	cmd := newWebhooksCreateCommand(state)
-	cmd.SetArgs([]string{"--project", "proj-test", "--url", "https://example.com/hook", "--event", "job.run.completed"})
+	cmd.SetArgs([]string{"--project", "proj-test", "--url", "https://example.com/hook", "--event", "run.completed"})
 
 	if err := captureAndExec(t, state, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -161,7 +162,7 @@ func TestWebhooksCreate_RequiresEvent(t *testing.T) {
 	}
 }
 
-func TestWebhooksUpdate_RequiresAtLeastOneFlag(t *testing.T) {
+func TestWebhooksRotateSecret_RejectsNegativeGracePeriod(t *testing.T) {
 	t.Parallel()
 
 	srv := newTestServer(t, http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
@@ -169,27 +170,31 @@ func TestWebhooksUpdate_RequiresAtLeastOneFlag(t *testing.T) {
 	}))
 
 	state := newTestState(t, srv)
-	cmd := newWebhooksUpdateCommand(state)
-	cmd.SetArgs([]string{"webhook-1"})
+	cmd := newWebhooksRotateSecretCommand(state)
+	cmd.SetArgs([]string{"webhook-1", "--grace-period-minutes", "-1"})
 
 	err := cmd.Execute()
-	if err == nil || !strings.Contains(err.Error(), "at least one update flag") {
-		t.Fatalf("expected update flag error, got: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "--grace-period-minutes") {
+		t.Fatalf("expected grace period error, got: %v", err)
 	}
 }
 
-func TestWebhooksUpdate_PatchURL(t *testing.T) {
+func TestWebhooksRotateSecret_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"PATCH /v1/webhooks/webhook-1": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, testWebhookFixture())
+		"POST /v1/webhooks/subscriptions/webhook-1/rotate-secret": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, client.RotateWebhookSecretResponse{
+				SubscriptionID:     "webhook-1",
+				NewSecret:          "whsec_new",
+				GracePeriodMinutes: 60,
+			})
 		},
 	})
 
 	state := newTestState(t, srv)
-	cmd := newWebhooksUpdateCommand(state)
-	cmd.SetArgs([]string{"webhook-1", "--url", "https://new.example.com/hook"})
+	cmd := newWebhooksRotateSecretCommand(state)
+	cmd.SetArgs([]string{"webhook-1"})
 
 	if err := captureAndExec(t, state, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -235,24 +240,23 @@ func TestWebhooksDeliveries_Success(t *testing.T) {
 	t.Parallel()
 
 	delivery := types.WebhookDelivery{
-		ID:           "delivery-1",
-		WebhookID:    "webhook-1",
-		EventType:    "job.run.completed",
-		Status:       "succeeded",
-		StatusCode:   200,
-		AttemptCount: 1,
-		RequestedAt:  time.Date(2026, 4, 1, 11, 0, 0, 0, time.UTC),
+		ID:             "delivery-1",
+		SubscriptionID: "webhook-1",
+		Status:         "succeeded",
+		Attempts:       1,
+		MaxAttempts:    3,
+		CreatedAt:      time.Date(2026, 4, 1, 11, 0, 0, 0, time.UTC),
 	}
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/webhooks/webhook-1/deliveries": func(w http.ResponseWriter, _ *http.Request) {
+		"GET /v1/webhooks/deliveries": func(w http.ResponseWriter, _ *http.Request) {
 			respondPaginated(t, w, http.StatusOK, []types.WebhookDelivery{delivery})
 		},
 	})
 
 	state := newTestState(t, srv)
 	cmd := newWebhooksDeliveriesCommand(state)
-	cmd.SetArgs([]string{"webhook-1"})
+	cmd.SetArgs([]string{"--status", "succeeded"})
 
 	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
@@ -271,7 +275,7 @@ func TestWebhooksRetry_Success(t *testing.T) {
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
 		"POST /v1/webhook-deliveries/delivery-1/retry": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, types.WebhookDelivery{
-				ID: "delivery-1", WebhookID: "webhook-1", Status: "succeeded",
+				ID: "delivery-1", SubscriptionID: "webhook-1", Status: "succeeded",
 			})
 		},
 	})
@@ -289,14 +293,14 @@ func TestWebhooksTest_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"POST /v1/webhooks/webhook-1/test": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, map[string]any{"ok": true})
+		"POST /v1/webhooks/test": func(w http.ResponseWriter, _ *http.Request) {
+			respondJSON(t, w, http.StatusOK, client.TestWebhookResponse{Success: true, StatusCode: 200})
 		},
 	})
 
 	state := newTestState(t, srv)
 	cmd := newWebhooksTestCommand(state)
-	cmd.SetArgs([]string{"webhook-1"})
+	cmd.SetArgs([]string{"--url", "https://example.com/hook"})
 
 	if err := captureAndExec(t, state, cmd); err != nil {
 		t.Fatalf("unexpected error: %v", err)

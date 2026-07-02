@@ -407,18 +407,32 @@ type CreateWebhookResponse struct {
 	SigningSecret string        `json:"signing_secret"`
 }
 
-// UpdateWebhookRequest is the request body for updating a webhook.
-type UpdateWebhookRequest struct {
-	URL    *string   `json:"url,omitempty"`
-	Events *[]string `json:"events,omitempty"`
-	Secret *string   `json:"secret,omitempty"`
-	Active *bool     `json:"active,omitempty"`
+// RotateWebhookSecretRequest is the request body for rotating a webhook secret.
+type RotateWebhookSecretRequest struct {
+	GracePeriodMinutes int `json:"grace_period_minutes,omitempty"`
+}
+
+// RotateWebhookSecretResponse is returned after rotating a webhook secret.
+type RotateWebhookSecretResponse struct {
+	SubscriptionID     string    `json:"subscription_id"`
+	NewSecret          string    `json:"new_secret"`
+	GraceExpiresAt     time.Time `json:"grace_expires_at"`
+	GracePeriodMinutes int       `json:"grace_period_minutes"`
+}
+
+// TestWebhookRequest is the request body for sending a webhook test ping.
+type TestWebhookRequest struct {
+	URL    string `json:"url"`
+	Secret string `json:"secret,omitempty"`
 }
 
 // TestWebhookResponse is the response from a webhook test ping.
 type TestWebhookResponse struct {
-	DeliveryID string `json:"delivery_id"`
-	Status     string `json:"status"`
+	Success      bool   `json:"success"`
+	StatusCode   int    `json:"status_code,omitempty"`
+	LatencyMs    int64  `json:"latency_ms"`
+	ResponseBody string `json:"response_body,omitempty"`
+	Error        string `json:"error,omitempty"`
 }
 
 // CreateEventSourceRequest is the request body for creating an event source.

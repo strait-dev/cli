@@ -1534,8 +1534,6 @@ func TestWebhookLifecycle(t *testing.T) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/subscriptions":
 			respondJSON(t, w, http.StatusOK, []types.Webhook{hook})
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/wh-1":
-			respondJSON(t, w, http.StatusOK, hook)
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/subscriptions":
 			var req map[string]any
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -1548,16 +1546,23 @@ func TestWebhookLifecycle(t *testing.T) {
 				t.Fatalf("unexpected legacy url field: %+v", req)
 			}
 			respondJSON(t, w, http.StatusCreated, CreateWebhookResponse{Subscription: hook, SigningSecret: "whsec_test"})
-		case r.Method == http.MethodPatch && r.URL.Path == "/v1/webhooks/wh-1":
-			respondJSON(t, w, http.StatusOK, hook)
 		case r.Method == http.MethodDelete && r.URL.Path == "/v1/webhooks/subscriptions/wh-1":
 			w.WriteHeader(http.StatusNoContent)
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/wh-1/deliveries":
-			respondPaginated(t, w, http.StatusOK, []types.WebhookDelivery{{ID: "wd-1", WebhookID: "wh-1", Status: "ok"}})
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/wh-1/test":
-			respondJSON(t, w, http.StatusOK, TestWebhookResponse{DeliveryID: "wd-9", Status: "queued"})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/subscriptions/wh-1/rotate-secret":
+			respondJSON(t, w, http.StatusOK, RotateWebhookSecretResponse{SubscriptionID: "wh-1", NewSecret: "whsec_new", GracePeriodMinutes: 60})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/deliveries":
+			respondPaginated(t, w, http.StatusOK, []types.WebhookDelivery{{ID: "wd-1", SubscriptionID: "wh-1", Status: "failed"}})
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/test":
+			var req TestWebhookRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Fatalf("decode test request body: %v", err)
+			}
+			if req.URL != "https://example.com/hook" {
+				t.Fatalf("unexpected test URL: %+v", req)
+			}
+			respondJSON(t, w, http.StatusOK, TestWebhookResponse{Success: true, StatusCode: http.StatusOK, LatencyMs: 12})
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhook-deliveries/wd-1/retry":
-			respondJSON(t, w, http.StatusOK, types.WebhookDelivery{ID: "wd-1", WebhookID: "wh-1", Status: "queued"})
+			respondJSON(t, w, http.StatusOK, types.WebhookDelivery{ID: "wd-1", SubscriptionID: "wh-1", Status: "pending"})
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -1568,7 +1573,7 @@ func TestWebhookLifecycle(t *testing.T) {
 	if got, err := c.ListWebhooks(context.Background(), "proj-1"); err != nil || len(got) != 1 {
 		t.Fatalf("ListWebhooks: %v / got=%+v", err, got)
 	}
-	if _, err := c.GetWebhook(context.Background(), "wh-1"); err != nil {
+	if _, err := c.GetWebhook(context.Background(), "proj-1", "wh-1"); err != nil {
 		t.Fatalf("GetWebhook: %v", err)
 	}
 	created, err := c.CreateWebhook(context.Background(), CreateWebhookRequest{ProjectID: "proj-1", URL: "https://example.com/hook", Events: []string{"run.completed"}})
@@ -1578,17 +1583,16 @@ func TestWebhookLifecycle(t *testing.T) {
 	if created.Secret != "whsec_test" {
 		t.Fatalf("expected signing secret, got %q", created.Secret)
 	}
-	url := "https://new.example.com"
-	if _, err := c.UpdateWebhook(context.Background(), "wh-1", UpdateWebhookRequest{URL: &url}); err != nil {
-		t.Fatalf("UpdateWebhook: %v", err)
-	}
 	if err := c.DeleteWebhook(context.Background(), "wh-1"); err != nil {
 		t.Fatalf("DeleteWebhook: %v", err)
 	}
-	if got, err := c.ListWebhookDeliveries(context.Background(), "wh-1", 10); err != nil || len(got) != 1 {
+	if got, err := c.RotateWebhookSecret(context.Background(), "wh-1", RotateWebhookSecretRequest{}); err != nil || got.NewSecret != "whsec_new" {
+		t.Fatalf("RotateWebhookSecret: %v / got=%+v", err, got)
+	}
+	if got, err := c.ListWebhookDeliveries(context.Background(), "failed", 10, ""); err != nil || len(got) != 1 {
 		t.Fatalf("ListWebhookDeliveries: %v / got=%+v", err, got)
 	}
-	if got, err := c.TestWebhook(context.Background(), "wh-1"); err != nil || got.DeliveryID != "wd-9" {
+	if got, err := c.TestWebhook(context.Background(), TestWebhookRequest{URL: "https://example.com/hook"}); err != nil || !got.Success {
 		t.Fatalf("TestWebhook: %v / got=%+v", err, got)
 	}
 	if got, err := c.RetryWebhookDelivery(context.Background(), "wd-1"); err != nil || got.ID != "wd-1" {

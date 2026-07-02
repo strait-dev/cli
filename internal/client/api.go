@@ -795,15 +795,20 @@ func (c *Client) ListWebhooks(ctx context.Context, projectID string) ([]types.We
 }
 
 // GetWebhook returns a webhook subscription by ID.
-func (c *Client) GetWebhook(ctx context.Context, id string) (*types.Webhook, error) {
+func (c *Client) GetWebhook(ctx context.Context, projectID, id string) (*types.Webhook, error) {
 	if err := validatePathSegment(id); err != nil {
 		return nil, fmt.Errorf("invalid webhook id: %w", err)
 	}
-	var out types.Webhook
-	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/webhooks", id), nil, nil, &out); err != nil {
+	hooks, err := c.ListWebhooks(ctx, projectID)
+	if err != nil {
 		return nil, err
 	}
-	return &out, nil
+	for i := range hooks {
+		if hooks[i].ID == id {
+			return &hooks[i], nil
+		}
+	}
+	return nil, fmt.Errorf("webhook subscription %q not found", id)
 }
 
 // CreateWebhook creates a new webhook subscription.
@@ -817,18 +822,6 @@ func (c *Client) CreateWebhook(ctx context.Context, req CreateWebhookRequest) (*
 	return &webhook, nil
 }
 
-// UpdateWebhook updates a webhook subscription.
-func (c *Client) UpdateWebhook(ctx context.Context, id string, req UpdateWebhookRequest) (*types.Webhook, error) {
-	if err := validatePathSegment(id); err != nil {
-		return nil, fmt.Errorf("invalid webhook id: %w", err)
-	}
-	var out types.Webhook
-	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/webhooks", id), nil, req, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
 // DeleteWebhook deletes a webhook subscription by ID.
 func (c *Client) DeleteWebhook(ctx context.Context, id string) error {
 	if err := validatePathSegment(id); err != nil {
@@ -837,17 +830,32 @@ func (c *Client) DeleteWebhook(ctx context.Context, id string) error {
 	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/webhooks/subscriptions", id), nil, nil, &map[string]string{})
 }
 
-// ListWebhookDeliveries returns delivery records for a webhook.
-func (c *Client) ListWebhookDeliveries(ctx context.Context, id string, limit int) ([]types.WebhookDelivery, error) {
+// RotateWebhookSecret rotates a webhook subscription signing secret.
+func (c *Client) RotateWebhookSecret(ctx context.Context, id string, req RotateWebhookSecretRequest) (*RotateWebhookSecretResponse, error) {
 	if err := validatePathSegment(id); err != nil {
 		return nil, fmt.Errorf("invalid webhook id: %w", err)
 	}
+	var out RotateWebhookSecretResponse
+	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/webhooks/subscriptions", id, "rotate-secret"), nil, req, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// ListWebhookDeliveries returns webhook delivery records for the project.
+func (c *Client) ListWebhookDeliveries(ctx context.Context, status string, limit int, cursor string) ([]types.WebhookDelivery, error) {
 	query := url.Values{}
+	if status != "" {
+		query.Set("status", status)
+	}
 	if limit > 0 {
 		query.Set("limit", fmt.Sprintf("%d", limit))
 	}
+	if cursor != "" {
+		query.Set("cursor", cursor)
+	}
 	var out []types.WebhookDelivery
-	if err := c.doListJSON(ctx, path.Join("/v1/webhooks", id, "deliveries"), query, &out); err != nil {
+	if err := c.doListJSON(ctx, "/v1/webhooks/deliveries", query, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -865,13 +873,10 @@ func (c *Client) RetryWebhookDelivery(ctx context.Context, deliveryID string) (*
 	return &out, nil
 }
 
-// TestWebhook sends a synthetic test event to a webhook.
-func (c *Client) TestWebhook(ctx context.Context, id string) (*TestWebhookResponse, error) {
-	if err := validatePathSegment(id); err != nil {
-		return nil, fmt.Errorf("invalid webhook id: %w", err)
-	}
+// TestWebhook sends a synthetic test event to a webhook URL.
+func (c *Client) TestWebhook(ctx context.Context, req TestWebhookRequest) (*TestWebhookResponse, error) {
 	var out TestWebhookResponse
-	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/webhooks", id, "test"), nil, nil, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/webhooks/test", nil, req, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
