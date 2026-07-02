@@ -997,7 +997,7 @@ func (c *Client) PauseJobGroup(ctx context.Context, id string) error {
 	if err := validatePathSegment(id); err != nil {
 		return fmt.Errorf("invalid job group id: %w", err)
 	}
-	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/job-groups", id, "pause"), nil, nil, &map[string]string{})
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/job-groups", id, "pause-all"), nil, nil, &map[string]string{})
 }
 
 // ResumeJobGroup resumes execution for all jobs in a group.
@@ -1005,7 +1005,7 @@ func (c *Client) ResumeJobGroup(ctx context.Context, id string) error {
 	if err := validatePathSegment(id); err != nil {
 		return fmt.Errorf("invalid job group id: %w", err)
 	}
-	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/job-groups", id, "resume"), nil, nil, &map[string]string{})
+	return c.doJSON(ctx, http.MethodPost, path.Join("/v1/job-groups", id, "resume-all"), nil, nil, &map[string]string{})
 }
 
 // GetJobGroupStats returns aggregate stats for a job group.

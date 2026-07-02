@@ -1672,9 +1672,9 @@ func TestJobGroupLifecycle(t *testing.T) {
 			respondJSON(t, w, http.StatusOK, map[string]string{})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/job-groups/jg-1/jobs":
 			respondPaginated(t, w, http.StatusOK, []types.Job{{ID: "job-1"}})
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups/jg-1/pause":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups/jg-1/pause-all":
 			respondJSON(t, w, http.StatusOK, map[string]string{})
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups/jg-1/resume":
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/job-groups/jg-1/resume-all":
 			respondJSON(t, w, http.StatusOK, map[string]string{})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/job-groups/jg-1/stats":
 			respondJSON(t, w, http.StatusOK, types.JobGroupStats{GroupID: "jg-1", JobCount: 3, RunsTotal: 100})
