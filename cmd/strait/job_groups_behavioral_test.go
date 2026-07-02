@@ -231,7 +231,7 @@ func TestJobGroupsPause_Success(t *testing.T) {
 		"GET /v1/job-groups/grp-1": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, testJobGroupFixture())
 		},
-		"POST /v1/job-groups/grp-1/pause": func(w http.ResponseWriter, _ *http.Request) {
+		"POST /v1/job-groups/grp-1/pause-all": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, map[string]string{})
 		},
 	})
@@ -252,7 +252,7 @@ func TestJobGroupsResume_Success(t *testing.T) {
 		"GET /v1/job-groups/grp-1": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, testJobGroupFixture())
 		},
-		"POST /v1/job-groups/grp-1/resume": func(w http.ResponseWriter, _ *http.Request) {
+		"POST /v1/job-groups/grp-1/resume-all": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, map[string]string{})
 		},
 	})

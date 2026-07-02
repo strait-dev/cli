@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/types"
 )
 
@@ -87,9 +88,11 @@ func TestEnvironmentsVariables_MasksByDefault(t *testing.T) {
 			respondJSON(t, w, http.StatusOK, types.Environment{ID: "env-1", Slug: "prod"})
 		},
 		"GET /v1/environments/env-1/variables": func(w http.ResponseWriter, r *http.Request) {
-			respondJSON(t, w, http.StatusOK, map[string]string{
-				"PG_PASSWORD": "very-secret-password",
-				"OTHER":       "value",
+			respondJSON(t, w, http.StatusOK, client.EnvironmentVariablesResponse{
+				Variables: map[string]string{
+					"PG_PASSWORD": "very-secret-password",
+					"OTHER":       "value",
+				},
 			})
 		},
 	})
