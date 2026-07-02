@@ -207,6 +207,9 @@ func (c *Client) doJSONWithHeaders(ctx context.Context, method, endpoint string,
 		if out == nil {
 			return nil
 		}
+		if resp.StatusCode == http.StatusNoContent {
+			return nil
+		}
 		// Cap decoded response to 50 MB to prevent unbounded memory allocation
 		// from a malicious or misconfigured server.
 		const maxResponseBody = 50 * 1024 * 1024

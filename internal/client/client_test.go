@@ -77,6 +77,23 @@ func TestNew_StreamHTTPHasNoTimeout(t *testing.T) {
 	}
 }
 
+func TestDoJSONNoContentWithOutputTarget(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertMethod(t, r, http.MethodDelete)
+		assertPath(t, r, "/v1/environments/env-1")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	c := mustClient(t, srv.URL)
+	out := map[string]string{}
+	if err := c.doJSON(context.Background(), http.MethodDelete, "/v1/environments/env-1", nil, nil, &out); err != nil {
+		t.Fatalf("doJSON 204 with output target: %v", err)
+	}
+}
+
 func TestListJobs(t *testing.T) {
 	t.Parallel()
 
