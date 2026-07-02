@@ -105,7 +105,7 @@ func isPrivateIP(ip net.IP) bool {
 // ValidateRuntime checks that a runtime is one of the known values.
 // It accepts both server-canonical names (typescript, go, python, ruby, rust)
 // and CLI aliases (node, bun → typescript). docker is accepted for legacy
-// manifest deployments but not for code-first source deployments.
+// manifest deployments.
 func ValidateRuntime(runtime string) error {
 	runtime = strings.TrimSpace(strings.ToLower(runtime))
 	valid := map[string]bool{

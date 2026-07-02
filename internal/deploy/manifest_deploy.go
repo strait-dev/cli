@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +23,8 @@ type ManifestDeployOptions struct {
 	Strategy       string
 	CanaryPercent  int
 	CanaryDuration string
+	Stdout         io.Writer
+	Stderr         io.Writer
 }
 
 // DeployManifest runs the create + finalize deployment flow using manifests.
@@ -36,9 +39,9 @@ func DeployManifest(ctx context.Context, cli *client.Client, opts ManifestDeploy
 		if encErr != nil {
 			return fmt.Errorf("encode manifest: %w", encErr)
 		}
-		fmt.Println(string(encoded))
+		fmt.Fprintln(stdoutOrDefault(opts.Stdout), string(encoded))
 		if opts.Strategy == "canary" {
-			fmt.Fprintf(os.Stderr, "[dry-run] canary strategy: %d%% traffic for %s\n", opts.CanaryPercent, opts.CanaryDuration)
+			fmt.Fprintf(stderrOrDefault(opts.Stderr), "[dry-run] canary strategy: %d%% traffic for %s\n", opts.CanaryPercent, opts.CanaryDuration)
 		}
 		return nil
 	}
@@ -51,7 +54,7 @@ func DeployManifest(ctx context.Context, cli *client.Client, opts ManifestDeploy
 		return fmt.Errorf("finalize deployment %s: %w", deployment.ID, err)
 	}
 
-	fmt.Printf("deployment %s created and finalized (checksum: %s)\n", deployment.ID, manifest.Checksum)
+	fmt.Fprintf(stdoutOrDefault(opts.Stdout), "deployment %s created and finalized (checksum: %s)\n", deployment.ID, manifest.Checksum)
 	return nil
 }
 

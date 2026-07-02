@@ -50,7 +50,7 @@ release:
     owner: strait-dev
     name: cli
 
-brews:
+homebrew_casks:
   - repository:
       owner: strait-dev
       name: homebrew-tap
@@ -58,9 +58,7 @@ brews:
     commit_author:
       name: strait-bot
       email: bot@strait.dev
+    binaries:
+      - strait
     homepage: https://github.com/strait-dev/cli
     description: "Strait CLI -- manage jobs, runs, and workflows"
-    install: |
-      bin.install "strait"
-    test: |
-      system "#{bin}/strait", "version", "--short"

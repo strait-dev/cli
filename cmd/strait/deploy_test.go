@@ -2,15 +2,10 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/spf13/cobra"
-	"github.com/strait-dev/cli/internal/client"
-	"github.com/strait-dev/cli/internal/types"
 )
 
 func TestDeployPromote_DryRunStillValidatesProject(t *testing.T) {
@@ -201,69 +196,5 @@ func TestDeploy_DirectDefault(t *testing.T) {
 	}
 	if f.DefValue != "direct" {
 		t.Fatalf("expected --strategy default to be 'direct', got %q", f.DefValue)
-	}
-}
-
-func TestCompleteDeploymentIDs_ReturnsIDs(t *testing.T) {
-	t.Parallel()
-
-	// Setup a server that handles job slug lookup and deployment list.
-	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/jobs": func(w http.ResponseWriter, r *http.Request) {
-			respondPaginated(t, w, http.StatusOK, []types.Job{
-				{ID: "job-abc", ProjectID: "proj-test", Name: "My Job", Slug: "my-job"},
-			})
-		},
-		"GET /v1/jobs/job-abc/deployments": func(w http.ResponseWriter, _ *http.Request) {
-			respondPaginated(t, w, http.StatusOK, []client.CodeDeployment{
-				{ID: "dep-1", Version: 1, Status: "ready", Runtime: "go"},
-				{ID: "dep-2", Version: 2, Status: "building", Runtime: "go"},
-			})
-		},
-	})
-
-	slug := "my-job"
-	state := newTestState(t, srv)
-	completeFn := completeDeploymentIDs(state, func() string { return slug })
-
-	completions, directive := completeFn(nil, nil, "")
-	if directive != cobra.ShellCompDirectiveNoFileComp {
-		t.Fatalf("unexpected directive: %v", directive)
-	}
-	if len(completions) != 2 {
-		t.Fatalf("expected 2 completions, got %d: %v", len(completions), completions)
-	}
-	if !strings.Contains(completions[0], "dep-1") {
-		t.Errorf("expected dep-1 in first completion, got %q", completions[0])
-	}
-	if !strings.Contains(completions[1], "dep-2") {
-		t.Errorf("expected dep-2 in second completion, got %q", completions[1])
-	}
-}
-
-func TestCompleteDeploymentIDs_ReturnsNilWithoutSlug(t *testing.T) {
-	t.Parallel()
-
-	state := &appState{opts: &rootOptions{projectID: "proj-test", apiKey: "k"}}
-	slug := ""
-	completeFn := completeDeploymentIDs(state, func() string { return slug })
-
-	completions, _ := completeFn(nil, nil, "")
-	if completions != nil {
-		t.Fatalf("expected nil completions without job slug, got: %v", completions)
-	}
-}
-
-func TestCompleteDeploymentIDs_SkipsIfAlreadyHasArg(t *testing.T) {
-	t.Parallel()
-
-	state := &appState{opts: &rootOptions{projectID: "proj-test", apiKey: "k"}}
-	slug := "my-job"
-	completeFn := completeDeploymentIDs(state, func() string { return slug })
-
-	// With one existing arg, no more completions needed.
-	completions, _ := completeFn(nil, []string{"existing-arg"}, "")
-	if completions != nil {
-		t.Fatalf("expected nil completions when arg already provided, got: %v", completions)
 	}
 }

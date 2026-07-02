@@ -1,0 +1,15 @@
+---
+title: "job-groups"
+description: "Manage job groups"
+---
+
+```bash
+strait job-groups list --project proj_123
+strait job-groups get group_123
+strait job-groups create --project proj_123 --name nightly
+strait job-groups update group_123 --name critical
+strait job-groups jobs group_123
+strait job-groups pause group_123
+strait job-groups resume group_123
+strait job-groups stats group_123
+```

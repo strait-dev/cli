@@ -4,6 +4,7 @@ package deploy
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -25,6 +26,8 @@ type DeployOptions struct {
 	Region       string
 	DryRun       bool
 	CacheEnabled bool
+	Stdout       io.Writer
+	Stderr       io.Writer
 }
 
 // DeployJob orchestrates the build -> push -> update flow for a single job.
@@ -43,13 +46,13 @@ func DeployJob(ctx context.Context, cli *client.Client, opts DeployOptions) erro
 
 		var alreadyPushed bool
 		var err error
-		imageURI, alreadyPushed, err = BuildImage(ctx, opts.Dockerfile, opts.Tag, opts.Registry, opts.JobSlug, opts.BuildArgs, opts.CacheEnabled)
+		imageURI, alreadyPushed, err = BuildImage(ctx, opts.Dockerfile, opts.Tag, opts.Registry, opts.JobSlug, opts.BuildArgs, opts.CacheEnabled, opts.stdout(), opts.stderr())
 		if err != nil {
 			return fmt.Errorf("build failed: %w", err)
 		}
 
 		if opts.Push && !alreadyPushed {
-			if err := PushImage(ctx, imageURI); err != nil {
+			if err := PushImage(ctx, imageURI, opts.stdout(), opts.stderr()); err != nil {
 				return fmt.Errorf("push failed: %w", err)
 			}
 		}
@@ -60,17 +63,31 @@ func DeployJob(ctx context.Context, cli *client.Client, opts DeployOptions) erro
 	}
 
 	if opts.DryRun {
-		fmt.Printf("[dry-run] would update job %s with image %s\n", opts.JobSlug, imageURI)
+		fmt.Fprintf(opts.stdout(), "[dry-run] would update job %s with image %s\n", opts.JobSlug, imageURI)
 		if opts.Preset != "" {
-			fmt.Printf("[dry-run]   preset: %s\n", opts.Preset)
+			fmt.Fprintf(opts.stdout(), "[dry-run]   preset: %s\n", opts.Preset)
 		}
 		if opts.Region != "" {
-			fmt.Printf("[dry-run]   region: %s\n", opts.Region)
+			fmt.Fprintf(opts.stdout(), "[dry-run]   region: %s\n", opts.Region)
 		}
 		return nil
 	}
 
 	return UpdateJobImage(ctx, cli, opts.JobSlug, imageURI, opts.Preset, opts.Region)
+}
+
+func (o DeployOptions) stdout() io.Writer {
+	if o.Stdout != nil {
+		return o.Stdout
+	}
+	return os.Stdout
+}
+
+func (o DeployOptions) stderr() io.Writer {
+	if o.Stderr != nil {
+		return o.Stderr
+	}
+	return os.Stderr
 }
 
 // UpdateJobImage patches a job with the new image URI and optional preset/region.
@@ -98,7 +115,7 @@ func UpdateJobImage(ctx context.Context, cli *client.Client, slug, imageURI, pre
 
 // BuildImage runs `docker build` (or `docker buildx build` with caching) and
 // returns the tagged image URI and whether the image was already pushed (buildx --push).
-func BuildImage(ctx context.Context, dockerfile, tag, registry, slug string, buildArgs []string, cacheEnabled bool) (string, bool, error) {
+func BuildImage(ctx context.Context, dockerfile, tag, registry, slug string, buildArgs []string, cacheEnabled bool, stdout, stderr io.Writer) (string, bool, error) {
 	imageURI := fmt.Sprintf("%s/%s:%s", registry, slug, tag)
 
 	useBuildx := cacheEnabled && hasBuildx(ctx)
@@ -113,7 +130,7 @@ func BuildImage(ctx context.Context, dockerfile, tag, registry, slug string, bui
 			"-t", imageURI, "-f", dockerfile, ".")
 	} else {
 		if cacheEnabled {
-			fmt.Println("warning: docker buildx not available, falling back to docker build")
+			fmt.Fprintln(stderrOrDefault(stderr), "warning: docker buildx not available, falling back to docker build")
 		}
 		args = append(args, "build", "-t", imageURI, "-f", dockerfile, ".")
 	}
@@ -123,8 +140,8 @@ func BuildImage(ctx context.Context, dockerfile, tag, registry, slug string, bui
 	}
 
 	cmd := exec.CommandContext(ctx, "docker", args...) //nolint:gosec // Args from trusted CLI flags.
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = stdoutOrDefault(stdout)
+	cmd.Stderr = stderrOrDefault(stderr)
 	if err := cmd.Run(); err != nil {
 		return "", false, fmt.Errorf("docker build failed: %w", err)
 	}
@@ -139,14 +156,28 @@ func hasBuildx(ctx context.Context) bool {
 }
 
 // PushImage pushes a Docker image to its registry.
-func PushImage(ctx context.Context, imageURI string) error {
+func PushImage(ctx context.Context, imageURI string, stdout, stderr io.Writer) error {
 	cmd := exec.CommandContext(ctx, "docker", "push", imageURI) //nolint:gosec // Image URI from trusted CLI input.
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = stdoutOrDefault(stdout)
+	cmd.Stderr = stderrOrDefault(stderr)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("docker push failed: %w", err)
 	}
 	return nil
+}
+
+func stdoutOrDefault(w io.Writer) io.Writer {
+	if w != nil {
+		return w
+	}
+	return os.Stdout
+}
+
+func stderrOrDefault(w io.Writer) io.Writer {
+	if w != nil {
+		return w
+	}
+	return os.Stderr
 }
 
 // gitSHA returns the current git HEAD short SHA.

@@ -1,7 +1,6 @@
 package extension
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -102,53 +101,5 @@ func TestRemove_NotInstalled_Errors(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "not installed") {
 		t.Errorf("expected 'not installed' in error, got: %v", err)
-	}
-}
-
-func TestInstall_InvalidSource_Errors(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name   string
-		source string
-	}{
-		{name: "empty string", source: ""},
-		{name: "random string", source: "foobar"},
-		{name: "http non-github", source: "https://example.com/repo"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			err := Install(context.Background(), tt.source)
-			if err == nil {
-				t.Fatalf("expected error for source %q, got nil", tt.source)
-			}
-		})
-	}
-}
-
-func TestInstall_ValidSource(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name   string
-		source string
-	}{
-		{name: "github URL", source: "https://github.com/user/repo"},
-		{name: "github without https", source: "github.com/user/repo"},
-		{name: "absolute path", source: "/tmp/my-plugin"},
-		{name: "relative dot path", source: "./my-plugin"},
-		{name: "relative parent path", source: "../my-plugin"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			err := Install(context.Background(), tt.source)
-			if err != nil {
-				t.Fatalf("unexpected error for source %q: %v", tt.source, err)
-			}
-		})
 	}
 }

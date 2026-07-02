@@ -64,6 +64,8 @@ func newDeployCommand(state *appState) *cobra.Command {
 					Strategy:       strategy,
 					CanaryPercent:  canaryPercent,
 					CanaryDuration: canaryDuration,
+					Stdout:         state.out(),
+					Stderr:         os.Stderr,
 				})
 			}
 
@@ -119,6 +121,8 @@ func newDeployCommand(state *appState) *cobra.Command {
 						Region:       jobRegion,
 						DryRun:       dryRun,
 						CacheEnabled: cacheEnabled,
+						Stdout:       state.out(),
+						Stderr:       os.Stderr,
 					}
 
 					fmt.Fprintln(os.Stderr, styles.Info("Deploying "+jobCfg.Slug+"..."))
@@ -149,6 +153,8 @@ func newDeployCommand(state *appState) *cobra.Command {
 				Region:       region,
 				DryRun:       dryRun,
 				CacheEnabled: cacheEnabled,
+				Stdout:       state.out(),
+				Stderr:       os.Stderr,
 			}
 
 			if err := deploy.DeployJob(cmd.Context(), cli, opts); err != nil {
@@ -186,7 +192,6 @@ func newDeployCommand(state *appState) *cobra.Command {
 	cmd.AddCommand(newDeployPreviewCommand(state))
 	cmd.AddCommand(newDeployCreateCommand(state))
 	cmd.AddCommand(newDeployFinalizeCommand(state))
-	cmd.AddCommand(newDeploySourceCommand(state))
 
 	return cmd
 }
@@ -217,6 +222,8 @@ func newDeployCreateCommand(state *appState) *cobra.Command {
 				ArtifactURI: artifactURI,
 				DryRun:      dryRun,
 				OutDir:      outDir,
+				Stdout:      state.out(),
+				Stderr:      os.Stderr,
 			})
 			if err != nil {
 				return err
@@ -491,6 +498,8 @@ func newDeployPreviewCommand(state *appState) *cobra.Command {
 			return deploy.DeployManifest(cmd.Context(), cli, deploy.ManifestDeployOptions{
 				ConfigPath:  configPath,
 				Environment: previewEnv,
+				Stdout:      state.out(),
+				Stderr:      os.Stderr,
 			})
 		},
 	}

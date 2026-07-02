@@ -19,42 +19,9 @@ func TestSchemaCommand_HasSubcommands(t *testing.T) {
 		names[sub.Name()] = true
 	}
 
-	for _, want := range []string{"runtimes", "job", "deployment", "workflow", "run", "trigger", "secret", "api-key"} {
+	for _, want := range []string{"job", "deployment", "workflow", "run", "trigger", "secret", "api-key"} {
 		if !names[want] {
 			t.Errorf("missing subcommand %q", want)
-		}
-	}
-}
-
-func TestSchemaRuntimes_OutputIsValidJSON(t *testing.T) {
-	t.Parallel()
-
-	srv := newTestServer(t, http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
-	state := newTestState(t, srv)
-	cmd := newSchemaCommand(state)
-	cmd.SetArgs([]string{"runtimes"})
-
-	out := captureStateOutput(t, state, func() {
-		if err := cmd.Execute(); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
-	var runtimes []map[string]string
-	if err := json.Unmarshal([]byte(out), &runtimes); err != nil {
-		t.Fatalf("output is not valid JSON: %v\noutput: %s", err, out)
-	}
-	if len(runtimes) == 0 {
-		t.Fatal("expected non-empty runtimes list")
-	}
-	// Check known runtimes are present
-	names := make(map[string]bool)
-	for _, r := range runtimes {
-		names[r["runtime"]] = true
-	}
-	for _, want := range []string{"go", "python", "typescript", "ruby", "rust"} {
-		if !names[want] {
-			t.Errorf("missing runtime %q in output", want)
 		}
 	}
 }
@@ -116,22 +83,16 @@ func TestSchemaDeployment_OutputIsValidJSON(t *testing.T) {
 	if schema.Resource != "deployment" {
 		t.Errorf("expected resource=deployment, got %q", schema.Resource)
 	}
-	// Verify status enum includes expected values
+	// Verify manifest deployment fields are present.
+	fields := make(map[string]bool)
 	for _, f := range schema.Fields {
-		if f.Name == "status" {
-			found := false
-			for _, e := range f.Enum {
-				if e == "ready" {
-					found = true
-				}
-			}
-			if !found {
-				t.Errorf("status enum missing 'ready', got: %v", f.Enum)
-			}
-			return
+		fields[f.Name] = true
+	}
+	for _, want := range []string{"project_id", "environment", "runtime", "artifact_uri", "strategy", "checksum"} {
+		if !fields[want] {
+			t.Errorf("missing deployment field %q", want)
 		}
 	}
-	t.Error("missing status field in deployment schema")
 }
 
 func TestSchemaWorkflow_OutputIsValidJSON(t *testing.T) {

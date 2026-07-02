@@ -31,7 +31,8 @@ func TestUsageCommand_BareInvocationCallsCurrent(t *testing.T) {
 
 	var hits atomic.Int32
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/billing/usage": func(w http.ResponseWriter, _ *http.Request) {
+		"GET /v1/usage/current": func(w http.ResponseWriter, r *http.Request) {
+			assertQuery(t, r, "org_id", "org-1")
 			hits.Add(1)
 			respondJSON(t, w, http.StatusOK, period)
 		},
@@ -40,7 +41,7 @@ func TestUsageCommand_BareInvocationCallsCurrent(t *testing.T) {
 	state := newTestState(t, srv)
 	state.opts.outputFormat = "json"
 	cmd := newUsageCommand(state)
-	cmd.SetArgs([]string{}) // bare invocation
+	cmd.SetArgs([]string{"--org-id", "org-1"}) // bare invocation
 
 	out := captureStateOutput(t, state, func() {
 		if err := cmd.Execute(); err != nil {
@@ -49,7 +50,7 @@ func TestUsageCommand_BareInvocationCallsCurrent(t *testing.T) {
 	})
 
 	if hits.Load() != 1 {
-		t.Fatalf("expected exactly 1 hit on /v1/billing/usage, got %d", hits.Load())
+		t.Fatalf("expected exactly 1 hit on /v1/usage/current, got %d", hits.Load())
 	}
 
 	var got types.UsagePeriod
@@ -70,7 +71,8 @@ func TestUsageCommand_CurrentSubcommandReachesSameEndpoint(t *testing.T) {
 
 	var hits atomic.Int32
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/billing/usage": func(w http.ResponseWriter, _ *http.Request) {
+		"GET /v1/usage/current": func(w http.ResponseWriter, r *http.Request) {
+			assertQuery(t, r, "org_id", "org-1")
 			hits.Add(1)
 			respondJSON(t, w, http.StatusOK, period)
 		},
@@ -79,13 +81,25 @@ func TestUsageCommand_CurrentSubcommandReachesSameEndpoint(t *testing.T) {
 	state := newTestState(t, srv)
 	state.opts.outputFormat = "json"
 	cmd := newUsageCommand(state)
-	cmd.SetArgs([]string{"current"})
+	cmd.SetArgs([]string{"--org-id", "org-1", "current"})
 
 	if _, err := captureCommandOutputErr(cmd); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if hits.Load() != 1 {
 		t.Fatalf("expected exactly 1 hit, got %d", hits.Load())
+	}
+}
+
+func TestUsageCommand_RequiresOrgID(t *testing.T) {
+	t.Parallel()
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{})
+	state := newTestState(t, srv)
+	cmd := newUsageCommand(state)
+
+	if _, err := captureCommandOutputErr(cmd); err == nil {
+		t.Fatal("expected missing --org-id error")
 	}
 }
 

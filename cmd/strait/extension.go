@@ -27,7 +27,6 @@ They are invoked as subcommands: strait extension run <name> [args...]`,
 
 	cmd.AddCommand(newExtensionListCommand(state))
 	cmd.AddCommand(newExtensionRunCommand())
-	cmd.AddCommand(newExtensionInstallCommand())
 	cmd.AddCommand(newExtensionCreateCommand())
 	cmd.AddCommand(newExtensionRemoveCommand())
 
@@ -90,23 +89,6 @@ func newExtensionRunCommand() *cobra.Command {
 type extensionInfo struct {
 	name string
 	path string
-}
-
-func newExtensionInstallCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "install <source>",
-		Short: "Install an extension from a GitHub URL or local path",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			source := args[0]
-			if err := extension.Install(cmd.Context(), source); err != nil {
-				return err
-			}
-			fmt.Fprintln(os.Stderr, styles.Success("Installed extension from "+source))
-			return nil
-		},
-	}
-	return cmd
 }
 
 func newExtensionCreateCommand() *cobra.Command {

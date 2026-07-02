@@ -1,0 +1,22 @@
+---
+title: "usage"
+description: "Inspect organization usage and billing forecasts"
+---
+
+Usage commands require an organization ID.
+
+```bash
+strait usage --org-id org_123
+strait usage --org-id org_123 current
+strait usage --org-id org_123 history --from 2026-06-01 --to 2026-06-30
+strait usage --org-id org_123 forecast
+```
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `usage --org-id ORG` | Show current usage |
+| `usage current --org-id ORG` | Show current usage |
+| `usage history --org-id ORG --from YYYY-MM-DD --to YYYY-MM-DD` | Show historical usage |
+| `usage forecast --org-id ORG` | Show projected usage |

@@ -21,7 +21,7 @@ These subcommands expose CLI capabilities, environment context, and skill
 references in a machine-readable format without requiring API connectivity.`,
 		Example: `  strait agent capabilities
   strait agent context
-  strait agent describe deploy source
+  strait agent describe deploy
   strait agent skills`,
 	}
 
@@ -68,16 +68,9 @@ func newAgentCapabilitiesCommand(state *appState) *cobra.Command {
 					Flags:       []string{"--format json", "--status", "--job"},
 				},
 				{
-					Name:        "code_deployment",
-					Description: "Deploy source code and manage code-first deployments",
-					Commands:    []string{"deploy source", "deployments list", "deployments get", "deployments logs", "deployments watch", "deployments rollback"},
-					Flags:       []string{"--job", "--runtime", "--dir", "--dry-run", "--no-stream", "--format json"},
-					EnvVars:     []string{},
-				},
-				{
 					Name:        "schema_introspection",
-					Description: "Inspect resource schemas and supported runtimes without API calls",
-					Commands:    []string{"schema runtimes", "schema job", "schema deployment", "schema workflow", "schema run"},
+					Description: "Inspect resource schemas without API calls",
+					Commands:    []string{"schema job", "schema deployment", "schema workflow", "schema run"},
 					Flags:       []string{},
 				},
 				{

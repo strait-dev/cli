@@ -2,7 +2,12 @@ package main
 
 import (
 	"archive/tar"
+	"archive/zip"
+	"bytes"
 	"compress/gzip"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,6 +22,7 @@ import (
 )
 
 const updateCheckCacheDuration = 24 * time.Hour
+const maxReleaseAssetSize = 200 * 1024 * 1024
 
 // githubReleasesURL is a var (not const) so tests can override it.
 var githubReleasesURL = "https://api.github.com/repos/strait-dev/cli/releases/latest"
@@ -160,25 +166,33 @@ func selfUpdate(version string) error {
 		return fmt.Errorf("resolve binary path: %w", err)
 	}
 
-	goos := runtime.GOOS
-	goarch := runtime.GOARCH
-	archiveName := fmt.Sprintf("strait_%s_%s_%s.tar.gz", version, goos, goarch)
-	if goos == "windows" {
-		archiveName = fmt.Sprintf("strait_%s_%s_%s.zip", version, goos, goarch)
+	archiveName := releaseArchiveName(version, runtime.GOOS, runtime.GOARCH)
+	binaryName := "strait"
+	if runtime.GOOS == "windows" {
+		binaryName = "strait.exe"
 	}
 
 	downloadURL := fmt.Sprintf("https://github.com/strait-dev/cli/releases/download/v%s/%s", version, archiveName)
 	fmt.Fprintf(os.Stderr, "Downloading %s...\n", downloadURL)
 
 	client := &http.Client{Timeout: 120 * time.Second}
-	resp, err := client.Get(downloadURL) //nolint:noctx // short-lived CLI command
+	ctx := context.Background()
+	checksumURL := fmt.Sprintf("https://github.com/strait-dev/cli/releases/download/v%s/checksums.txt", version)
+	checksums, _, err := downloadReleaseAsset(ctx, client, checksumURL, 1024*1024)
+	if err != nil {
+		return fmt.Errorf("download checksums: %w", err)
+	}
+	expectedChecksum, err := checksumForAsset(checksums, archiveName)
+	if err != nil {
+		return err
+	}
+
+	archiveData, gotChecksum, err := downloadReleaseAsset(ctx, client, downloadURL, maxReleaseAssetSize)
 	if err != nil {
 		return fmt.Errorf("download release: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
+	if !strings.EqualFold(expectedChecksum, gotChecksum) {
+		return fmt.Errorf("checksum mismatch for %s: got %s, want %s", archiveName, gotChecksum, expectedChecksum)
 	}
 
 	// Read the archive into a temp file in the same directory as the binary
@@ -191,8 +205,7 @@ func selfUpdate(version string) error {
 	tmpPath := tmpFile.Name()
 	defer os.Remove(tmpPath)
 
-	// Extract the "strait" binary from the tar.gz archive.
-	binary, err := extractBinaryFromTarGz(resp.Body, "strait")
+	binary, err := extractBinaryFromArchive(archiveData, archiveName, binaryName)
 	if err != nil {
 		_ = tmpFile.Close()
 		return fmt.Errorf("extract binary: %w", err)
@@ -220,6 +233,67 @@ func selfUpdate(version string) error {
 	return nil
 }
 
+func releaseArchiveName(version, goos, goarch string) string {
+	if goos == "windows" {
+		return fmt.Sprintf("strait_%s_%s_%s.zip", version, goos, goarch)
+	}
+	return fmt.Sprintf("strait_%s_%s_%s.tar.gz", version, goos, goarch)
+}
+
+func downloadReleaseAsset(ctx context.Context, client *http.Client, assetURL string, maxSize int64) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, assetURL, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("create request: %w", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	data, err := readAtMost(resp.Body, maxSize)
+	if err != nil {
+		return nil, "", err
+	}
+	sum := sha256.Sum256(data)
+	return data, hex.EncodeToString(sum[:]), nil
+}
+
+func checksumForAsset(checksums []byte, archiveName string) (string, error) {
+	for line := range strings.SplitSeq(string(checksums), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		if fields[len(fields)-1] == archiveName {
+			checksum := fields[0]
+			if len(checksum) != sha256.Size*2 {
+				return "", fmt.Errorf("invalid checksum for %s", archiveName)
+			}
+			if _, err := hex.DecodeString(checksum); err != nil {
+				return "", fmt.Errorf("invalid checksum for %s: %w", archiveName, err)
+			}
+			return checksum, nil
+		}
+	}
+	return "", fmt.Errorf("checksum for %s not found", archiveName)
+}
+
+func extractBinaryFromArchive(data []byte, archiveName, binaryName string) ([]byte, error) {
+	switch {
+	case strings.HasSuffix(archiveName, ".tar.gz"):
+		return extractBinaryFromTarGz(bytes.NewReader(data), binaryName)
+	case strings.HasSuffix(archiveName, ".zip"):
+		return extractBinaryFromZip(data, binaryName)
+	default:
+		return nil, fmt.Errorf("unsupported archive format %q", archiveName)
+	}
+}
+
 // extractBinaryFromTarGz reads a tar.gz archive and returns the contents of
 // the file matching binaryName.
 func extractBinaryFromTarGz(r io.Reader, binaryName string) ([]byte, error) {
@@ -241,9 +315,7 @@ func extractBinaryFromTarGz(r io.Reader, binaryName string) ([]byte, error) {
 
 		name := filepath.Base(hdr.Name)
 		if name == binaryName && hdr.Typeflag == tar.TypeReg {
-			// Limit read to 200MB to prevent resource exhaustion.
-			const maxBinarySize = 200 * 1024 * 1024
-			data, err := io.ReadAll(io.LimitReader(tr, maxBinarySize))
+			data, err := readAtMost(tr, maxReleaseAssetSize)
 			if err != nil {
 				return nil, fmt.Errorf("read binary: %w", err)
 			}
@@ -252,4 +324,38 @@ func extractBinaryFromTarGz(r io.Reader, binaryName string) ([]byte, error) {
 	}
 
 	return nil, fmt.Errorf("binary %q not found in archive", binaryName)
+}
+
+func extractBinaryFromZip(data []byte, binaryName string) ([]byte, error) {
+	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return nil, fmt.Errorf("open zip: %w", err)
+	}
+	for _, f := range zr.File {
+		if filepath.Base(f.Name) != binaryName || f.FileInfo().IsDir() {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return nil, fmt.Errorf("open zip entry: %w", err)
+		}
+		defer rc.Close()
+		out, err := readAtMost(rc, maxReleaseAssetSize)
+		if err != nil {
+			return nil, fmt.Errorf("read binary: %w", err)
+		}
+		return out, nil
+	}
+	return nil, fmt.Errorf("binary %q not found in archive", binaryName)
+}
+
+func readAtMost(r io.Reader, maxSize int64) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, maxSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxSize {
+		return nil, fmt.Errorf("asset exceeds maximum size of %d bytes", maxSize)
+	}
+	return data, nil
 }

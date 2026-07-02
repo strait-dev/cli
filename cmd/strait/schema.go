@@ -27,8 +27,7 @@ func newSchemaCommand(state *appState) *cobra.Command {
 		Long: `Print field schemas for Strait resources as JSON.
 Useful for agents and scripts that need to know valid field names,
 types, and enum values without hitting the API.`,
-		Example: `  strait schema runtimes
-  strait schema job
+		Example: `  strait schema job
   strait schema deployment
   strait schema workflow
   strait schema run
@@ -37,7 +36,6 @@ types, and enum values without hitting the API.`,
   strait schema api-key`,
 	}
 
-	cmd.AddCommand(newSchemaRuntimesCommand(state))
 	cmd.AddCommand(newSchemaJobCommand(state))
 	cmd.AddCommand(newSchemaDeploymentCommand(state))
 	cmd.AddCommand(newSchemaWorkflowCommand(state))
@@ -47,23 +45,6 @@ types, and enum values without hitting the API.`,
 	cmd.AddCommand(newSchemaAPIKeyCommand(state))
 
 	return cmd
-}
-
-func newSchemaRuntimesCommand(state *appState) *cobra.Command {
-	return &cobra.Command{
-		Use:   "runtimes",
-		Short: "List supported code-first deployment runtimes",
-		RunE: func(_ *cobra.Command, _ []string) error {
-			runtimes := []map[string]string{
-				{"runtime": "go", "aliases": "go", "marker": "go.mod"},
-				{"runtime": "python", "aliases": "python", "marker": "requirements.txt, pyproject.toml, setup.py"},
-				{"runtime": "typescript", "aliases": "typescript, node, bun, js", "marker": "package.json, bun.lockb"},
-				{"runtime": "ruby", "aliases": "ruby", "marker": "Gemfile"},
-				{"runtime": "rust", "aliases": "rust", "marker": "Cargo.toml"},
-			}
-			return printData(state, runtimes)
-		},
-	}
 }
 
 func newSchemaJobCommand(state *appState) *cobra.Command {
@@ -88,7 +69,7 @@ func newSchemaJobCommand(state *appState) *cobra.Command {
 					{Name: "concurrency_limit", Type: "integer", Required: false, Description: "Maximum simultaneous runs"},
 					{Name: "paused", Type: "boolean", Required: false, Description: "Whether the job is paused (no new runs scheduled)"},
 					{Name: "source_type", Type: "string", Required: false, Description: "Deployment source type", Enum: []string{"endpoint", "code"}},
-					{Name: "active_deployment_id", Type: "string", Required: false, Description: "Active code deployment ID (code-first jobs only)"},
+					{Name: "active_deployment_id", Type: "string", Required: false, Description: "Active deployment version ID"},
 					{Name: "created_at", Type: "string (RFC3339)", Required: false, Description: "Creation timestamp"},
 					{Name: "updated_at", Type: "string (RFC3339)", Required: false, Description: "Last update timestamp"},
 				},
@@ -101,24 +82,23 @@ func newSchemaJobCommand(state *appState) *cobra.Command {
 func newSchemaDeploymentCommand(state *appState) *cobra.Command {
 	return &cobra.Command{
 		Use:   "deployment",
-		Short: "Print the schema for a Strait code deployment resource",
+		Short: "Print the schema for a Strait deployment version resource",
 		RunE: func(_ *cobra.Command, _ []string) error {
 			s := schemaResource{
 				Resource:    "deployment",
-				Description: "A code-first deployment created by `strait deploy source`.",
+				Description: "A manifest deployment version created by `strait deploy`.",
 				Fields: []schemaField{
 					{Name: "id", Type: "string", Required: false, Description: "Unique deployment identifier (server-assigned UUID)"},
-					{Name: "job_id", Type: "string", Required: true, Description: "Job this deployment belongs to"},
 					{Name: "project_id", Type: "string", Required: true, Description: "Project the deployment belongs to"},
-					{Name: "runtime", Type: "string", Required: true, Description: "Language runtime", Enum: []string{"go", "python", "typescript", "ruby", "rust"}},
-					{Name: "source_hash", Type: "string", Required: true, Description: "SHA-256 hex digest of the packed source tarball"},
-					{Name: "source_size_bytes", Type: "integer", Required: true, Description: "Size of the packed source tarball in bytes"},
-					{Name: "version", Type: "integer", Required: false, Description: "Monotonically increasing deployment version number"},
-					{Name: "status", Type: "string", Required: false, Description: "Current deployment status", Enum: []string{"pending", "building", "ready", "failed", "timed_out"}},
-					{Name: "built_image_uri", Type: "string", Required: false, Description: "OCI image URI after a successful build"},
-					{Name: "error_message", Type: "string", Required: false, Description: "Human-readable build error (failed/timed_out deployments only)"},
+					{Name: "environment", Type: "string", Required: true, Description: "Deployment environment"},
+					{Name: "runtime", Type: "string", Required: true, Description: "Runtime declared by the manifest"},
+					{Name: "artifact_uri", Type: "string", Required: true, Description: "Pre-built artifact URI"},
+					{Name: "strategy", Type: "string", Required: false, Description: "Rollout strategy", Enum: []string{"direct", "canary"}},
+					{Name: "canary_percent", Type: "integer", Required: false, Description: "Canary traffic percentage"},
+					{Name: "canary_duration", Type: "string", Required: false, Description: "Canary duration"},
+					{Name: "status", Type: "string", Required: false, Description: "Current deployment status"},
+					{Name: "checksum", Type: "string", Required: false, Description: "Manifest checksum"},
 					{Name: "created_at", Type: "string (RFC3339)", Required: false, Description: "Creation timestamp"},
-					{Name: "finished_at", Type: "string (RFC3339)", Required: false, Description: "Build completion timestamp"},
 				},
 			}
 			return printData(state, s)

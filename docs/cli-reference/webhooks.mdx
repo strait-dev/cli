@@ -1,0 +1,14 @@
+---
+title: "webhooks"
+description: "Manage webhooks and deliveries"
+---
+
+```bash
+strait webhooks list --project proj_123
+strait webhooks get webhook_123
+strait webhooks create --project proj_123 --url https://example.com/hooks/strait
+strait webhooks delete webhook_123 --yes
+strait webhooks deliveries webhook_123
+strait webhooks retry delivery_123
+strait webhooks test webhook_123
+```

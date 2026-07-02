@@ -49,10 +49,10 @@ strait tui                                         # Open the dashboard
 | Category | Commands | Docs |
 |---|---|---|
 | Jobs | `create job`, `trigger`, `jobs list/get/describe/edit/delete/pause/resume/clone/health/dependencies/add-dependency/batch` | [jobs](docs/cli-reference/jobs.mdx) |
-| Runs | `runs list/get/watch/cancel/replay/diff/reschedule/dlq/dlq-replay/outputs/tool-calls/usage/checkpoints`, `wait run` | [runs](docs/cli-reference/runs.mdx) |
+| Runs | `runs list/get/watch/cancel/replay/diff/reschedule/dlq/dlq-replay/outputs/checkpoints`, `wait run` | [runs](docs/cli-reference/runs.mdx) |
 | Workflows | `create workflow`, `workflows list/describe/visualize/trigger/clone/dry-run/plan/simulate/versions/diff/policy` | [workflows](docs/cli-reference/workflows.mdx) |
 | Workflow runs | `workflow-runs list/get/pause/resume/retry/approve-step/retry-step/skip-step/force-complete-step` | [workflow-runs](docs/cli-reference/workflow-runs.mdx) |
-| Deployment | `deploy`, `deploy create/finalize/promote/rollback/list`, `deployments create-from-source/get/logs/rollback/watch`, `verify` | [deployment](docs/guides/deployment.mdx) |
+| Deployment | `deploy`, `deploy create/finalize/promote/rollback/list`, `verify` | [deployment](docs/guides/deployment.mdx) |
 | Environments | `environments list/get/create/update/delete/variables` | [environments](docs/cli-reference/environments.mdx) |
 | Webhooks | `webhooks list/get/create/delete/deliveries/retry/test` | [webhooks](docs/cli-reference/webhooks.mdx) |
 | Event sources | `event-sources list/get/create/update/delete` | [event-sources](docs/cli-reference/event-sources.mdx) |
@@ -65,10 +65,10 @@ strait tui                                         # Open the dashboard
 | Team | `team list/add/remove/roles`, `team policies list/create/delete`, `audit` | [team](docs/cli-reference/team.mdx) |
 | Triggers | `triggers list/get/send/purge` | [triggers](docs/cli-reference/triggers.mdx) |
 | Monitoring | `doctor`, `status`, `health`, `listen`, `top`, `trace`, `perf`, `stats`, `analytics costs/reliability/top-failing` | [monitoring](docs/guides/monitoring.mdx) |
-| Billing | `usage current/history/forecast` | [billing](docs/cli-reference/usage.mdx) |
+| Billing | `usage --org-id ORG current/history/forecast` | [billing](docs/cli-reference/usage.mdx) |
 | Local dev | `dev test`, `dev tunnel`, `dev status`, `run` | [local dev](docs/guides/local-development.mdx) |
 | CI/CD | `ci setup`, `ci check` | [ci-cd](docs/guides/ci-cd.mdx) |
-| Extensions | `extension list/install/run/create/remove` | [extensions](docs/guides/extensions.mdx) |
+| Extensions | `extension list/run/create/remove` | [extensions](docs/guides/extensions.mdx) |
 | Auth | `login`, `logout`, `whoami`, `context`, `auth` | [authentication](docs/getting-started/authentication.mdx) |
 | Config | `config`, `alias`, `completion` | [configuration](docs/guides/configuration.mdx) |
 | Backup | `backup create`, `backup restore` | [backup](docs/cli-reference/backup.mdx) |

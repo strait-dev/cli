@@ -1780,6 +1780,13 @@ func assertPath(t *testing.T, r *http.Request, want string) {
 	}
 }
 
+func assertQuery(t *testing.T, r *http.Request, key, want string) {
+	t.Helper()
+	if got := r.URL.Query().Get(key); got != want {
+		t.Fatalf("expected query %s=%q, got %q", key, want, got)
+	}
+}
+
 func assertAuth(t *testing.T, r *http.Request, key string) {
 	t.Helper()
 	want := "Bearer " + key
@@ -2942,10 +2949,6 @@ func TestRunTelemetryEndpoints(t *testing.T) {
 		switch r.URL.Path {
 		case "/v1/runs/run-1/outputs":
 			respondPaginated(t, w, http.StatusOK, []types.RunOutput{{ID: "out-1", RunID: "run-1", Key: "result"}})
-		case "/v1/runs/run-1/tool-calls":
-			respondPaginated(t, w, http.StatusOK, []types.RunToolCall{{ID: "tc-1", RunID: "run-1", Tool: "fetch"}})
-		case "/v1/runs/run-1/usage":
-			respondJSON(t, w, http.StatusOK, types.RunUsage{RunID: "run-1", DurationMS: 4200, CostUSD: 0.12})
 		case "/v1/runs/run-1/checkpoints":
 			respondPaginated(t, w, http.StatusOK, []types.RunCheckpoint{{ID: "cp-1", RunID: "run-1", Name: "phase-1"}})
 		default:
@@ -2958,13 +2961,6 @@ func TestRunTelemetryEndpoints(t *testing.T) {
 	if outputs, err := c.ListRunOutputs(context.Background(), "run-1"); err != nil || len(outputs) != 1 {
 		t.Fatalf("ListRunOutputs: %v len=%d", err, len(outputs))
 	}
-	if calls, err := c.ListRunToolCalls(context.Background(), "run-1"); err != nil || len(calls) != 1 {
-		t.Fatalf("ListRunToolCalls: %v len=%d", err, len(calls))
-	}
-	usage, err := c.GetRunUsage(context.Background(), "run-1")
-	if err != nil || usage.DurationMS != 4200 {
-		t.Fatalf("GetRunUsage: %v %+v", err, usage)
-	}
 	if cps, err := c.ListRunCheckpoints(context.Background(), "run-1"); err != nil || len(cps) != 1 {
 		t.Fatalf("ListRunCheckpoints: %v len=%d", err, len(cps))
 	}
@@ -2975,14 +2971,19 @@ func TestUsageEndpoints(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/billing/usage":
+		case "/v1/usage/current":
 			assertMethod(t, r, http.MethodGet)
+			assertQuery(t, r, "org_id", "org-1")
 			respondJSON(t, w, http.StatusOK, types.UsagePeriod{Runs: 42, CostUSD: 12.34})
-		case "/v1/billing/usage/history":
+		case "/v1/usage/history":
 			assertMethod(t, r, http.MethodGet)
-			respondPaginated(t, w, http.StatusOK, []types.UsagePeriod{{Runs: 10}, {Runs: 20}})
-		case "/v1/billing/usage/forecast":
+			assertQuery(t, r, "org_id", "org-1")
+			assertQuery(t, r, "from", "2026-06-01")
+			assertQuery(t, r, "to", "2026-06-30")
+			respondJSON(t, w, http.StatusOK, []types.UsagePeriod{{Runs: 10}, {Runs: 20}})
+		case "/v1/usage/forecast":
 			assertMethod(t, r, http.MethodGet)
+			assertQuery(t, r, "org_id", "org-1")
 			respondJSON(t, w, http.StatusOK, types.UsagePeriod{Runs: 99, CostUSD: 50})
 		default:
 			t.Fatalf("unexpected path %q", r.URL.Path)
@@ -2991,15 +2992,15 @@ func TestUsageEndpoints(t *testing.T) {
 	defer srv.Close()
 
 	c := mustClient(t, srv.URL)
-	cur, err := c.GetCurrentUsage(context.Background())
+	cur, err := c.GetCurrentUsage(context.Background(), "org-1")
 	if err != nil || cur.Runs != 42 {
 		t.Fatalf("GetCurrentUsage: %v %+v", err, cur)
 	}
-	hist, err := c.GetUsageHistory(context.Background())
+	hist, err := c.GetUsageHistory(context.Background(), "org-1", "2026-06-01", "2026-06-30")
 	if err != nil || len(hist) != 2 {
 		t.Fatalf("GetUsageHistory: %v len=%d", err, len(hist))
 	}
-	fc, err := c.GetUsageForecast(context.Background())
+	fc, err := c.GetUsageForecast(context.Background(), "org-1")
 	if err != nil || fc.Runs != 99 {
 		t.Fatalf("GetUsageForecast: %v %+v", err, fc)
 	}

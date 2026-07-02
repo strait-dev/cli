@@ -713,82 +713,6 @@ func (c *Client) GetJobBySlug(ctx context.Context, projectID, slug string) (*typ
 	return nil, fmt.Errorf("job with slug %q not found in project", slug)
 }
 
-// CreateCodeDeployment creates a new code-first deployment and returns the
-// deployment record plus a presigned PUT URL for uploading the source tarball.
-func (c *Client) CreateCodeDeployment(ctx context.Context, jobID string, req CreateCodeDeploymentRequest) (*CreateCodeDeploymentResponse, error) {
-	if err := validatePathSegment(jobID); err != nil {
-		return nil, fmt.Errorf("invalid job id: %w", err)
-	}
-	var out CreateCodeDeploymentResponse
-	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments"), nil, req, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-// ConfirmCodeDeployment marks the tarball upload complete, triggering the build.
-func (c *Client) ConfirmCodeDeployment(ctx context.Context, jobID, deploymentID string, req ConfirmCodeDeploymentRequest) (*CodeDeployment, error) {
-	if err := validatePathSegment(jobID); err != nil {
-		return nil, fmt.Errorf("invalid job id: %w", err)
-	}
-	if err := validatePathSegment(deploymentID); err != nil {
-		return nil, fmt.Errorf("invalid deployment id: %w", err)
-	}
-	var out CodeDeployment
-	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments", deploymentID, "confirm"), nil, req, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-// GetCodeDeployment fetches a single code deployment by ID.
-func (c *Client) GetCodeDeployment(ctx context.Context, jobID, deploymentID string) (*CodeDeployment, error) {
-	if err := validatePathSegment(jobID); err != nil {
-		return nil, fmt.Errorf("invalid job id: %w", err)
-	}
-	if err := validatePathSegment(deploymentID); err != nil {
-		return nil, fmt.Errorf("invalid deployment id: %w", err)
-	}
-	var out CodeDeployment
-	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/jobs", jobID, "deployments", deploymentID), nil, nil, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-// ListCodeDeployments lists code deployments for a job.
-func (c *Client) ListCodeDeployments(ctx context.Context, jobID string, limit int) ([]CodeDeployment, error) {
-	if err := validatePathSegment(jobID); err != nil {
-		return nil, fmt.Errorf("invalid job id: %w", err)
-	}
-	query := url.Values{}
-	if limit > 0 {
-		query.Set("limit", fmt.Sprintf("%d", limit))
-	}
-	var out []CodeDeployment
-	if err := c.doListJSON(ctx, path.Join("/v1/jobs", jobID, "deployments"), query, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// RollbackCodeDeployment activates a previously ready deployment as the active
-// deployment for the job, effectively rolling back to that version.
-func (c *Client) RollbackCodeDeployment(ctx context.Context, jobID, deploymentID, projectID string) (*CodeDeployment, error) {
-	if err := validatePathSegment(jobID); err != nil {
-		return nil, fmt.Errorf("invalid job id: %w", err)
-	}
-	if err := validatePathSegment(deploymentID); err != nil {
-		return nil, fmt.Errorf("invalid deployment id: %w", err)
-	}
-	body := ConfirmCodeDeploymentRequest{ProjectID: projectID}
-	var out CodeDeployment
-	if err := c.doJSON(ctx, http.MethodPost, path.Join("/v1/jobs", jobID, "deployments", deploymentID, "rollback"), nil, body, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
 // ServerCapabilities represents the capabilities reported by a Strait server instance.
 type ServerCapabilities struct {
 	CodeDeployEnabled bool   `json:"code_deploy_enabled"`
@@ -1498,30 +1422,6 @@ func (c *Client) ListRunOutputs(ctx context.Context, runID string) ([]types.RunO
 	return out, nil
 }
 
-// ListRunToolCalls returns the tool calls invoked during a run.
-func (c *Client) ListRunToolCalls(ctx context.Context, runID string) ([]types.RunToolCall, error) {
-	if err := validatePathSegment(runID); err != nil {
-		return nil, fmt.Errorf("invalid run id: %w", err)
-	}
-	var out []types.RunToolCall
-	if err := c.doListJSON(ctx, path.Join("/v1/runs", runID, "tool-calls"), nil, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// GetRunUsage returns resource usage for a run.
-func (c *Client) GetRunUsage(ctx context.Context, runID string) (*types.RunUsage, error) {
-	if err := validatePathSegment(runID); err != nil {
-		return nil, fmt.Errorf("invalid run id: %w", err)
-	}
-	var out types.RunUsage
-	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/runs", runID, "usage"), nil, nil, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
 // ListRunCheckpoints returns checkpoints recorded during a run.
 func (c *Client) ListRunCheckpoints(ctx context.Context, runID string) ([]types.RunCheckpoint, error) {
 	if err := validatePathSegment(runID); err != nil {
@@ -1535,27 +1435,44 @@ func (c *Client) ListRunCheckpoints(ctx context.Context, runID string) ([]types.
 }
 
 // GetCurrentUsage returns the active billing period usage.
-func (c *Client) GetCurrentUsage(ctx context.Context) (*types.UsagePeriod, error) {
+func (c *Client) GetCurrentUsage(ctx context.Context, orgID string) (*types.UsagePeriod, error) {
+	if err := validatePathSegment(orgID); err != nil {
+		return nil, fmt.Errorf("invalid org id: %w", err)
+	}
+	query := url.Values{}
+	query.Set("org_id", orgID)
 	var out types.UsagePeriod
-	if err := c.doJSON(ctx, http.MethodGet, "/v1/billing/usage", nil, nil, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/usage/current", query, nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil
 }
 
 // GetUsageHistory returns historical billing periods.
-func (c *Client) GetUsageHistory(ctx context.Context) ([]types.UsagePeriod, error) {
+func (c *Client) GetUsageHistory(ctx context.Context, orgID, from, to string) ([]types.UsagePeriod, error) {
+	if err := validatePathSegment(orgID); err != nil {
+		return nil, fmt.Errorf("invalid org id: %w", err)
+	}
+	query := url.Values{}
+	query.Set("org_id", orgID)
+	query.Set("from", from)
+	query.Set("to", to)
 	var out []types.UsagePeriod
-	if err := c.doListJSON(ctx, "/v1/billing/usage/history", nil, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/usage/history", query, nil, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
 // GetUsageForecast returns projected end-of-period usage.
-func (c *Client) GetUsageForecast(ctx context.Context) (*types.UsagePeriod, error) {
+func (c *Client) GetUsageForecast(ctx context.Context, orgID string) (*types.UsagePeriod, error) {
+	if err := validatePathSegment(orgID); err != nil {
+		return nil, fmt.Errorf("invalid org id: %w", err)
+	}
+	query := url.Values{}
+	query.Set("org_id", orgID)
 	var out types.UsagePeriod
-	if err := c.doJSON(ctx, http.MethodGet, "/v1/billing/usage/forecast", nil, nil, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/usage/forecast", query, nil, &out); err != nil {
 		return nil, err
 	}
 	return &out, nil

@@ -194,8 +194,6 @@ func TestPathTraversalRejected(t *testing.T) {
 		}},
 		{name: "ReplayDLQ", fn: func(id string) error { _, e := c.ReplayDLQ(ctx, id); return e }},
 		{name: "ListRunOutputs", fn: func(id string) error { _, e := c.ListRunOutputs(ctx, id); return e }},
-		{name: "ListRunToolCalls", fn: func(id string) error { _, e := c.ListRunToolCalls(ctx, id); return e }},
-		{name: "GetRunUsage", fn: func(id string) error { _, e := c.GetRunUsage(ctx, id); return e }},
 		{name: "ListRunCheckpoints", fn: func(id string) error { _, e := c.ListRunCheckpoints(ctx, id); return e }},
 
 		// Workflows
@@ -421,24 +419,8 @@ func TestPathTraversalRejected_DeployAndStream(t *testing.T) {
 	defer cancel()
 
 	noopRun := func(RunStreamMessage) error { return nil }
-	noopChunk := func(string) error { return nil }
-
 	t.Run("StreamRunEvents poisoned", func(t *testing.T) {
 		err := c.StreamRunEvents(ctx, "../jobs", noopRun)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-	})
-
-	t.Run("StreamDeploymentLogs poisoned job id", func(t *testing.T) {
-		err := c.StreamDeploymentLogs(ctx, "../foo", "dep-1", noopChunk)
-		if err == nil {
-			t.Fatal("expected error, got nil")
-		}
-	})
-
-	t.Run("StreamDeploymentLogs poisoned deployment id", func(t *testing.T) {
-		err := c.StreamDeploymentLogs(ctx, "job-1", "../bar", noopChunk)
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}

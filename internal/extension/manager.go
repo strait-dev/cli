@@ -1,7 +1,6 @@
 package extension
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -62,27 +61,6 @@ func ListInstalled(dir string) ([]InstalledPlugin, error) {
 	}
 
 	return plugins, nil
-}
-
-// Install validates the source and prepares for plugin installation.
-// Currently this is a stub that validates the source looks like a GitHub URL
-// or a local file path.
-func Install(_ context.Context, source string) error {
-	if source == "" {
-		return fmt.Errorf("install source is required")
-	}
-
-	isGitHub := strings.HasPrefix(source, "https://github.com/") ||
-		strings.HasPrefix(source, "github.com/")
-	isPath := strings.HasPrefix(source, "/") ||
-		strings.HasPrefix(source, "./") ||
-		strings.HasPrefix(source, "../")
-
-	if !isGitHub && !isPath {
-		return fmt.Errorf("invalid install source %q: must be a github.com URL or local file path", source)
-	}
-
-	return nil
 }
 
 // Remove deletes an installed extension by name from the given directory.

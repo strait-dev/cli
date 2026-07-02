@@ -77,7 +77,7 @@ func TestAgentCapabilities_OutputIsValidJSON(t *testing.T) {
 	}
 
 	// Check key capabilities are present.
-	for _, want := range []string{"job_management", "code_deployment", "structured_output", "non_interactive_mode"} {
+	for _, want := range []string{"job_management", "run_management", "structured_output", "non_interactive_mode"} {
 		if !names[want] {
 			t.Errorf("missing capability %q", want)
 		}

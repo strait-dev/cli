@@ -221,7 +221,6 @@ Restore: `strait backup restore -i F [--database-url URL] [--clean] --yes`
 ## Extensions
 
 List: `strait extension list`
-Install: `strait extension install URL`
 Run: `strait extension run <name> [args]`
 Create: `strait extension create <name>`
 Remove: `strait extension remove <name>`
