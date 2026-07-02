@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -433,33 +432,6 @@ func newVersionCommand(state *appState) *cobra.Command {
 				info["server"] = serverStatus
 			}
 
-			if asJSON {
-				enc := json.NewEncoder(w)
-				enc.SetIndent("", "  ")
-				return enc.Encode(info)
-			}
-
-			if isTTYRich(state) {
-				fmt.Fprintln(w, styles.TitleStyle.Render("Strait CLI"))
-				fmt.Fprintln(w, styles.KeyValue("Version", info["version"]))
-				fmt.Fprintln(w, styles.KeyValue("Commit", info["commit"]))
-				fmt.Fprintln(w, styles.KeyValue("Date", info["date"]))
-				fmt.Fprintln(w, styles.KeyValue("Go", info["go"]))
-				fmt.Fprintln(w, styles.KeyValue("OS/Arch", info["os_arch"]))
-				if checkServer {
-					fmt.Fprintln(w, styles.KeyValue("Server", info["server"]))
-				}
-			} else {
-				fmt.Fprintf(w, "version: %s\n", info["version"])
-				fmt.Fprintf(w, "commit: %s\n", info["commit"])
-				fmt.Fprintf(w, "date: %s\n", info["date"])
-				fmt.Fprintf(w, "go: %s\n", info["go"])
-				fmt.Fprintf(w, "os/arch: %s\n", info["os_arch"])
-				if checkServer {
-					fmt.Fprintf(w, "server: %s\n", info["server"])
-				}
-			}
-
 			if checkUpdate {
 				latest, cached := getCachedUpdate()
 				if !cached {
@@ -471,13 +443,39 @@ func newVersionCommand(state *appState) *cobra.Command {
 				if latest != "" {
 					current := strings.TrimPrefix(version, "v")
 					if current == latest {
-						fmt.Fprintln(w, "update: up to date")
+						info["update"] = "up to date"
 					} else {
-						fmt.Fprintf(w, "update: v%s available (current: v%s)\n", latest, current)
+						info["update"] = fmt.Sprintf("v%s available (current: v%s)", latest, current)
 					}
 				} else {
-					fmt.Fprintln(w, "update: check failed")
+					info["update"] = "check failed"
 				}
+			}
+
+			if asJSON {
+				oldFormat := state.opts.outputFormat
+				state.opts.outputFormat = "json"
+				defer func() {
+					state.opts.outputFormat = oldFormat
+				}()
+				return printData(state, info)
+			}
+
+			if !isTTYRich(state) {
+				return printData(state, info)
+			}
+
+			fmt.Fprintln(w, styles.TitleStyle.Render("Strait CLI"))
+			fmt.Fprintln(w, styles.KeyValue("Version", info["version"]))
+			fmt.Fprintln(w, styles.KeyValue("Commit", info["commit"]))
+			fmt.Fprintln(w, styles.KeyValue("Date", info["date"]))
+			fmt.Fprintln(w, styles.KeyValue("Go", info["go"]))
+			fmt.Fprintln(w, styles.KeyValue("OS/Arch", info["os_arch"]))
+			if checkServer {
+				fmt.Fprintln(w, styles.KeyValue("Server", info["server"]))
+			}
+			if checkUpdate {
+				fmt.Fprintln(w, styles.KeyValue("Update", info["update"]))
 			}
 			return nil
 		},

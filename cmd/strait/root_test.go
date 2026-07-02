@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"bytes"
+	"encoding/json"
+	"testing"
+	"time"
+)
 
 func TestNormalizeLegacyArgs(t *testing.T) {
 	t.Parallel()
@@ -28,5 +33,34 @@ func TestNormalizeLegacyArgs(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestVersionCommand_UsesGlobalJSONFormat(t *testing.T) {
+	t.Parallel()
+
+	state := &appState{
+		opts: &rootOptions{
+			outputFormat: "json",
+			timeout:      10 * time.Second,
+			ciMode:       true,
+			noColor:      true,
+		},
+		stdout: &bytes.Buffer{},
+	}
+	cmd := newVersionCommand(state)
+
+	out := captureStateOutput(t, state, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("version command: %v", err)
+		}
+	})
+
+	var got map[string]string
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("version --format json output is not valid JSON: %v\noutput: %s", err, out)
+	}
+	if got["version"] == "" || got["commit"] == "" || got["go"] == "" || got["os_arch"] == "" {
+		t.Fatalf("missing version fields: %#v", got)
 	}
 }
