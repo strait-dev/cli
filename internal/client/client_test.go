@@ -2065,19 +2065,22 @@ func TestCreateServerSecret(t *testing.T) {
 		assertAuth(t, r, "test-key")
 		assertContentType(t, r)
 
-		var req CreateServerSecretRequest
+		var req map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("decode request body: %v", err)
 		}
-		if req.ProjectID != "proj-1" || req.SecretKey != "API_TOKEN" || req.SecretValue != "secret123" {
+		if req["project_id"] != "proj-1" || req["secret_key"] != "API_TOKEN" || req["value"] != "secret123" {
 			t.Fatalf("unexpected request: %+v", req)
+		}
+		if _, ok := req["secret_value"]; ok {
+			t.Fatalf("unexpected legacy secret_value field: %+v", req)
 		}
 
 		respondJSON(t, w, http.StatusOK, ServerSecret{
 			ID:          "sec-1",
-			ProjectID:   req.ProjectID,
-			SecretKey:   req.SecretKey,
-			Environment: req.Environment,
+			ProjectID:   "proj-1",
+			SecretKey:   "API_TOKEN",
+			Environment: "production",
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		})

@@ -250,7 +250,7 @@ type ServerSecret struct {
 type CreateServerSecretRequest struct {
 	ProjectID   string `json:"project_id"`
 	SecretKey   string `json:"secret_key"`
-	SecretValue string `json:"secret_value"`
+	SecretValue string `json:"value"`
 	Environment string `json:"environment"`
 	JobID       string `json:"job_id,omitempty"`
 }
