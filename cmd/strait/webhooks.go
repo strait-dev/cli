@@ -158,6 +158,9 @@ func newWebhooksCreateCommand(state *appState) *cobra.Command {
 			if len(events) == 0 {
 				return fmt.Errorf("--event is required (repeatable)")
 			}
+			if cmd.Flags().Changed("secret") {
+				return fmt.Errorf("--secret is no longer supported; the server generates and returns a signing secret on create")
+			}
 			cli, err := newAPIClient(state)
 			if err != nil {
 				return err

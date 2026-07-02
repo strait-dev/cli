@@ -665,9 +665,9 @@ type StepOverride struct {
 type Webhook struct {
 	ID         string     `json:"id"`
 	ProjectID  string     `json:"project_id"`
-	URL        string     `json:"url"`
-	Events     []string   `json:"events"`
-	Secret     string     `json:"secret,omitempty"`
+	URL        string     `json:"webhook_url"`
+	Events     []string   `json:"event_types"`
+	Secret     string     `json:"signing_secret,omitempty"`
 	Active     bool       `json:"active"`
 	CreatedAt  time.Time  `json:"created_at"`
 	UpdatedAt  time.Time  `json:"updated_at"`

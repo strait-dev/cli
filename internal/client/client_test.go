@@ -1532,16 +1532,26 @@ func TestWebhookLifecycle(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks":
-			respondPaginated(t, w, http.StatusOK, []types.Webhook{hook})
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/subscriptions":
+			respondJSON(t, w, http.StatusOK, []types.Webhook{hook})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/wh-1":
 			respondJSON(t, w, http.StatusOK, hook)
-		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks":
-			respondJSON(t, w, http.StatusCreated, hook)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/subscriptions":
+			var req map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			if req["webhook_url"] != "https://example.com/hook" {
+				t.Fatalf("unexpected webhook_url: %+v", req)
+			}
+			if _, ok := req["url"]; ok {
+				t.Fatalf("unexpected legacy url field: %+v", req)
+			}
+			respondJSON(t, w, http.StatusCreated, CreateWebhookResponse{Subscription: hook, SigningSecret: "whsec_test"})
 		case r.Method == http.MethodPatch && r.URL.Path == "/v1/webhooks/wh-1":
 			respondJSON(t, w, http.StatusOK, hook)
-		case r.Method == http.MethodDelete && r.URL.Path == "/v1/webhooks/wh-1":
-			respondJSON(t, w, http.StatusOK, map[string]string{})
+		case r.Method == http.MethodDelete && r.URL.Path == "/v1/webhooks/subscriptions/wh-1":
+			w.WriteHeader(http.StatusNoContent)
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/webhooks/wh-1/deliveries":
 			respondPaginated(t, w, http.StatusOK, []types.WebhookDelivery{{ID: "wd-1", WebhookID: "wh-1", Status: "ok"}})
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/webhooks/wh-1/test":
@@ -1561,8 +1571,12 @@ func TestWebhookLifecycle(t *testing.T) {
 	if _, err := c.GetWebhook(context.Background(), "wh-1"); err != nil {
 		t.Fatalf("GetWebhook: %v", err)
 	}
-	if _, err := c.CreateWebhook(context.Background(), CreateWebhookRequest{ProjectID: "proj-1", URL: "https://example.com/hook", Events: []string{"run.completed"}}); err != nil {
+	created, err := c.CreateWebhook(context.Background(), CreateWebhookRequest{ProjectID: "proj-1", URL: "https://example.com/hook", Events: []string{"run.completed"}})
+	if err != nil {
 		t.Fatalf("CreateWebhook: %v", err)
+	}
+	if created.Secret != "whsec_test" {
+		t.Fatalf("expected signing secret, got %q", created.Secret)
 	}
 	url := "https://new.example.com"
 	if _, err := c.UpdateWebhook(context.Background(), "wh-1", UpdateWebhookRequest{URL: &url}); err != nil {

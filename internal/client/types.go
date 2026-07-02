@@ -394,11 +394,17 @@ type EnvironmentVariablesResponse struct {
 // CreateWebhookRequest is the request body for creating a webhook subscription.
 type CreateWebhookRequest struct {
 	ProjectID  string   `json:"project_id"`
-	URL        string   `json:"url"`
-	Events     []string `json:"events"`
-	Secret     string   `json:"secret,omitempty"`
+	URL        string   `json:"webhook_url"`
+	Events     []string `json:"event_types"`
+	Secret     string   `json:"-"`
 	Active     *bool    `json:"active,omitempty"`
 	HeadersRaw string   `json:"-"`
+}
+
+// CreateWebhookResponse is returned when a webhook subscription is created.
+type CreateWebhookResponse struct {
+	Subscription  types.Webhook `json:"subscription"`
+	SigningSecret string        `json:"signing_secret"`
 }
 
 // UpdateWebhookRequest is the request body for updating a webhook.

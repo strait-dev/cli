@@ -788,7 +788,7 @@ func (c *Client) ListWebhooks(ctx context.Context, projectID string) ([]types.We
 	query := url.Values{}
 	query.Set("project_id", projectID)
 	var out []types.Webhook
-	if err := c.doListJSON(ctx, "/v1/webhooks", query, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/webhooks/subscriptions", query, nil, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -808,11 +808,13 @@ func (c *Client) GetWebhook(ctx context.Context, id string) (*types.Webhook, err
 
 // CreateWebhook creates a new webhook subscription.
 func (c *Client) CreateWebhook(ctx context.Context, req CreateWebhookRequest) (*types.Webhook, error) {
-	var out types.Webhook
-	if err := c.doJSON(ctx, http.MethodPost, "/v1/webhooks", nil, req, &out); err != nil {
+	var out CreateWebhookResponse
+	if err := c.doJSON(ctx, http.MethodPost, "/v1/webhooks/subscriptions", nil, req, &out); err != nil {
 		return nil, err
 	}
-	return &out, nil
+	webhook := out.Subscription
+	webhook.Secret = out.SigningSecret
+	return &webhook, nil
 }
 
 // UpdateWebhook updates a webhook subscription.
@@ -832,7 +834,7 @@ func (c *Client) DeleteWebhook(ctx context.Context, id string) error {
 	if err := validatePathSegment(id); err != nil {
 		return fmt.Errorf("invalid webhook id: %w", err)
 	}
-	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/webhooks", id), nil, nil, &map[string]string{})
+	return c.doJSON(ctx, http.MethodDelete, path.Join("/v1/webhooks/subscriptions", id), nil, nil, &map[string]string{})
 }
 
 // ListWebhookDeliveries returns delivery records for a webhook.
