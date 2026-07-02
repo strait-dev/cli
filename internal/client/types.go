@@ -423,20 +423,25 @@ type TestWebhookResponse struct {
 
 // CreateEventSourceRequest is the request body for creating an event source.
 type CreateEventSourceRequest struct {
-	ProjectID string          `json:"project_id"`
-	Name      string          `json:"name"`
-	Slug      string          `json:"slug"`
-	Type      string          `json:"type"`
-	Config    json.RawMessage `json:"config,omitempty"`
-	Enabled   *bool           `json:"enabled,omitempty"`
+	ProjectID          string          `json:"project_id"`
+	Name               string          `json:"name"`
+	Description        string          `json:"description,omitempty"`
+	Schema             json.RawMessage `json:"schema,omitempty"`
+	Enabled            *bool           `json:"enabled,omitempty"`
+	SignatureHeader    string          `json:"signature_header,omitempty"`
+	SignatureAlgorithm string          `json:"signature_algorithm,omitempty"`
+	SignatureSecret    string          `json:"signature_secret,omitempty"`
 }
 
 // UpdateEventSourceRequest is the request body for updating an event source.
 type UpdateEventSourceRequest struct {
-	Name    *string          `json:"name,omitempty"`
-	Slug    *string          `json:"slug,omitempty"`
-	Config  *json.RawMessage `json:"config,omitempty"`
-	Enabled *bool            `json:"enabled,omitempty"`
+	Name               *string          `json:"name,omitempty"`
+	Description        *string          `json:"description,omitempty"`
+	Schema             *json.RawMessage `json:"schema,omitempty"`
+	Enabled            *bool            `json:"enabled,omitempty"`
+	SignatureHeader    *string          `json:"signature_header,omitempty"`
+	SignatureAlgorithm *string          `json:"signature_algorithm,omitempty"`
+	SignatureSecret    *string          `json:"signature_secret,omitempty"`
 }
 
 // CreateJobGroupRequest is the request body for creating a job group.

@@ -115,7 +115,7 @@ func completeWebhookIDs(state *appState) func(*cobra.Command, []string, string) 
 	}
 }
 
-// completeEventSourceSlugs returns a ValidArgsFunction that fetches event source slugs from the API.
+// completeEventSourceSlugs returns a ValidArgsFunction that fetches event source IDs from the API.
 func completeEventSourceSlugs(state *appState) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 	return func(_ *cobra.Command, args []string, _ string) ([]string, cobra.ShellCompDirective) {
 		if len(args) > 0 {
@@ -132,11 +132,15 @@ func completeEventSourceSlugs(state *appState) func(*cobra.Command, []string, st
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		slugs := make([]string, 0, len(sources))
+		ids := make([]string, 0, len(sources))
 		for _, s := range sources {
-			slugs = append(slugs, s.Slug)
+			if s.Name != "" {
+				ids = append(ids, s.ID+"\t"+s.Name)
+				continue
+			}
+			ids = append(ids, s.ID)
 		}
-		return slugs, cobra.ShellCompDirectiveNoFileComp
+		return ids, cobra.ShellCompDirectiveNoFileComp
 	}
 }
 

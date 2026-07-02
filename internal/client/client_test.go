@@ -1599,20 +1599,30 @@ func TestWebhookLifecycle(t *testing.T) {
 func TestEventSourceCRUD(t *testing.T) {
 	t.Parallel()
 
-	src := types.EventSource{ID: "es-1", ProjectID: "proj-1", Name: "Kafka", Slug: "kafka", Type: "kafka", Enabled: true}
+	src := types.EventSource{ID: "es-1", ProjectID: "proj-1", Name: "Kafka", Description: "events", Enabled: true, SignatureAlgorithm: "hmac-sha256"}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/event-sources":
-			respondPaginated(t, w, http.StatusOK, []types.EventSource{src})
+			respondJSON(t, w, http.StatusOK, []types.EventSource{src})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/event-sources/es-1":
 			respondJSON(t, w, http.StatusOK, src)
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/event-sources":
+			var req map[string]any
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				t.Fatalf("decode request body: %v", err)
+			}
+			if req["description"] != "events" || req["signature_algorithm"] != "hmac-sha256" {
+				t.Fatalf("unexpected request: %+v", req)
+			}
+			if _, ok := req["slug"]; ok {
+				t.Fatalf("unexpected legacy slug field: %+v", req)
+			}
 			respondJSON(t, w, http.StatusCreated, src)
 		case r.Method == http.MethodPatch && r.URL.Path == "/v1/event-sources/es-1":
-			respondJSON(t, w, http.StatusOK, src)
+			w.WriteHeader(http.StatusNoContent)
 		case r.Method == http.MethodDelete && r.URL.Path == "/v1/event-sources/es-1":
-			respondJSON(t, w, http.StatusOK, map[string]string{})
+			w.WriteHeader(http.StatusNoContent)
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -1626,7 +1636,12 @@ func TestEventSourceCRUD(t *testing.T) {
 	if _, err := c.GetEventSource(context.Background(), "es-1"); err != nil {
 		t.Fatalf("GetEventSource: %v", err)
 	}
-	if _, err := c.CreateEventSource(context.Background(), CreateEventSourceRequest{ProjectID: "proj-1", Name: "Kafka", Slug: "kafka", Type: "kafka"}); err != nil {
+	if _, err := c.CreateEventSource(context.Background(), CreateEventSourceRequest{
+		ProjectID:          "proj-1",
+		Name:               "Kafka",
+		Description:        "events",
+		SignatureAlgorithm: "hmac-sha256",
+	}); err != nil {
 		t.Fatalf("CreateEventSource: %v", err)
 	}
 	name := "Kafka2"

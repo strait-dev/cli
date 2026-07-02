@@ -249,7 +249,7 @@ func TestResolveEventSourceIdentifier_DoesNotFallbackOn500(t *testing.T) {
 		},
 		"GET /v1/event-sources": func(w http.ResponseWriter, _ *http.Request) {
 			listCalls.Add(1)
-			respondPaginated(t, w, http.StatusOK, []types.EventSource{{ID: "src-1", Slug: "github"}})
+			respondJSON(t, w, http.StatusOK, []types.EventSource{{ID: "src-1", Name: "github"}})
 		},
 	})
 

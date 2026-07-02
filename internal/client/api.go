@@ -882,7 +882,7 @@ func (c *Client) ListEventSources(ctx context.Context, projectID string) ([]type
 	query := url.Values{}
 	query.Set("project_id", projectID)
 	var out []types.EventSource
-	if err := c.doListJSON(ctx, "/v1/event-sources", query, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodGet, "/v1/event-sources", query, nil, &out); err != nil {
 		return nil, err
 	}
 	return out, nil
@@ -914,11 +914,10 @@ func (c *Client) UpdateEventSource(ctx context.Context, id string, req UpdateEve
 	if err := validatePathSegment(id); err != nil {
 		return nil, fmt.Errorf("invalid event source id: %w", err)
 	}
-	var out types.EventSource
-	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/event-sources", id), nil, req, &out); err != nil {
+	if err := c.doJSON(ctx, http.MethodPatch, path.Join("/v1/event-sources", id), nil, req, nil); err != nil {
 		return nil, err
 	}
-	return &out, nil
+	return c.GetEventSource(ctx, id)
 }
 
 // DeleteEventSource deletes an event source by ID.

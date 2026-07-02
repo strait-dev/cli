@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/strait-dev/cli/internal/client"
 	"github.com/strait-dev/cli/internal/types"
 )
 
@@ -28,10 +29,10 @@ func TestWebhooksList_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"GET /v1/webhooks": func(w http.ResponseWriter, r *http.Request) {
+		"GET /v1/webhooks/subscriptions": func(w http.ResponseWriter, r *http.Request) {
 			assertAuth(t, r, "test-key")
 			assertQuery(t, r, "project_id", "proj-test")
-			respondPaginated(t, w, http.StatusOK, []types.Webhook{testWebhookFixture()})
+			respondJSON(t, w, http.StatusOK, []types.Webhook{testWebhookFixture()})
 		},
 	})
 
@@ -96,12 +97,12 @@ func TestWebhooksCreate_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"POST /v1/webhooks": func(w http.ResponseWriter, r *http.Request) {
+		"POST /v1/webhooks/subscriptions": func(w http.ResponseWriter, r *http.Request) {
 			assertMethod(t, r, w, "POST")
 			assertAuth(t, r, "test-key")
 			var got struct {
-				URL    string   `json:"url"`
-				Events []string `json:"events"`
+				URL    string   `json:"webhook_url"`
+				Events []string `json:"event_types"`
 			}
 			readJSONBody(t, r, &got)
 			if got.URL != "https://example.com/hook" {
@@ -110,7 +111,10 @@ func TestWebhooksCreate_Success(t *testing.T) {
 			if len(got.Events) != 1 || got.Events[0] != "job.run.completed" {
 				t.Errorf("events: got %v, want [job.run.completed]", got.Events)
 			}
-			respondJSON(t, w, http.StatusCreated, testWebhookFixture())
+			respondJSON(t, w, http.StatusCreated, client.CreateWebhookResponse{
+				Subscription:  testWebhookFixture(),
+				SigningSecret: "whsec_test",
+			})
 		},
 	})
 
@@ -213,8 +217,8 @@ func TestWebhooksDelete_WithYes(t *testing.T) {
 	t.Parallel()
 
 	srv := newRouterServer(t, map[string]http.HandlerFunc{
-		"DELETE /v1/webhooks/webhook-1": func(w http.ResponseWriter, _ *http.Request) {
-			respondJSON(t, w, http.StatusOK, map[string]string{})
+		"DELETE /v1/webhooks/subscriptions/webhook-1": func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
 		},
 	})
 

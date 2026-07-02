@@ -19,7 +19,7 @@ func newEventSourcesCommand(state *appState) *cobra.Command {
 		Use:     "event-sources",
 		Aliases: []string{"event-source"},
 		Short:   "Manage external event sources",
-		Long:    idOrSlugLong("event source", "Manage external event sources."),
+		Long:    "Manage external event sources.",
 	}
 
 	getCmd := newEventSourcesGetCommand(state)
@@ -60,20 +60,20 @@ func newEventSourcesListCommand(state *appState) *cobra.Command {
 			rows := make([]map[string]any, 0, len(sources))
 			for _, s := range sources {
 				rows = append(rows, map[string]any{
-					"id":      s.ID,
-					"name":    s.Name,
-					"slug":    s.Slug,
-					"type":    s.Type,
-					"enabled": s.Enabled,
+					"id":                  s.ID,
+					"name":                s.Name,
+					"description":         s.Description,
+					"enabled":             s.Enabled,
+					"signature_algorithm": s.SignatureAlgorithm,
 				})
 			}
 			if isTTYRich(state) {
 				fmt.Fprintln(os.Stderr, styles.SectionHeader("Event Sources", len(sources)))
 				for _, s := range sources {
-					fmt.Fprintf(os.Stderr, "  %s  %-20s  type=%s  %s\n",
+					fmt.Fprintf(os.Stderr, "  %s  %-24s  signature=%s  %s\n",
 						styles.Enabled(s.Enabled),
-						styles.Bold.Render(styles.SafeText(s.Slug)),
-						styles.SafeText(s.Type),
+						styles.Bold.Render(styles.SafeText(s.Name)),
+						styles.SafeText(s.SignatureAlgorithm),
 						styles.MutedStyle.Render(styles.SafeText(s.ID)),
 					)
 				}
@@ -88,7 +88,7 @@ func newEventSourcesListCommand(state *appState) *cobra.Command {
 
 func newEventSourcesGetCommand(state *appState) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "get <event-source-id-or-slug>",
+		Use:   "get <event-source-id>",
 		Short: "Get event source details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -108,8 +108,9 @@ func newEventSourcesGetCommand(state *appState) *cobra.Command {
 				lines := []string{
 					styles.DetailLine("ID", source.ID),
 					styles.DetailLine("Name", source.Name),
-					styles.DetailLine("Slug", source.Slug),
-					styles.DetailLine("Type", source.Type),
+					styles.DetailLine("Description", source.Description),
+					styles.DetailLine("Signature", source.SignatureAlgorithm),
+					styles.DetailLine("Signature Header", source.SignatureHeader),
 					styles.DetailLine("Enabled", styles.Enabled(source.Enabled)),
 				}
 				fmt.Fprint(os.Stderr, styles.DetailBox("Event Source", lines))
@@ -124,9 +125,12 @@ func newEventSourcesGetCommand(state *appState) *cobra.Command {
 func newEventSourcesCreateCommand(state *appState) *cobra.Command {
 	var projectID string
 	var name string
-	var slug string
-	var sourceType string
+	var description string
 	var configJSON string
+	var schemaJSON string
+	var signatureHeader string
+	var signatureAlgorithm string
+	var signatureSecret string
 	var enabled bool
 
 	cmd := &cobra.Command{
@@ -141,23 +145,23 @@ func newEventSourcesCreateCommand(state *appState) *cobra.Command {
 			if strings.TrimSpace(name) == "" {
 				return fmt.Errorf("--name is required")
 			}
-			if strings.TrimSpace(slug) == "" {
-				return fmt.Errorf("--slug is required")
-			}
-			if strings.TrimSpace(sourceType) == "" {
-				return fmt.Errorf("--type is required")
-			}
 			req := client.CreateEventSourceRequest{
-				ProjectID: projectID,
-				Name:      name,
-				Slug:      slug,
-				Type:      sourceType,
+				ProjectID:          projectID,
+				Name:               name,
+				Description:        description,
+				SignatureHeader:    signatureHeader,
+				SignatureAlgorithm: signatureAlgorithm,
+				SignatureSecret:    signatureSecret,
 			}
-			if strings.TrimSpace(configJSON) != "" {
-				if !json.Valid([]byte(configJSON)) {
-					return fmt.Errorf("--config-json must be valid JSON")
+			rawSchema := strings.TrimSpace(schemaJSON)
+			if rawSchema == "" {
+				rawSchema = strings.TrimSpace(configJSON)
+			}
+			if rawSchema != "" {
+				if !json.Valid([]byte(rawSchema)) {
+					return fmt.Errorf("--schema-json must be valid JSON")
 				}
-				req.Config = json.RawMessage(configJSON)
+				req.Schema = json.RawMessage(rawSchema)
 			}
 			if cmd.Flags().Changed("enabled") {
 				req.Enabled = &enabled
@@ -171,7 +175,7 @@ func newEventSourcesCreateCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Created event source "+styles.Bold.Render(styles.SafeText(source.Slug))))
+				fmt.Fprintln(os.Stderr, styles.Success("Created event source "+styles.Bold.Render(styles.SafeText(source.ID))))
 				return nil
 			}
 			return printData(state, source)
@@ -180,9 +184,12 @@ func newEventSourcesCreateCommand(state *appState) *cobra.Command {
 
 	cmd.Flags().StringVar(&projectID, "project", "", "project ID")
 	cmd.Flags().StringVar(&name, "name", "", "event source name")
-	cmd.Flags().StringVar(&slug, "slug", "", "event source slug")
-	cmd.Flags().StringVar(&sourceType, "type", "", "event source type (kafka, pubsub, sqs, etc.)")
-	cmd.Flags().StringVar(&configJSON, "config-json", "", "JSON-encoded source configuration")
+	cmd.Flags().StringVar(&description, "description", "", "event source description")
+	cmd.Flags().StringVar(&schemaJSON, "schema-json", "", "JSON-encoded event payload schema")
+	cmd.Flags().StringVar(&configJSON, "config-json", "", "deprecated alias for --schema-json")
+	cmd.Flags().StringVar(&signatureHeader, "signature-header", "", "header containing the event signature")
+	cmd.Flags().StringVar(&signatureAlgorithm, "signature-algorithm", "", "signature algorithm (hmac-sha256, stripe-v1, github-sha256)")
+	cmd.Flags().StringVar(&signatureSecret, "signature-secret", "", "secret used to verify event signatures")
 	cmd.Flags().BoolVar(&enabled, "enabled", true, "whether the source is enabled")
 
 	return cmd
@@ -190,12 +197,16 @@ func newEventSourcesCreateCommand(state *appState) *cobra.Command {
 
 func newEventSourcesUpdateCommand(state *appState) *cobra.Command {
 	var name string
-	var slug string
+	var description string
 	var configJSON string
+	var schemaJSON string
+	var signatureHeader string
+	var signatureAlgorithm string
+	var signatureSecret string
 	var enabled bool
 
 	cmd := &cobra.Command{
-		Use:   "update <event-source-id-or-slug>",
+		Use:   "update <event-source-id>",
 		Short: "Update an event source",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -203,20 +214,34 @@ func newEventSourcesUpdateCommand(state *appState) *cobra.Command {
 			if cmd.Flags().Changed("name") {
 				req.Name = &name
 			}
-			if cmd.Flags().Changed("slug") {
-				req.Slug = &slug
+			if cmd.Flags().Changed("description") {
+				req.Description = &description
 			}
-			if cmd.Flags().Changed("config-json") {
-				if strings.TrimSpace(configJSON) != "" && !json.Valid([]byte(configJSON)) {
-					return fmt.Errorf("--config-json must be valid JSON")
+			rawSchema := strings.TrimSpace(schemaJSON)
+			if rawSchema == "" {
+				rawSchema = strings.TrimSpace(configJSON)
+			}
+			if cmd.Flags().Changed("schema-json") || cmd.Flags().Changed("config-json") {
+				if rawSchema != "" && !json.Valid([]byte(rawSchema)) {
+					return fmt.Errorf("--schema-json must be valid JSON")
 				}
-				raw := json.RawMessage(configJSON)
-				req.Config = &raw
+				raw := json.RawMessage(rawSchema)
+				req.Schema = &raw
+			}
+			if cmd.Flags().Changed("signature-header") {
+				req.SignatureHeader = &signatureHeader
+			}
+			if cmd.Flags().Changed("signature-algorithm") {
+				req.SignatureAlgorithm = &signatureAlgorithm
+			}
+			if cmd.Flags().Changed("signature-secret") {
+				req.SignatureSecret = &signatureSecret
 			}
 			if cmd.Flags().Changed("enabled") {
 				req.Enabled = &enabled
 			}
-			if req.Name == nil && req.Slug == nil && req.Config == nil && req.Enabled == nil {
+			if req.Name == nil && req.Description == nil && req.Schema == nil && req.Enabled == nil &&
+				req.SignatureHeader == nil && req.SignatureAlgorithm == nil && req.SignatureSecret == nil {
 				return fmt.Errorf("at least one update flag is required")
 			}
 			cli, err := newAPIClient(state)
@@ -232,7 +257,7 @@ func newEventSourcesUpdateCommand(state *appState) *cobra.Command {
 				return err
 			}
 			if isTTYRich(state) {
-				fmt.Fprintln(os.Stderr, styles.Success("Updated event source "+styles.Bold.Render(styles.SafeText(source.Slug))))
+				fmt.Fprintln(os.Stderr, styles.Success("Updated event source "+styles.Bold.Render(styles.SafeText(source.ID))))
 				return nil
 			}
 			return printData(state, source)
@@ -240,8 +265,12 @@ func newEventSourcesUpdateCommand(state *appState) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&name, "name", "", "event source name")
-	cmd.Flags().StringVar(&slug, "slug", "", "event source slug")
-	cmd.Flags().StringVar(&configJSON, "config-json", "", "JSON-encoded source configuration")
+	cmd.Flags().StringVar(&description, "description", "", "event source description")
+	cmd.Flags().StringVar(&schemaJSON, "schema-json", "", "JSON-encoded event payload schema")
+	cmd.Flags().StringVar(&configJSON, "config-json", "", "deprecated alias for --schema-json")
+	cmd.Flags().StringVar(&signatureHeader, "signature-header", "", "header containing the event signature")
+	cmd.Flags().StringVar(&signatureAlgorithm, "signature-algorithm", "", "signature algorithm (hmac-sha256, stripe-v1, github-sha256)")
+	cmd.Flags().StringVar(&signatureSecret, "signature-secret", "", "secret used to verify event signatures")
 	cmd.Flags().BoolVar(&enabled, "enabled", true, "whether the source is enabled")
 
 	return cmd
@@ -250,7 +279,7 @@ func newEventSourcesUpdateCommand(state *appState) *cobra.Command {
 func newEventSourcesDeleteCommand(state *appState) *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
-		Use:   "delete <event-source-id-or-slug>",
+		Use:   "delete <event-source-id>",
 		Short: "Delete an event source",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -279,32 +308,32 @@ func newEventSourcesDeleteCommand(state *appState) *cobra.Command {
 	return cmd
 }
 
-func resolveEventSourceIdentifier(ctx context.Context, cli *client.Client, state *appState, idOrSlug string) (string, error) {
-	if err := validate.SlugOrID(idOrSlug); err != nil {
+func resolveEventSourceIdentifier(ctx context.Context, cli *client.Client, state *appState, idOrName string) (string, error) {
+	if err := validate.SlugOrID(idOrName); err != nil {
 		return "", fmt.Errorf("invalid event source identifier: %w", err)
 	}
-	if validate.IsUUID(idOrSlug) {
-		return idOrSlug, nil
+	if validate.IsUUID(idOrName) {
+		return idOrName, nil
 	}
-	_, err := cli.GetEventSource(ctx, idOrSlug)
+	_, err := cli.GetEventSource(ctx, idOrName)
 	if err == nil {
-		return idOrSlug, nil
+		return idOrName, nil
 	}
 	if !client.IsNotFound(err) {
-		return "", fmt.Errorf("resolving event source %q: %w", idOrSlug, err)
+		return "", fmt.Errorf("resolving event source %q: %w", idOrName, err)
 	}
 	projectID, perr := requireProjectID(state, "")
 	if perr != nil {
-		return "", fmt.Errorf("project is required to resolve slug %q", idOrSlug)
+		return "", fmt.Errorf("project is required to resolve event source %q", idOrName)
 	}
 	sources, lerr := cli.ListEventSources(ctx, projectID)
 	if lerr != nil {
-		return "", fmt.Errorf("resolving event source %q: %w", idOrSlug, lerr)
+		return "", fmt.Errorf("resolving event source %q: %w", idOrName, lerr)
 	}
 	for _, s := range sources {
-		if s.Slug == idOrSlug {
+		if s.Name == idOrName {
 			return s.ID, nil
 		}
 	}
-	return "", fmt.Errorf("event source %q not found", idOrSlug)
+	return "", fmt.Errorf("event source %q not found", idOrName)
 }

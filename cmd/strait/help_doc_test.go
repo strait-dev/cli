@@ -24,7 +24,6 @@ func TestResourceGroupsDocumentIdOrSlug(t *testing.T) {
 		"jobs",
 		"workflows",
 		"environments",
-		"event-sources",
 		"job-groups",
 	}
 
