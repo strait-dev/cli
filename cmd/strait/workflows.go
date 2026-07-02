@@ -479,12 +479,12 @@ func newWorkflowsTriggerCommand(state *appState) *cobra.Command {
 				return err
 			}
 
-			workflowID, err := resolveWorkflowIdentifier(cmd.Context(), cli, state, args[0])
+			projectID, err = requireProjectID(state, projectID)
 			if err != nil {
 				return err
 			}
 
-			projectID, err = requireProjectID(state, projectID)
+			workflowID, err := resolveWorkflowIdentifierWithProject(cmd.Context(), cli, state, args[0], projectID)
 			if err != nil {
 				return err
 			}
@@ -523,6 +523,10 @@ func newWorkflowsTriggerCommand(state *appState) *cobra.Command {
 }
 
 func resolveWorkflowIdentifier(ctx context.Context, cli *client.Client, state *appState, idOrSlug string) (string, error) {
+	return resolveWorkflowIdentifierWithProject(ctx, cli, state, idOrSlug, "")
+}
+
+func resolveWorkflowIdentifierWithProject(ctx context.Context, cli *client.Client, state *appState, idOrSlug, projectOverride string) (string, error) {
 	if err := validate.SlugOrID(idOrSlug); err != nil {
 		return "", fmt.Errorf("invalid workflow identifier: %w", err)
 	}
@@ -537,7 +541,7 @@ func resolveWorkflowIdentifier(ctx context.Context, cli *client.Client, state *a
 		return "", fmt.Errorf("resolving workflow %q: %w", idOrSlug, err)
 	}
 
-	projectID, perr := requireProjectID(state, "")
+	projectID, perr := requireProjectID(state, projectOverride)
 	if perr != nil {
 		return "", fmt.Errorf("project is required to resolve slug %q", idOrSlug)
 	}

@@ -285,6 +285,54 @@ func TestWorkflowsTrigger_Success(t *testing.T) {
 	}
 }
 
+func TestWorkflowsTrigger_SlugUsesProjectFlag(t *testing.T) {
+	t.Parallel()
+
+	srv := newRouterServer(t, map[string]http.HandlerFunc{
+		"GET /v1/workflows/nightly": func(w http.ResponseWriter, _ *http.Request) {
+			http.NotFound(w, nil)
+		},
+		"GET /v1/workflows": func(w http.ResponseWriter, r *http.Request) {
+			if got := r.URL.Query().Get("project_id"); got != "proj-test" {
+				t.Fatalf("project_id query = %q, want proj-test", got)
+			}
+			respondPaginated(t, w, http.StatusOK, []types.Workflow{{
+				ID:        "wf-1",
+				ProjectID: "proj-test",
+				Name:      "Nightly",
+				Slug:      "nightly",
+				Enabled:   true,
+			}})
+		},
+		"POST /v1/workflows/wf-1/trigger": func(w http.ResponseWriter, r *http.Request) {
+			assertAuth(t, r, "test-key")
+			respondJSON(t, w, http.StatusOK, types.WorkflowRun{
+				ID:          "wfr-1",
+				WorkflowID:  "wf-1",
+				ProjectID:   "proj-test",
+				Status:      types.WfStatusPending,
+				TriggeredBy: "api",
+				CreatedAt:   time.Date(2026, 3, 20, 10, 0, 0, 0, time.UTC),
+			})
+		},
+	})
+
+	state := newTestState(t, srv)
+	state.opts.projectID = ""
+	cmd := newWorkflowsTriggerCommand(state)
+	cmd.SetArgs([]string{"nightly", "--project", "proj-test"})
+
+	out := captureStateOutput(t, state, func() {
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if !strings.Contains(out, "wfr-1") {
+		t.Fatalf("expected wfr-1 in output, got: %s", out)
+	}
+}
+
 func TestWorkflowsVisualizeCommand(t *testing.T) {
 	t.Parallel()
 
