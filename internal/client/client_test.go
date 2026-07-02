@@ -1479,7 +1479,9 @@ func TestEnvironmentCRUD(t *testing.T) {
 		case r.Method == http.MethodDelete && r.URL.Path == "/v1/environments/env-1":
 			respondJSON(t, w, http.StatusOK, map[string]string{})
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/environments/env-1/variables":
-			respondJSON(t, w, http.StatusOK, map[string]string{"FOO": "bar"})
+			respondJSON(t, w, http.StatusOK, EnvironmentVariablesResponse{
+				Variables: map[string]string{"FOO": "bar"},
+			})
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}

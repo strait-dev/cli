@@ -776,11 +776,11 @@ func (c *Client) ListEnvironmentVariables(ctx context.Context, id string) (map[s
 	if err := validatePathSegment(id); err != nil {
 		return nil, fmt.Errorf("invalid environment id: %w", err)
 	}
-	var out map[string]string
+	var out EnvironmentVariablesResponse
 	if err := c.doJSON(ctx, http.MethodGet, path.Join("/v1/environments", id, "variables"), nil, nil, &out); err != nil {
 		return nil, err
 	}
-	return out, nil
+	return out.Variables, nil
 }
 
 // ListWebhooks returns webhook subscriptions for a project.

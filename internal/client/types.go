@@ -386,6 +386,11 @@ type UpdateEnvironmentRequest struct {
 	Variables *map[string]string `json:"variables,omitempty"`
 }
 
+// EnvironmentVariablesResponse is returned by GET /v1/environments/{id}/variables.
+type EnvironmentVariablesResponse struct {
+	Variables map[string]string `json:"variables"`
+}
+
 // CreateWebhookRequest is the request body for creating a webhook subscription.
 type CreateWebhookRequest struct {
 	ProjectID  string   `json:"project_id"`
