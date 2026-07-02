@@ -77,6 +77,7 @@ type BulkTriggerResult struct {
 
 // BulkTriggerResponse is the response from bulk triggering a job.
 type BulkTriggerResponse struct {
+	BatchID string              `json:"batch_id,omitempty"`
 	Results []BulkTriggerResult `json:"results"`
 	Total   int                 `json:"total"`
 	Created int                 `json:"created"`

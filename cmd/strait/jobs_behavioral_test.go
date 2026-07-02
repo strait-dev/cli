@@ -338,9 +338,10 @@ func TestJobsTriggerBulk_Success(t *testing.T) {
 		},
 		"POST /v1/jobs/job-1/trigger/bulk": func(w http.ResponseWriter, _ *http.Request) {
 			respondJSON(t, w, http.StatusOK, map[string]any{
-				"results": []map[string]any{{"id": "run-1", "status": "queued"}},
-				"total":   1,
-				"created": 1,
+				"batch_id": "batch-1",
+				"results":  []map[string]any{{"id": "run-1", "status": "queued"}},
+				"total":    1,
+				"created":  1,
 			})
 		},
 	})
@@ -358,6 +359,9 @@ func TestJobsTriggerBulk_Success(t *testing.T) {
 
 	if !strings.Contains(out, "run-1") {
 		t.Fatalf("expected run-1 in output, got: %s", out)
+	}
+	if !strings.Contains(out, "batch-1") {
+		t.Fatalf("expected batch-1 in output, got: %s", out)
 	}
 }
 

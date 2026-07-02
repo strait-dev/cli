@@ -620,6 +620,7 @@ func TestBulkTriggerJob(t *testing.T) {
 		}
 
 		respondJSON(t, w, http.StatusOK, BulkTriggerResponse{
+			BatchID: "batch-1",
 			Results: []BulkTriggerResult{{ID: "run-1", Status: "queued"}},
 			Total:   1,
 			Created: 1,
@@ -632,7 +633,7 @@ func TestBulkTriggerJob(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BulkTriggerJob: %v", err)
 	}
-	if got.Created != 1 || len(got.Results) != 1 {
+	if got.BatchID != "batch-1" || got.Created != 1 || len(got.Results) != 1 {
 		t.Fatalf("unexpected response: %+v", got)
 	}
 }
